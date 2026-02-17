@@ -56,8 +56,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
     if (picked != null) {
       setState(() {
-        _dobController.text =
-            '${picked.day}/${picked.month}/${picked.year}';
+        _dobController.text = '${picked.day}/${picked.month}/${picked.year}';
       });
     }
   }
@@ -257,9 +256,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                     ),
                   ],
-                )
-                    .animate()
-                    .fadeIn(
+                ).animate().fadeIn(
                       delay: const Duration(milliseconds: 900),
                       duration: const Duration(
                           milliseconds: AnimationConstants.normal),
@@ -356,9 +353,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                     ],
                   ),
-                )
-                    .animate()
-                    .fadeIn(
+                ).animate().fadeIn(
                       delay: const Duration(milliseconds: 1100),
                       duration: const Duration(
                           milliseconds: AnimationConstants.normal),
@@ -475,15 +470,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
           .animate()
           .fadeIn(
             delay: Duration(milliseconds: delay),
-            duration:
-                const Duration(milliseconds: AnimationConstants.normal),
+            duration: const Duration(milliseconds: AnimationConstants.normal),
             curve: AnimationConstants.cubicEaseOut,
           )
           .slideX(
             begin: 0.1,
             delay: Duration(milliseconds: delay),
-            duration:
-                const Duration(milliseconds: AnimationConstants.normal),
+            duration: const Duration(milliseconds: AnimationConstants.normal),
             curve: AnimationConstants.cubicEaseOut,
           ),
     );

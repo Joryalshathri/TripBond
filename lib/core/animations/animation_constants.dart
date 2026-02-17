@@ -18,7 +18,7 @@ class AnimationConstants {
   static const smoothEaseOut = Curves.easeOut;
   static const smoothEaseIn = Curves.easeIn;
   static const spring = Curves.elasticOut;
-  
+
   // Offsets for slide animations
   static const slideUpOffset = Offset(0, 0.1);
   static const slideDownOffset = Offset(0, -0.1);

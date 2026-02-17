@@ -21,13 +21,14 @@ class _SplashScreenState extends State<SplashScreen> {
   Future<void> _checkFirstTime() async {
     // Simulate splash screen delay
     await Future.delayed(const Duration(seconds: 2));
-    
+
     // Check if onboarding has been completed
     final prefs = await SharedPreferences.getInstance();
-    final hasCompletedOnboarding = prefs.getBool('onboarding_complete') ?? false;
-    
+    final hasCompletedOnboarding =
+        prefs.getBool('onboarding_complete') ?? false;
+
     if (!mounted) return;
-    
+
     // Navigate to appropriate screen
     if (hasCompletedOnboarding) {
       Navigator.of(context).pushReplacement(

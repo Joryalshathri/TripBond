@@ -190,14 +190,19 @@ class _NewPasswordScreenState extends State<NewPasswordScreen> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                           elevation: 0,
-                          disabledBackgroundColor: const Color(0xFF4675B8).withOpacity(0.6),
+                          disabledBackgroundColor:
+                              const Color(0xFF4675B8).withOpacity(0.6),
                         ),
                         child: _isLoading
                             ? const CustomLoadingSpinner(
                                 fontSize: 14,
                                 dotSize: 8,
                                 textColor: Colors.white,
-                                dotColors: [Colors.white, Colors.white70, Colors.white54],
+                                dotColors: [
+                                  Colors.white,
+                                  Colors.white70,
+                                  Colors.white54
+                                ],
                               )
                             : Row(
                                 mainAxisAlignment: MainAxisAlignment.center,

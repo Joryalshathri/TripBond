@@ -46,7 +46,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
     setState(() {
       _remainingSeconds = 60;
     });
-    
+
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_remainingSeconds > 0) {
         setState(() {
@@ -98,7 +98,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
 
     // TODO: Implement actual resend verification code API call
     _startCountdown();
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
@@ -119,11 +119,16 @@ class _VerificationScreenState extends State<VerificationScreen> {
   List<TextSpan> _buildEmailText(String email) {
     final parts = email.split('@');
     if (parts.length != 2) {
-      return [TextSpan(text: 'Please enter the 6-digit code sent to your email $email for verification.')];
+      return [
+        TextSpan(
+            text:
+                'Please enter the 6-digit code sent to your email $email for verification.')
+      ];
     }
 
     return [
-      const TextSpan(text: 'Please enter the 6-digit code sent to\nyour email '),
+      const TextSpan(
+          text: 'Please enter the 6-digit code sent to\nyour email '),
       TextSpan(
         text: parts[0],
         style: GoogleFonts.mulish(color: Colors.black54),
@@ -270,14 +275,19 @@ class _VerificationScreenState extends State<VerificationScreen> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                           elevation: 0,
-                          disabledBackgroundColor: const Color(0xFF4675B8).withOpacity(0.6),
+                          disabledBackgroundColor:
+                              const Color(0xFF4675B8).withOpacity(0.6),
                         ),
                         child: _isLoading
                             ? const CustomLoadingSpinner(
                                 fontSize: 14,
                                 dotSize: 8,
                                 textColor: Colors.white,
-                                dotColors: [Colors.white, Colors.white70, Colors.white54],
+                                dotColors: [
+                                  Colors.white,
+                                  Colors.white70,
+                                  Colors.white54
+                                ],
                               )
                             : Text(
                                 'Verify',
@@ -324,8 +334,12 @@ class _VerificationScreenState extends State<VerificationScreen> {
                                 : 'You can request a new code now',
                             style: GoogleFonts.mulish(
                               fontSize: 12,
-                              color: _remainingSeconds > 0 ? Colors.black38 : const Color(0xFF4675B8),
-                              fontWeight: _remainingSeconds > 0 ? FontWeight.normal : FontWeight.w600,
+                              color: _remainingSeconds > 0
+                                  ? Colors.black38
+                                  : const Color(0xFF4675B8),
+                              fontWeight: _remainingSeconds > 0
+                                  ? FontWeight.normal
+                                  : FontWeight.w600,
                             ),
                           ),
                         ],

@@ -209,20 +209,17 @@ class HomeScreen extends StatelessWidget {
     )
         .animate()
         .fadeIn(
-          duration:
-              const Duration(milliseconds: AnimationConstants.normal),
+          duration: const Duration(milliseconds: AnimationConstants.normal),
           curve: AnimationConstants.cubicEaseOut,
         )
         .slideX(
           begin: 0.1,
-          duration:
-              const Duration(milliseconds: AnimationConstants.normal),
+          duration: const Duration(milliseconds: AnimationConstants.normal),
           curve: AnimationConstants.cubicEaseOut,
         )
         .scale(
           begin: const Offset(0.9, 0.9),
-          duration:
-              const Duration(milliseconds: AnimationConstants.normal),
+          duration: const Duration(milliseconds: AnimationConstants.normal),
           curve: AnimationConstants.cubicEaseOut,
         );
   }
@@ -246,14 +243,12 @@ class HomeScreen extends StatelessWidget {
     )
         .animate()
         .fadeIn(
-          duration:
-              const Duration(milliseconds: AnimationConstants.normal),
+          duration: const Duration(milliseconds: AnimationConstants.normal),
           curve: AnimationConstants.cubicEaseOut,
         )
         .slideX(
           begin: -0.1,
-          duration:
-              const Duration(milliseconds: AnimationConstants.normal),
+          duration: const Duration(milliseconds: AnimationConstants.normal),
           curve: AnimationConstants.cubicEaseOut,
         );
   }

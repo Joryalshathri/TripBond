@@ -65,7 +65,7 @@ class _CustomLoadingSpinnerState extends State<CustomLoadingSpinner>
                 // Calculate animation delay for each dot
                 final delay = index * 0.2;
                 final value = (_controller.value - delay) % 1.0;
-                
+
                 // Scale animation: starts small, grows, then shrinks
                 double scale;
                 if (value < 0.5) {
@@ -73,7 +73,7 @@ class _CustomLoadingSpinnerState extends State<CustomLoadingSpinner>
                 } else {
                   scale = 1.0 - ((value - 0.5) * 0.8); // Scale from 1.0 to 0.6
                 }
-                
+
                 // Opacity animation for smooth effect
                 double opacity;
                 if (value < 0.5) {
