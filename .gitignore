@@ -1,0 +1,39 @@
+# Flutter/Dart Build Outputs
+build/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+
+# Android Build Outputs
+android/app/build/
+android/.gradle/
+*.iml
+local.properties
+
+# iOS Build Outputs
+ios/Flutter/flutter_export_environment.sh
+ios/Pods/
+ios/.symlinks/
+
+# Python AI Backend
+tripbond_ai_backend/__pycache__/
+tripbond_ai_backend/**/__pycache__/
+*.pyc
+tripbond_ai_backend/cache/
+tripbond_ai_backend/.env
+
+# Machine Learning Models (optional - uncomment if models are large)
+# tripbond_ai_backend/models/*.pkl
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
