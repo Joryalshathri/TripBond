@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .config import get_settings
-from .routers import auth
+from .routers import auth, personality, preferences, profile, settings, adventures
 
 settings = get_settings()
 
@@ -23,6 +23,11 @@ app.add_middleware(
 
 # Include routers
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
+app.include_router(personality.router, prefix="/api/personality", tags=["Personality Quiz"])
+app.include_router(preferences.router, prefix="/api/preferences", tags=["Travel Preferences"])
+app.include_router(profile.router, prefix="/api/profile", tags=["User Profile"])
+app.include_router(settings.router, prefix="/api/settings", tags=["Settings"])
+app.include_router(adventures.router, prefix="/api/adventures", tags=["Trips & Adventures"])
 
 
 @app.get("/")
