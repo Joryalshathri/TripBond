@@ -14,7 +14,7 @@ class SignUpRequest(BaseModel):
     full_name: Optional[str] = None
     date_of_birth: Optional[date] = None
     phone_number: Optional[str] = None
-    gender: Optional[str] = None  # 'male', 'female', 'other'
+    gender: Optional[str] = None  # 'male', 'female'
     # Personality traits (Big Five)
     openness: Optional[float] = None
     conscientiousness: Optional[float] = None
