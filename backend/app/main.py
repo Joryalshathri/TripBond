@@ -3,13 +3,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from .config import get_settings
 from .routers import auth, personality, preferences, profile, settings, adventures
 
-settings = get_settings()
+config = get_settings()
 
 app = FastAPI(
     title="TripBond API",
     description="AI-based Group Travel Recommender System Backend",
     version="1.0.0",
-    debug=settings.debug
+    debug=config.debug
 )
 
 # CORS middleware

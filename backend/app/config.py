@@ -10,6 +10,15 @@ class Settings(BaseSettings):
     supabase_key: str
     supabase_anon_key: str
     
+    # JWT Authentication
+    secret_key: str
+    algorithm: str = "HS256"
+    access_token_expire_minutes: int = 30
+    
+    # ML Model
+    model_path: str
+    recommendation_top_k: int = 5
+    
     # API
     api_host: str = "0.0.0.0"
     api_port: int = 8000
