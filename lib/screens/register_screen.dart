@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'login_screen.dart';
-import '../main.dart';
 import 'widgets/custom_loading_spinner.dart';
 import '../core/animations/page_transitions.dart';
 import '../core/animations/animation_constants.dart';

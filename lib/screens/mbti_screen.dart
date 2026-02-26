@@ -206,7 +206,7 @@ class _MbtiScreenState extends State<MbtiScreen> {
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               Text(
-                '${_currentScreen}/${_questions.length - 1}',
+                '$_currentScreen/${_questions.length - 1}',
                 style: AppTextStyles.label,
               ),
             ],

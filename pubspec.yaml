@@ -42,6 +42,11 @@ dependencies:
   flutter_animate: ^4.5.0
   animations: ^2.0.11
 
+  google_fonts: ^6.0.0
+  table_calendar: ^3.0.9
+  image_picker: ^1.0.0
+
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -69,7 +74,8 @@ flutter:
     - assets/images/
     - assets/images/icons/
     - assets/animations/
-
+    - assets/figmaAssests/ 
+    
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
 

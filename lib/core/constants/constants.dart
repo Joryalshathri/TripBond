@@ -1,6 +1,6 @@
 /// Central export file for all constants
 /// Import this file to access all app constants
-library constants;
+library;
 
 export 'app_colors.dart';
 export 'app_text_styles.dart';
