@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import '../core/animations/animation_constants.dart';
 
 class PlanItem {
   final String name;
@@ -43,14 +45,14 @@ const List<Color> _avatarColors = [
   Color(0xFFE87C5D),
 ];
 
-class Planslist extends StatefulWidget {
-  const Planslist({super.key});
+class PlansList extends StatefulWidget {
+  const PlansList({super.key});
 
   @override
-  State<Planslist> createState() => _PlanslistState();
+  State<PlansList> createState() => _PlansListState();
 }
 
-class _PlanslistState extends State<Planslist> {
+class _PlansListState extends State<PlansList> {
   bool _currentOpen = true;
   bool _futureOpen = true;
 
@@ -74,7 +76,7 @@ class _PlanslistState extends State<Planslist> {
                         const SizedBox(height: 8),
                         _buildSection('Current Plans', _currentOpen, () {
                           setState(() => _currentOpen = !_currentOpen);
-                        }, _currentPlans, navigateOnTap: true),
+                        }, _currentPlans),
                         const SizedBox(height: 16),
                         _buildSection('Future Plans', _futureOpen, () {
                           setState(() => _futureOpen = !_futureOpen);
@@ -96,30 +98,42 @@ class _PlanslistState extends State<Planslist> {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 50, 20, 12),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: const Icon(Icons.arrow_back,
+                size: 24, color: Color(0xFF1E1E1E)),
+          ),
           const Spacer(),
           const Text(
             "Sara's Plans",
             style: TextStyle(
-              fontFamily: 'Architects Daughter',
+              fontFamily: 'Poppins',
               fontWeight: FontWeight.w700,
               fontSize: 24,
               color: Colors.black,
-              fontStyle: FontStyle.italic,
             ),
           ),
           const Spacer(),
-          GestureDetector(
-            onTap: () {},
-            child: const Icon(Icons.menu, size: 22, color: Color(0xFF1E1E1E)),
-          ),
+          const SizedBox(width: 24),
         ],
       ),
-    );
+    )
+        .animate()
+        .fadeIn(
+          duration: Duration(milliseconds: AnimationConstants.normal),
+          curve: AnimationConstants.cubicEaseOut,
+        )
+        .slideY(
+          begin: -0.1,
+          end: 0,
+          duration: Duration(milliseconds: AnimationConstants.normal),
+          curve: AnimationConstants.cubicEaseOut,
+        );
   }
 
-  Widget _buildSection(String title, bool isOpen, VoidCallback onToggle, List<PlanItem> plans, {bool navigateOnTap = false}) {
+  Widget _buildSection(
+      String title, bool isOpen, VoidCallback onToggle, List<PlanItem> plans) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -146,107 +160,102 @@ class _PlanslistState extends State<Planslist> {
           ),
         ),
         const SizedBox(height: 12),
-        if (isOpen)
-          ...plans.map((plan) => _buildPlanCard(plan, navigateOnTap: navigateOnTap)),
+        if (isOpen) ...plans.map((plan) => _buildPlanCard(plan)),
       ],
     );
   }
 
-  Widget _buildPlanCard(PlanItem plan, {bool navigateOnTap = false}) {
-    return GestureDetector(
-      onTap: navigateOnTap
-          ? () => Navigator.push(context, MaterialPageRoute(builder: (_) => const Planslist()))
-          : null,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border.all(color: Colors.grey.shade200),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Row(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: Image.asset(
-                plan.image,
+  Widget _buildPlanCard(PlanItem plan) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: Colors.grey.shade200),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Image.asset(
+              plan.image,
+              width: 90,
+              height: 90,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Container(
                 width: 90,
                 height: 90,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
-                  width: 90,
-                  height: 90,
-                  color: Colors.grey.shade300,
-                  child: const Icon(Icons.image, color: Colors.grey),
-                ),
+                color: Colors.grey.shade300,
+                child: const Icon(Icons.image, color: Colors.grey),
               ),
             ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    plan.name,
-                    style: const TextStyle(
-                      fontFamily: 'Poppins',
-                      fontWeight: FontWeight.w700,
-                      fontSize: 16,
-                      color: Colors.black,
-                    ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  plan.name,
+                  style: const TextStyle(
+                    fontFamily: 'Poppins',
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                    color: Colors.black,
                   ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      const Icon(Icons.calendar_today, size: 14, color: Color(0xFF666666)),
-                      const SizedBox(width: 6),
-                      Text(
-                        plan.dateRange,
-                        style: TextStyle(
-                          fontFamily: 'Poppins',
-                          fontSize: 13,
-                          color: Colors.grey.shade500,
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (plan.avatarInitials.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    SizedBox(
-                      height: 24,
-                      child: Stack(
-                        children: List.generate(plan.avatarInitials.length, (i) {
-                          return Positioned(
-                            left: i * 18.0,
-                            child: Container(
-                              width: 24,
-                              height: 24,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: _avatarColors[i % _avatarColors.length],
-                                border: Border.all(color: Colors.white, width: 2),
-                              ),
-                              alignment: Alignment.center,
-                              child: Text(
-                                plan.avatarInitials[i],
-                                style: const TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
-                          );
-                        }),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    const Icon(Icons.calendar_today,
+                        size: 14, color: Color(0xFF666666)),
+                    const SizedBox(width: 6),
+                    Text(
+                      plan.dateRange,
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 13,
+                        color: Colors.grey.shade500,
                       ),
                     ),
                   ],
+                ),
+                if (plan.avatarInitials.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    height: 24,
+                    child: Stack(
+                      children: List.generate(plan.avatarInitials.length, (i) {
+                        return Positioned(
+                          left: i * 18.0,
+                          child: Container(
+                            width: 24,
+                            height: 24,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: _avatarColors[i % _avatarColors.length],
+                              border: Border.all(color: Colors.white, width: 2),
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              plan.avatarInitials[i],
+                              style: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        );
+                      }),
+                    ),
+                  ),
                 ],
-              ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

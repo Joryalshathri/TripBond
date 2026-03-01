@@ -27,6 +27,8 @@ class _VerificationScreenState extends State<VerificationScreen> {
   void initState() {
     super.initState();
     _startCountdown();
+    // Add listener to first field for paste support
+    _focusNodes[0].requestFocus();
   }
 
   @override
@@ -250,9 +252,23 @@ class _VerificationScreenState extends State<VerificationScreen> {
                               ),
                             ),
                             onChanged: (value) {
-                              if (value.isNotEmpty && index < 5) {
+                              // Handle paste - check if multiple digits
+                              if (value.length > 1) {
+                                // Extract digits and distribute across fields
+                                final digits = value.split('');
+                                for (int i = 0;
+                                    i < digits.length && (index + i) < 6;
+                                    i++) {
+                                  _controllers[index + i].text = digits[i];
+                                  if (index + i < 5) {
+                                    _focusNodes[index + i + 1].requestFocus();
+                                  }
+                                }
+                              } else if (value.isNotEmpty && index < 5) {
+                                // Single digit - move to next field
                                 _focusNodes[index + 1].requestFocus();
                               } else if (value.isEmpty && index > 0) {
+                                // Backspace - move to previous field
                                 _focusNodes[index - 1].requestFocus();
                               }
                             },

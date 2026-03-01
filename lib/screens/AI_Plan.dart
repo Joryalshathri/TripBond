@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
-import 'CalendarView.dart';
+import 'DestinationLandingPage.dart';
+import 'Bonder.dart';
+import 'profile.dart';
+import 'close_spots.dart';
+import 'group_suggested_itinerary.dart';
+import 'plans_list.dart';
 
 class Place {
   final String name;
@@ -19,26 +24,62 @@ final List<Map<String, dynamic>> itinerary = [
   {
     'day': 1,
     'places': [
-      const Place(name: 'Ithra', image: 'assets/images/Ithra.png', rating: 4.8, location: 'Dhahran'),
-      const Place(name: 'City Walk', image: 'assets/images/CityWalk.png', rating: 4.8, location: 'Olaya'),
-      const Place(name: 'Salt', image: 'assets/images/Salt.jpg', rating: 4.6, location: 'Olaya'),
+      const Place(
+          name: 'Ithra',
+          image: 'assets/images/Ithra.png',
+          rating: 4.8,
+          location: 'Dhahran'),
+      const Place(
+          name: 'City Walk',
+          image: 'assets/images/CityWalk.png',
+          rating: 4.8,
+          location: 'Olaya'),
+      const Place(
+          name: 'Salt',
+          image: 'assets/images/Salt.jpg',
+          rating: 4.6,
+          location: 'Olaya'),
     ],
   },
   {
     'day': 2,
     'places': [
-      const Place(name: 'Ajdan Walk', image: 'assets/images/Khobar2.png', rating: 4.3, location: 'Alkurnaish'),
-      const Place(name: 'AMC Cinema', image: 'assets/images/Cinema.png', rating: 4.3, location: 'Alkurnaish'),
-      const Place(name: 'The Shed', image: 'assets/images/TheShed.png', rating: 4.5, location: 'Alkurnaish'),
+      const Place(
+          name: 'Ajdan Walk',
+          image: 'assets/images/Khobar2.png',
+          rating: 4.3,
+          location: 'Alkurnaish'),
+      const Place(
+          name: 'AMC Cinema',
+          image: 'assets/images/Cinema.png',
+          rating: 4.3,
+          location: 'Alkurnaish'),
+      const Place(
+          name: 'The Shed',
+          image: 'assets/images/TheShed.png',
+          rating: 4.5,
+          location: 'Alkurnaish'),
     ],
   },
   {
     'day': 3,
     'places': [
-      const Place(name: 'Parkers', image: 'assets/images/Parkers.png', rating: 4.4, location: 'Dhahran'),
-      const Place(name: 'Escap The Room', image: 'assets/images/escapTheRoom.png', rating: 4.2, location: 'Khobar'),
-      const Place(name: 'AlKhobar Beach', image: 'assets/images/Beach.png', rating: 4.2, location: 'Khobar'),
-      ],
+      const Place(
+          name: 'Parkers',
+          image: 'assets/images/Parkers.png',
+          rating: 4.4,
+          location: 'Dhahran'),
+      const Place(
+          name: 'Escap The Room',
+          image: 'assets/images/escapTheRoom.png',
+          rating: 4.2,
+          location: 'Khobar'),
+      const Place(
+          name: 'AlKhobar Beach',
+          image: 'assets/images/Beach.png',
+          rating: 4.2,
+          location: 'Khobar'),
+    ],
   },
 ];
 
@@ -49,11 +90,13 @@ class AI_Plan extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
+      resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
           Column(
             children: [
               _buildTopBar(context),
+              _buildPlanToggle(context),
               Expanded(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.only(bottom: 90),
@@ -69,7 +112,7 @@ class AI_Plan extends StatelessWidget {
               ),
             ],
           ),
-          _buildBottomNav(),
+          _buildBottomNav(context),
         ],
       ),
     );
@@ -86,7 +129,8 @@ class AI_Plan extends StatelessWidget {
               width: 40,
               height: 40,
               alignment: Alignment.center,
-              child: const Icon(Icons.arrow_back, size: 24, color: Color(0xFF1E1E1E)),
+              child: const Icon(Icons.arrow_back,
+                  size: 24, color: Color(0xFF1E1E1E)),
             ),
           ),
           const Spacer(),
@@ -102,7 +146,8 @@ class AI_Plan extends StatelessWidget {
           Stack(
             children: [
               IconButton(
-                icon: const Icon(Icons.notifications_outlined, size: 20, color: Color(0xFF1E1E1E)),
+                icon: const Icon(Icons.notifications_outlined,
+                    size: 20, color: Color(0xFF1E1E1E)),
                 onPressed: () => _showBondersSuggestions(context),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
@@ -113,37 +158,76 @@ class AI_Plan extends StatelessWidget {
                 child: Container(
                   width: 8,
                   height: 8,
-                  decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.red),
+                  decoration: const BoxDecoration(
+                      shape: BoxShape.circle, color: Colors.red),
                 ),
               ),
             ],
           ),
-          PopupMenuButton<String>(
-            onSelected: (value) {
-              if (value == 'calendar') {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const CalendarView()),
-                );
-              }
-            },
+          IconButton(
             icon: const Icon(Icons.menu, size: 22, color: Color(0xFF1E1E1E)),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'calendar',
-                child: Row(
-                  children: [
-                    Icon(Icons.calendar_today, size: 16, color: Color(0xFF1E1E1E)),
-                    SizedBox(width: 8),
-                    Text(
-                      'Calendar View',
-                      style: TextStyle(fontFamily: 'Poppins', fontSize: 14),
-                    ),
-                  ],
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const PlansList()),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPlanToggle(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE8E8E8),
+        borderRadius: BorderRadius.circular(25),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFF4675B8),
+                borderRadius: BorderRadius.circular(25),
+              ),
+              child: const Text(
+                'Your Plan',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-            ],
+            ),
+          ),
+          Expanded(
+            child: GestureDetector(
+              onTap: () {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const GroupSuggestedItinerary(),
+                  ),
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                child: const Text(
+                  'Group Plan',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Color(0xFF757575),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ),
           ),
         ],
       ),
@@ -187,7 +271,8 @@ class AI_Plan extends StatelessWidget {
         ];
 
         return Container(
-          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.75),
+          constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.75),
           decoration: const BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.only(
@@ -226,9 +311,17 @@ class AI_Plan extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
                 child: Row(
                   children: [
-                    Text('Action', style: TextStyle(fontFamily: 'Poppins', fontSize: 14, color: Colors.grey.shade400)),
+                    Text('Action',
+                        style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 14,
+                            color: Colors.grey.shade400)),
                     const SizedBox(width: 24),
-                    Text('Course', style: TextStyle(fontFamily: 'Poppins', fontSize: 14, color: Colors.grey.shade400)),
+                    Text('Course',
+                        style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 14,
+                            color: Colors.grey.shade400)),
                     const Spacer(),
                     Icon(Icons.tune, size: 16, color: Colors.grey.shade400),
                   ],
@@ -255,11 +348,16 @@ class AI_Plan extends StatelessWidget {
                                 const SizedBox(height: 16),
                                 Text(
                                   isAdd ? 'Add' : 'Delete',
-                                  style: TextStyle(fontFamily: 'Poppins', fontSize: 12, color: Colors.grey.shade500),
+                                  style: TextStyle(
+                                      fontFamily: 'Poppins',
+                                      fontSize: 12,
+                                      color: Colors.grey.shade500),
                                 ),
                                 const SizedBox(height: 2),
                                 Icon(
-                                  isAdd ? Icons.add_circle_outline : Icons.delete_outline,
+                                  isAdd
+                                      ? Icons.add_circle_outline
+                                      : Icons.delete_outline,
                                   size: 20,
                                   color: Colors.grey.shade600,
                                 ),
@@ -271,9 +369,13 @@ class AI_Plan extends StatelessWidget {
                             child: Container(
                               padding: const EdgeInsets.all(16),
                               decoration: BoxDecoration(
-                                color: isHighlight ? const Color(0xFFE8D5A0) : Colors.white,
+                                color: isHighlight
+                                    ? const Color(0xFFE8D5A0)
+                                    : Colors.white,
                                 border: Border.all(
-                                  color: isHighlight ? const Color(0xFFD4BC7A) : Colors.grey.shade200,
+                                  color: isHighlight
+                                      ? const Color(0xFFD4BC7A)
+                                      : Colors.grey.shade200,
                                 ),
                                 borderRadius: BorderRadius.circular(16),
                               ),
@@ -281,7 +383,8 @@ class AI_Plan extends StatelessWidget {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
                                     children: [
                                       Text(
                                         s['name'] as String,
@@ -289,14 +392,24 @@ class AI_Plan extends StatelessWidget {
                                           fontFamily: 'Poppins',
                                           fontWeight: FontWeight.w700,
                                           fontSize: 16,
-                                          color: isHighlight ? Colors.white : Colors.black,
+                                          color: isHighlight
+                                              ? Colors.white
+                                              : Colors.black,
                                         ),
                                       ),
                                       Row(
                                         children: [
-                                          Icon(Icons.favorite_border, size: 16, color: isHighlight ? Colors.white : const Color(0xFFC4A44A)),
+                                          Icon(Icons.favorite_border,
+                                              size: 16,
+                                              color: isHighlight
+                                                  ? Colors.white
+                                                  : const Color(0xFFC4A44A)),
                                           const SizedBox(width: 8),
-                                          Icon(Icons.close, size: 14, color: isHighlight ? Colors.white : Colors.grey),
+                                          Icon(Icons.close,
+                                              size: 14,
+                                              color: isHighlight
+                                                  ? Colors.white
+                                                  : Colors.grey),
                                         ],
                                       ),
                                     ],
@@ -306,20 +419,28 @@ class AI_Plan extends StatelessWidget {
                                     style: TextStyle(
                                       fontFamily: 'Poppins',
                                       fontSize: 13,
-                                      color: isHighlight ? Colors.white70 : Colors.grey.shade500,
+                                      color: isHighlight
+                                          ? Colors.white70
+                                          : Colors.grey.shade500,
                                     ),
                                   ),
                                   const SizedBox(height: 8),
                                   Row(
                                     children: [
-                                      Icon(Icons.location_on, size: 12, color: isHighlight ? Colors.white : const Color(0xFF4675B8)),
+                                      Icon(Icons.location_on,
+                                          size: 12,
+                                          color: isHighlight
+                                              ? Colors.white
+                                              : const Color(0xFF4675B8)),
                                       const SizedBox(width: 4),
                                       Text(
                                         s['location'] as String,
                                         style: TextStyle(
                                           fontFamily: 'Poppins',
                                           fontSize: 12,
-                                          color: isHighlight ? Colors.white70 : Colors.grey.shade500,
+                                          color: isHighlight
+                                              ? Colors.white70
+                                              : Colors.grey.shade500,
                                         ),
                                       ),
                                     ],
@@ -337,7 +458,10 @@ class AI_Plan extends StatelessWidget {
                                         alignment: Alignment.center,
                                         child: Text(
                                           (s['person'] as String)[0],
-                                          style: const TextStyle(fontSize: 8, fontWeight: FontWeight.w700, color: Colors.white),
+                                          style: const TextStyle(
+                                              fontSize: 8,
+                                              fontWeight: FontWeight.w700,
+                                              color: Colors.white),
                                         ),
                                       ),
                                       const SizedBox(width: 4),
@@ -346,7 +470,9 @@ class AI_Plan extends StatelessWidget {
                                         style: TextStyle(
                                           fontFamily: 'Poppins',
                                           fontSize: 12,
-                                          color: isHighlight ? Colors.white70 : Colors.grey.shade500,
+                                          color: isHighlight
+                                              ? Colors.white70
+                                              : Colors.grey.shade500,
                                         ),
                                       ),
                                     ],
@@ -422,7 +548,8 @@ class AI_Plan extends StatelessWidget {
                     color: Colors.black,
                   ),
                 ),
-                const Icon(Icons.arrow_forward, size: 20, color: Color(0xFF1E1E1E)),
+                const Icon(Icons.arrow_forward,
+                    size: 20, color: Color(0xFF1E1E1E)),
               ],
             ),
           ),
@@ -442,7 +569,7 @@ class AI_Plan extends StatelessWidget {
     );
   }
 
-  Widget _buildBottomNav() {
+  Widget _buildBottomNav(BuildContext context) {
     return Positioned(
       bottom: 0,
       left: 0,
@@ -467,19 +594,41 @@ class AI_Plan extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            _navIcon(Icons.search),
-            _navIcon(Icons.location_on_outlined),
-            _navIcon(Icons.airplanemode_active),
-            _navIcon(Icons.group_outlined),
-            _navIcon(Icons.person_outline),
+            _navIcon(Icons.search, onTap: () {
+              Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const DestinationLandingPage()));
+            }),
+            _navIcon(Icons.location_on_outlined, onTap: () {
+              Navigator.pushReplacement(context,
+                  MaterialPageRoute(builder: (_) => const CloseSpots()));
+            }),
+            _navIcon(Icons.airplanemode_active, onTap: () {
+              Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const GroupSuggestedItinerary()));
+            }),
+            _navIcon(Icons.group_outlined, onTap: () {
+              Navigator.pushReplacement(
+                  context, MaterialPageRoute(builder: (_) => const Bonders()));
+            }),
+            _navIcon(Icons.person_outline, onTap: () {
+              Navigator.pushReplacement(
+                  context, MaterialPageRoute(builder: (_) => const Profile()));
+            }),
           ],
         ),
       ),
     );
   }
 
-  Widget _navIcon(IconData icon) {
-    return Icon(icon, size: 24, color: Colors.white);
+  Widget _navIcon(IconData icon, {VoidCallback? onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Icon(icon, size: 24, color: Colors.white),
+    );
   }
 }
 
@@ -510,6 +659,14 @@ class _PlaceCard extends StatelessWidget {
               width: 155,
               height: 110,
               fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return Container(
+                  width: 155,
+                  height: 110,
+                  color: const Color(0xFF4675B8),
+                  child: const Icon(Icons.place, size: 50, color: Colors.white),
+                );
+              },
             ),
           ),
           Padding(
@@ -547,7 +704,8 @@ class _PlaceCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    const Icon(Icons.location_on, size: 10, color: Color(0xFF4675B8)),
+                    const Icon(Icons.location_on,
+                        size: 10, color: Color(0xFF4675B8)),
                     const SizedBox(width: 4),
                     Text(
                       place.location,

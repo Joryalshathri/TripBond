@@ -1,11 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'DestinationLandingPage.dart';
+import 'Bonder.dart';
+import 'profile.dart';
+import 'group_suggested_itinerary.dart';
+import '../core/animations/animation_constants.dart';
 
 class NearActivity {
   final String name;
   final String arrival;
   final int minutes;
 
-  const NearActivity({required this.name, required this.arrival, required this.minutes});
+  const NearActivity(
+      {required this.name, required this.arrival, required this.minutes});
 }
 
 const List<NearActivity> _activities = [
@@ -21,6 +28,7 @@ class CloseSpots extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
+      resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
           Column(
@@ -40,13 +48,14 @@ class CloseSpots extends StatelessWidget {
               ),
               Expanded(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.only(bottom: 90),
+                  physics: const ClampingScrollPhysics(),
+                  padding: const EdgeInsets.only(bottom: 100),
                   child: _buildActivityList(),
                 ),
               ),
             ],
           ),
-          _buildBottomNav(),
+          _buildBottomNav(context),
         ],
       ),
     );
@@ -73,7 +82,18 @@ class CloseSpots extends StatelessWidget {
           ),
         ),
       ),
-    );
+    )
+        .animate()
+        .fadeIn(
+          duration: Duration(milliseconds: AnimationConstants.normal),
+          curve: AnimationConstants.cubicEaseOut,
+        )
+        .slideY(
+          begin: -0.2,
+          end: 0,
+          duration: Duration(milliseconds: AnimationConstants.normal),
+          curve: AnimationConstants.cubicEaseOut,
+        );
   }
 
   Widget _buildMap() {
@@ -99,7 +119,14 @@ class CloseSpots extends StatelessWidget {
     return Positioned(
       left: left,
       top: top,
-      child: const Icon(Icons.location_on, size: 28, color: Color(0xFF4675B8)),
+      child: const Icon(Icons.location_on, size: 28, color: Color(0xFF4675B8))
+          .animate(onPlay: (controller) => controller.repeat(reverse: true))
+          .scale(
+            begin: const Offset(1.0, 1.0),
+            end: const Offset(1.2, 1.2),
+            duration: 1200.ms,
+            curve: Curves.easeInOut,
+          ),
     );
   }
 
@@ -121,7 +148,8 @@ class CloseSpots extends StatelessWidget {
           const SizedBox(height: 16),
           ..._activities.map((a) => Container(
                 margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   border: Border.all(color: Colors.grey.shade200),
@@ -134,9 +162,11 @@ class CloseSpots extends StatelessWidget {
                       height: 36,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        border: Border.all(color: const Color(0xFF4675B8), width: 2),
+                        border: Border.all(
+                            color: const Color(0xFF4675B8), width: 2),
                       ),
-                      child: const Icon(Icons.location_on, size: 14, color: Color(0xFF4675B8)),
+                      child: const Icon(Icons.location_on,
+                          size: 14, color: Color(0xFF4675B8)),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -180,13 +210,13 @@ class CloseSpots extends StatelessWidget {
     );
   }
 
-  Widget _buildBottomNav() {
+  Widget _buildBottomNav(BuildContext context) {
     return Positioned(
       bottom: 0,
       left: 0,
       right: 0,
       child: Container(
-        height: 70,
+        height: 80,
         decoration: const BoxDecoration(
           color: Color(0xFF4675B8),
           borderRadius: BorderRadius.only(
@@ -195,23 +225,62 @@ class CloseSpots extends StatelessWidget {
           ),
           boxShadow: [
             BoxShadow(
-              color: Color(0x1A000000),
-              blurRadius: 20,
-              offset: Offset(0, -4),
+              color: Color(0x33000000),
+              blurRadius: 24,
+              offset: Offset(0, -8),
             ),
           ],
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 32),
+        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 8),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: const [
-            Icon(Icons.search, size: 24, color: Colors.white),
-            Icon(Icons.location_on_outlined, size: 24, color: Colors.white),
-            Icon(Icons.airplanemode_active, size: 24, color: Colors.white),
-            Icon(Icons.group_outlined, size: 24, color: Colors.white),
-            Icon(Icons.person_outline, size: 24, color: Colors.white),
+          children: [
+            _navIcon(Icons.search, onTap: () {
+              Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const DestinationLandingPage()));
+            }),
+            _navIcon(Icons.location_on_outlined, active: true),
+            _navIcon(Icons.airplanemode_active, onTap: () {
+              Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const GroupSuggestedItinerary()));
+            }),
+            _navIcon(Icons.group_outlined, onTap: () {
+              Navigator.push(
+                  context, MaterialPageRoute(builder: (_) => const Bonders()));
+            }),
+            _navIcon(Icons.person_outline, onTap: () {
+              Navigator.push(
+                  context, MaterialPageRoute(builder: (_) => const Profile()));
+            }),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _navIcon(IconData icon, {VoidCallback? onTap, bool active = false}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 24, color: Colors.white),
+          if (active) ...[
+            const SizedBox(height: 4),
+            Container(
+              width: 20,
+              height: 2,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(1),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

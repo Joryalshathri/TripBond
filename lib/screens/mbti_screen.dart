@@ -4,7 +4,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../core/animations/page_transitions.dart';
 import '../core/animations/animation_constants.dart';
 import '../core/constants/constants.dart';
-import 'home_screen.dart';
+import 'DestinationLandingPage.dart';
 
 class MbtiScreen extends StatefulWidget {
   const MbtiScreen({super.key});
@@ -139,9 +139,9 @@ class _MbtiScreenState extends State<MbtiScreen> {
 
     if (!mounted) return;
 
-    // Navigate to home screen
+    // Navigate to destination landing page
     Navigator.of(context).pushReplacement(
-      SharedAxisPageRoute(page: const HomeScreen()),
+      SharedAxisPageRoute(page: const DestinationLandingPage()),
     );
   }
 

@@ -1,5 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'DatesPage.dart';
+import 'Bonder.dart';
+import 'profile.dart';
+import 'close_spots.dart';
+import 'group_suggested_itinerary.dart';
+import '../core/animations/animation_constants.dart';
 
 class Destination {
   final int id;
@@ -22,20 +28,20 @@ final List<Destination> destinations = [
     id: 1,
     name: 'Buraidah',
     image: 'assets/images/Buraidah.png',
-    stars: ['assets/images/Buraidah.png', 'assets/images/Buraidah.png', 'assets/images/Buraidah.png'],
+    stars: ['star', 'star', 'star'],
   ),
   Destination(
     id: 2,
     name: 'Khobar',
     image: 'assets/images/Khobar.png',
-    stars: ['assets/images/Khobar.png', 'assets/images/Khobar.png', 'assets/images/Khobar.png'],
+    stars: ['star', 'star', 'star'],
     featured: true,
   ),
   Destination(
     id: 3,
     name: 'Jeddah',
     image: 'assets/images/Jeddah.png',
-    stars: ['assets/images/Jeddah.png', 'assets/images/Jeddah.png', 'assets/images/Jeddah.png'],
+    stars: ['star', 'star', 'star'],
   ),
 ];
 
@@ -51,33 +57,108 @@ final List<String> postAvatars = [
   'assets/images/ellipse3.png',
 ];
 
+class Post {
+  final String userName;
+  final String location;
+  final String image;
+  final String title;
+  final int likes;
+
+  const Post({
+    required this.userName,
+    required this.location,
+    required this.image,
+    required this.title,
+    required this.likes,
+  });
+}
+
+final List<Post> posts = [
+  Post(
+    userName: 'Sarah Mohamed',
+    location: 'Al Khobar',
+    image: 'assets/images/khobar2.png',
+    title: 'Family Trip',
+    likes: 8,
+  ),
+  Post(
+    userName: 'Ahmed Ali',
+    location: 'Jeddah',
+    image: 'assets/images/jeddah_post.png',
+    title: 'Weekend Gateway',
+    likes: 12,
+  ),
+  Post(
+    userName: 'Fatima Khan',
+    location: 'Riyadh',
+    image: 'assets/images/riyadh_post.png',
+    title: 'Adventure Time',
+    likes: 5,
+  ),
+];
+
 class DestinationLandingPage extends StatelessWidget {
   const DestinationLandingPage({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF5F5F5),
+      resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
-          SingleChildScrollView(
-            padding: const EdgeInsets.only(bottom: 90),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildHeader(context),
-                const SizedBox(height: 4),
-                _buildDestinationCards(context),
-                const SizedBox(height: 16),
-                _buildPeopleBanner(),
-                const SizedBox(height: 24),
-                _buildDivider(),
-                const SizedBox(height: 24),
-                _buildPostCard(),
-              ],
-            ),
+          CustomScrollView(
+            slivers: [
+              SliverToBoxAdapter(
+                child: Container(
+                  color: Colors.white,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildHeader(context),
+                      const SizedBox(height: 4),
+                      _buildDestinationCards(context),
+                      const SizedBox(height: 16),
+                      _buildPeopleBanner(),
+                      const SizedBox(height: 16),
+                    ],
+                  ),
+                ),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.only(bottom: 100, top: 8),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _buildPostCard(posts[index])
+                            .animate()
+                            .fadeIn(
+                              delay:
+                                  Duration(milliseconds: 450 + (index * 100)),
+                              duration: Duration(
+                                  milliseconds: AnimationConstants.normal),
+                              curve: AnimationConstants.cubicEaseOut,
+                            )
+                            .slideY(
+                              delay:
+                                  Duration(milliseconds: 450 + (index * 100)),
+                              begin: 0.15,
+                              end: 0,
+                              duration: Duration(
+                                  milliseconds: AnimationConstants.normal),
+                              curve: AnimationConstants.cubicEaseOut,
+                            ),
+                      );
+                    },
+                    childCount: posts.length,
+                  ),
+                ),
+              ),
+            ],
           ),
-          _buildBottomNav(),
+          _buildBottomNav(context),
         ],
       ),
     );
@@ -85,7 +166,7 @@ class DestinationLandingPage extends StatelessWidget {
 
   Widget _buildHeader(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(27, 60, 27, 16),
+      padding: const EdgeInsets.fromLTRB(20, 50, 20, 12),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -94,41 +175,70 @@ class DestinationLandingPage extends StatelessWidget {
             style: TextStyle(
               fontFamily: 'Poppins',
               fontWeight: FontWeight.w800,
-              fontSize: 24,
+              fontSize: 22,
               color: Colors.black,
             ),
           ),
           IconButton(
             onPressed: () {},
-            icon: Image.asset(
-              'assets/figmaAssets/search-icon.svg',
-              width: 24,
-              height: 24,
-            ),
+            icon: const Icon(Icons.search, size: 28, color: Colors.black),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
           ),
         ],
       ),
-    );
+    )
+        .animate()
+        .fadeIn(
+          duration: Duration(milliseconds: AnimationConstants.normal),
+          curve: AnimationConstants.cubicEaseOut,
+        )
+        .slideY(
+          begin: -0.1,
+          end: 0,
+          duration: Duration(milliseconds: AnimationConstants.normal),
+          curve: AnimationConstants.cubicEaseOut,
+        );
   }
 
   Widget _buildDestinationCards(BuildContext context) {
     return SizedBox(
-      height: 220,
+      height: 200,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 27),
+        padding: const EdgeInsets.symmetric(horizontal: 20),
         itemCount: destinations.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 20),
+        separatorBuilder: (_, __) => const SizedBox(width: 16),
         itemBuilder: (context, index) {
           return _DestinationCard(
             destination: destinations[index],
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => DatesPage()),
+                MaterialPageRoute(builder: (_) => const DatesPage()),
               );
             },
-          );
+          )
+              .animate()
+              .fadeIn(
+                delay: Duration(milliseconds: 100 + (index * 80)),
+                duration: Duration(milliseconds: AnimationConstants.normal),
+                curve: AnimationConstants.cubicEaseOut,
+              )
+              .scale(
+                delay: Duration(milliseconds: 100 + (index * 80)),
+                begin: const Offset(0.8, 0.8),
+                end: const Offset(1.0, 1.0),
+                duration: Duration(milliseconds: AnimationConstants.medium),
+                curve: AnimationConstants.cubicEaseOut,
+              )
+              .slideX(
+                delay: Duration(milliseconds: 100 + (index * 80)),
+                begin: 0.2,
+                end: 0,
+                duration: Duration(milliseconds: AnimationConstants.medium),
+                curve: AnimationConstants.cubicEaseOut,
+              );
         },
       ),
     );
@@ -136,213 +246,237 @@ class DestinationLandingPage extends StatelessWidget {
 
   Widget _buildPeopleBanner() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 27),
+      padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Container(
-        height: 48,
+        height: 50,
         decoration: BoxDecoration(
           color: const Color(0xFF4675B8),
-          borderRadius: BorderRadius.circular(15),
+          borderRadius: BorderRadius.circular(12),
         ),
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Row(
           children: [
             SizedBox(
-              width: 60,
+              width: 70,
               child: Stack(
-                children: List.generate(peopleAvatars.length, (i) {
+                children: List.generate(3, (i) {
                   return Positioned(
-                    left: i * 18.0,
+                    left: i * 20.0,
                     child: Container(
-                      width: 28,
-                      height: 28,
+                      width: 32,
+                      height: 32,
                       decoration: BoxDecoration(
+                        color: Colors.white,
                         shape: BoxShape.circle,
-                        border: Border.all(color: const Color(0xFF4675B8), width: 2),
-                        image: DecorationImage(
-                          image: AssetImage(peopleAvatars[i]),
-                          fit: BoxFit.cover,
-                        ),
+                        border: Border.all(
+                            color: const Color(0xFF4675B8), width: 2),
                       ),
+                      child: const Icon(Icons.person,
+                          size: 16, color: Color(0xFF4675B8)),
                     ),
                   );
                 }),
               ),
             ),
-            const SizedBox(width: 8),
-            const Text(
-              '+8 people like this destination',
-              style: TextStyle(
-                fontFamily: 'Poppins',
-                fontSize: 12,
-                color: Colors.white,
-                letterSpacing: 0.36,
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                '+8 people like this destination',
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.white,
+                  letterSpacing: 0.2,
+                ),
               ),
             ),
           ],
         ),
       ),
-    );
+    )
+        .animate()
+        .fadeIn(
+          delay: Duration(milliseconds: 350),
+          duration: Duration(milliseconds: AnimationConstants.normal),
+          curve: AnimationConstants.cubicEaseOut,
+        )
+        .slideY(
+          delay: Duration(milliseconds: 350),
+          begin: 0.15,
+          end: 0,
+          duration: Duration(milliseconds: AnimationConstants.normal),
+          curve: AnimationConstants.cubicEaseOut,
+        );
   }
 
-  Widget _buildDivider() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 27),
-      child: Container(
-        height: 1,
-        color: const Color(0xFFCAC4D0),
+  Widget _buildPostCard(Post post) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
-    );
-  }
-
-  Widget _buildPostCard() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 30),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFFDBDBDB)),
-        ),
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ClipOval(
-                  child: Image.asset(
-                    'assets/images/profile.png',
-                    width: 36,
-                    height: 36,
-                    fit: BoxFit.cover,
-                  ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Color(0xFF4675B8),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Sarah Mohamed',
-                        style: TextStyle(
-                          fontFamily: 'Poppins',
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                          color: Color(0xFF121212),
-                          letterSpacing: 0.28,
-                          height: 25 / 14,
-                        ),
+                child: const Icon(Icons.person, color: Colors.white, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      post.userName,
+                      style: const TextStyle(
+                        fontFamily: 'Poppins',
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                        color: Color(0xFF121212),
+                        letterSpacing: 0.28,
                       ),
-                      Row(
-                        children: [
-                          Image.asset(
-                            'assets/figmaAssets/location-group.svg',
-                            width: 14,
-                            height: 14,
+                    ),
+                    Row(
+                      children: [
+                        const Icon(Icons.location_on,
+                            size: 14, color: Color(0xFF6F7789)),
+                        const SizedBox(width: 4),
+                        Text(
+                          post.location,
+                          style: const TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 13,
+                            color: Color(0xFF6F7789),
                           ),
-                          const SizedBox(width: 4),
-                          const Text(
-                            'Al Khobar',
-                            style: TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 13,
-                              color: Color(0xFF6F7789),
-                            ),
-                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.favorite_border, size: 20, color: Colors.grey[600])
+                  .animate(
+                      onPlay: (controller) => controller.repeat(reverse: true))
+                  .scale(
+                    begin: const Offset(1.0, 1.0),
+                    end: const Offset(1.08, 1.08),
+                    duration: 1500.ms,
+                    curve: Curves.easeInOut,
+                  ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              width: double.infinity,
+              height: 180,
+              color: Colors.grey[200],
+              child: Image.asset(
+                post.image,
+                width: double.infinity,
+                height: 180,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    width: double.infinity,
+                    height: 180,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          const Color(0xFF4675B8).withOpacity(0.3),
+                          const Color(0xFF4675B8).withOpacity(0.1),
                         ],
                       ),
-                    ],
-                  ),
-                ),
-                GestureDetector(
-                  onTap: () {},
-                  child: Image.asset(
-                    'assets/figmaAssets/heart-outline.svg',
-                    width: 20,
-                    height: 18,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Container(
-                decoration: BoxDecoration(
-                  border: Border.all(color: const Color(0xFFDBDBDB)),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Image.asset(
-                  'assets/images/khobar2.png',
-                  width: double.infinity,
-                  height: 131,
-                  fit: BoxFit.cover,
-                ),
+                    ),
+                    child: const Icon(Icons.image,
+                        size: 50, color: Color(0xFF4675B8)),
+                  );
+                },
               ),
             ),
-            const SizedBox(height: 8),
-            const Text(
-              'Family Trip',
-              style: TextStyle(
-                fontFamily: 'Poppins',
-                fontSize: 18,
-                fontWeight: FontWeight.w500,
-                fontStyle: FontStyle.italic,
-                color: Color(0xFF121212),
-              ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            post.title,
+            style: const TextStyle(
+              fontFamily: 'Poppins',
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              fontStyle: FontStyle.italic,
+              color: Color(0xFF121212),
             ),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                SizedBox(
-                  width: 44,
-                  height: 20,
-                  child: Stack(
-                    children: List.generate(postAvatars.length, (i) {
-                      return Positioned(
-                        left: i * 14.0,
-                        child: Container(
-                          width: 20,
-                          height: 20,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 1),
-                            image: DecorationImage(
-                              image: AssetImage(postAvatars[i]),
-                              fit: BoxFit.cover,
-                            ),
-                          ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              SizedBox(
+                width: 50,
+                height: 24,
+                child: Stack(
+                  children: List.generate(3, (i) {
+                    return Positioned(
+                      left: i * 16.0,
+                      child: Container(
+                        width: 24,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF4675B8),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 2),
                         ),
-                      );
-                    }),
-                  ),
+                        child: const Icon(Icons.person,
+                            size: 12, color: Colors.white),
+                      ),
+                    );
+                  }),
                 ),
-                const SizedBox(width: 8),
-                const Text(
-                  '+8 people like this Post',
-                  style: TextStyle(
-                    fontFamily: 'Poppins',
-                    fontSize: 12,
-                    color: Colors.black,
-                    letterSpacing: 0.36,
-                  ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '+${post.likes} people like this Post',
+                style: const TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 12,
+                  color: Color(0xFF6F7789),
+                  letterSpacing: 0.36,
                 ),
-              ],
-            ),
-          ],
-        ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildBottomNav() {
+  Widget _buildBottomNav(BuildContext context) {
     return Positioned(
       bottom: 0,
       left: 0,
       right: 0,
       child: Container(
-        height: 70,
+        height: 80,
         decoration: const BoxDecoration(
           color: Color(0xFF4675B8),
           borderRadius: BorderRadius.only(
@@ -351,49 +485,89 @@ class DestinationLandingPage extends StatelessWidget {
           ),
           boxShadow: [
             BoxShadow(
-              color: Color(0x1A000000),
-              blurRadius: 20,
-              offset: Offset(0, -4),
+              color: Color(0x33000000),
+              blurRadius: 24,
+              offset: Offset(0, -8),
             ),
           ],
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 32),
+        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 8),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            _navItem('assets/figmaAssets/search-nav-icon.svg', active: true),
-            _navItem('assets/figmaAssets/location-icon.svg'),
-            _navItem('assets/figmaAssets/plane-icon.svg'),
-            _navItem('assets/figmaAssets/users-two.svg'),
-            _navItem('assets/figmaAssets/profile-shape.svg'),
+            _navIcon(Icons.search, active: true, onTap: () {}, index: 0),
+            _navIcon(Icons.location_on_outlined, onTap: () {
+              Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const CloseSpots()));
+            }, index: 1),
+            _navIcon(Icons.airplanemode_active, onTap: () {
+              Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const GroupSuggestedItinerary()));
+            }, index: 2),
+            _navIcon(Icons.group_outlined, onTap: () {
+              Navigator.push(
+                  context, MaterialPageRoute(builder: (_) => const Bonders()));
+            }, index: 3),
+            _navIcon(Icons.person_outline, onTap: () {
+              Navigator.push(
+                  context, MaterialPageRoute(builder: (_) => const Profile()));
+            }, index: 4),
           ],
         ),
-      ),
+      ).animate().slideY(
+            begin: 1.0,
+            end: 0,
+            duration: Duration(milliseconds: AnimationConstants.medium),
+            curve: AnimationConstants.cubicEaseOut,
+          ),
     );
   }
 
-  Widget _navItem(String icon, {bool active = false}) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Image.asset(icon, width: 24, height: 24),
-        if (active) ...[
-          const SizedBox(height: 4),
-          Container(
-            width: 20,
-            height: 2,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(1),
-            ),
-          ),
+  Widget _navIcon(IconData icon,
+      {VoidCallback? onTap, bool active = false, int index = 0}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 24, color: Colors.white),
+          if (active) ...[
+            const SizedBox(height: 4),
+            Container(
+              width: 20,
+              height: 2,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(1),
+              ),
+            )
+                .animate(onPlay: (controller) => controller.repeat())
+                .fadeIn(duration: 800.ms)
+                .then()
+                .fadeOut(duration: 800.ms),
+          ],
         ],
-      ],
-    );
+      ),
+    )
+        .animate()
+        .fadeIn(
+          delay: Duration(milliseconds: 500 + (index * 50)),
+          duration: Duration(milliseconds: AnimationConstants.fast),
+          curve: AnimationConstants.cubicEaseOut,
+        )
+        .scale(
+          delay: Duration(milliseconds: 500 + (index * 50)),
+          begin: const Offset(0.7, 0.7),
+          end: const Offset(1.0, 1.0),
+          duration: Duration(milliseconds: AnimationConstants.normal),
+          curve: AnimationConstants.cubicEaseOut,
+        );
   }
 }
 
-class _DestinationCard extends StatelessWidget {
+class _DestinationCard extends StatefulWidget {
   final Destination destination;
   final VoidCallback onTap;
 
@@ -403,90 +577,153 @@ class _DestinationCard extends StatelessWidget {
   });
 
   @override
+  State<_DestinationCard> createState() => _DestinationCardState();
+}
+
+class _DestinationCardState extends State<_DestinationCard>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _scaleController;
+  late Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _scaleController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 150),
+    );
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.95).animate(
+      CurvedAnimation(parent: _scaleController, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _scaleController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final isFeatured = destination.featured;
-    final width = isFeatured ? 184.0 : 160.0;
-    final height = isFeatured ? 208.0 : 183.0;
-    final starSize = isFeatured ? 20.0 : 17.0;
+    final isFeatured = widget.destination.featured;
+    final width = isFeatured ? 170.0 : 150.0;
+    final height = isFeatured ? 200.0 : 180.0;
 
     return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: width,
-        height: height,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(30),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0xFFCCE0CC),
-              blurRadius: 15,
-              offset: Offset(0, 6),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(30),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              Image.asset(
-                destination.image,
-                fit: BoxFit.cover,
-              ),
-              Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.bottomCenter,
-                    end: Alignment.topCenter,
-                    colors: [
-                      Color(0x4D000000),
-                      Colors.transparent,
-                    ],
-                  ),
-                ),
-              ),
-              Positioned(
-                top: 12,
-                right: 12,
-                child: GestureDetector(
-                  onTap: () {},
-                  child: Image.asset(
-                    'assets/figmaAssets/heart-small.svg',
-                    width: 13,
-                    height: 12,
-                  ),
-                ),
-              ),
-              Positioned(
-                bottom: 52,
-                left: 0,
-                right: 0,
-                child: Text(
-                  destination.name,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontFamily: 'Poppins',
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-              Positioned(
-                bottom: 16,
-                left: 0,
-                right: 0,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: destination.stars.map((star) {
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 1),
-                      child: Image.asset(star, width: starSize, height: starSize - 1),
-                    );
-                  }).toList(),
-                ),
+      onTapDown: (_) => _scaleController.forward(),
+      onTapUp: (_) {
+        _scaleController.reverse();
+        widget.onTap();
+      },
+      onTapCancel: () => _scaleController.reverse(),
+      child: ScaleTransition(
+        scale: _scaleAnimation,
+        child: Container(
+          width: width,
+          height: height,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
               ),
             ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        const Color(0xFF4675B8),
+                        const Color(0xFF5B89CC),
+                      ],
+                    ),
+                  ),
+                  child: Image.asset(
+                    widget.destination.image,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return const Center(
+                        child: Icon(Icons.location_city,
+                            size: 60, color: Colors.white),
+                      );
+                    },
+                  ),
+                ),
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.bottomCenter,
+                      end: Alignment.center,
+                      colors: [
+                        Colors.black.withOpacity(0.6),
+                        Colors.transparent,
+                      ],
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: 10,
+                  right: 10,
+                  child: GestureDetector(
+                    onTap: () {},
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.3),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.favorite_border,
+                          size: 16, color: Colors.white),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  bottom: 40,
+                  left: 0,
+                  right: 0,
+                  child: Text(
+                    widget.destination.name,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontFamily: 'Poppins',
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15,
+                      color: Colors.white,
+                      shadows: [
+                        Shadow(
+                          color: Colors.black38,
+                          blurRadius: 4,
+                          offset: Offset(0, 1),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Positioned(
+                  bottom: 12,
+                  left: 0,
+                  right: 0,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: widget.destination.stars.map((star) {
+                      return const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 2),
+                        child: Icon(Icons.star, color: Colors.amber, size: 16),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

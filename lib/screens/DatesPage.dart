@@ -1,8 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'TripInfo.dart';
+import '../core/animations/animation_constants.dart';
 
 const List<String> _days = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
-const List<String> _months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const List<String> _months = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec'
+];
 
 class DatesPage extends StatefulWidget {
   const DatesPage({super.key});
@@ -82,11 +97,13 @@ class _DatesPageState extends State<DatesPage> {
     final cells = <_CalendarCell>[];
     for (int i = 0; i < totalCells; i++) {
       if (i < firstDay) {
-        cells.add(_CalendarCell(day: prevMonthDays - firstDay + i + 1, isCurrentMonth: false));
+        cells.add(_CalendarCell(
+            day: prevMonthDays - firstDay + i + 1, isCurrentMonth: false));
       } else if (i - firstDay < daysInMonth) {
         cells.add(_CalendarCell(day: i - firstDay + 1, isCurrentMonth: true));
       } else {
-        cells.add(_CalendarCell(day: i - firstDay - daysInMonth + 1, isCurrentMonth: false));
+        cells.add(_CalendarCell(
+            day: i - firstDay - daysInMonth + 1, isCurrentMonth: false));
       }
     }
 
@@ -104,12 +121,15 @@ class _DatesPageState extends State<DatesPage> {
                   width: 40,
                   height: 40,
                   alignment: Alignment.center,
-                  child: const Icon(Icons.arrow_back, size: 24, color: Color(0xFF1E1E1E)),
+                  child: const Icon(Icons.arrow_back,
+                      size: 24, color: Color(0xFF1E1E1E)),
                 ),
               ),
             ),
-          ),
-
+          ).animate().fadeIn(
+                duration: Duration(milliseconds: AnimationConstants.fast),
+                curve: AnimationConstants.cubicEaseOut,
+              ),
           const Text(
             'Choose Your Dates',
             style: TextStyle(
@@ -118,9 +138,21 @@ class _DatesPageState extends State<DatesPage> {
               fontSize: 22,
               color: Colors.black,
             ),
-          ),
+          )
+              .animate()
+              .fadeIn(
+                delay: Duration(milliseconds: 100),
+                duration: Duration(milliseconds: AnimationConstants.normal),
+                curve: AnimationConstants.cubicEaseOut,
+              )
+              .slideY(
+                delay: Duration(milliseconds: 100),
+                begin: -0.1,
+                end: 0,
+                duration: Duration(milliseconds: AnimationConstants.normal),
+                curve: AnimationConstants.cubicEaseOut,
+              ),
           const SizedBox(height: 24),
-
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 27),
             child: Container(
@@ -145,11 +177,22 @@ class _DatesPageState extends State<DatesPage> {
                   _buildCalendarGrid(cells),
                 ],
               ),
-            ),
+            )
+                .animate()
+                .fadeIn(
+                  delay: Duration(milliseconds: 200),
+                  duration: Duration(milliseconds: AnimationConstants.medium),
+                  curve: AnimationConstants.cubicEaseOut,
+                )
+                .scale(
+                  delay: Duration(milliseconds: 200),
+                  begin: const Offset(0.95, 0.95),
+                  end: const Offset(1.0, 1.0),
+                  duration: Duration(milliseconds: AnimationConstants.medium),
+                  curve: AnimationConstants.cubicEaseOut,
+                ),
           ),
-
           const Spacer(),
-
           Padding(
             padding: const EdgeInsets.fromLTRB(30, 24, 30, 40),
             child: SizedBox(
@@ -194,7 +237,8 @@ class _DatesPageState extends State<DatesPage> {
             width: 32,
             height: 32,
             alignment: Alignment.center,
-            child: const Icon(Icons.chevron_left, size: 20, color: Color(0xFF1E1E1E)),
+            child: const Icon(Icons.chevron_left,
+                size: 20, color: Color(0xFF1E1E1E)),
           ),
         ),
         Row(
@@ -216,7 +260,8 @@ class _DatesPageState extends State<DatesPage> {
                     ),
                   ),
                   const SizedBox(width: 4),
-                  const Icon(Icons.keyboard_arrow_down, size: 14, color: Color(0xFF1E1E1E)),
+                  const Icon(Icons.keyboard_arrow_down,
+                      size: 14, color: Color(0xFF1E1E1E)),
                 ],
               ),
             ),
@@ -238,7 +283,8 @@ class _DatesPageState extends State<DatesPage> {
                     ),
                   ),
                   const SizedBox(width: 4),
-                  const Icon(Icons.keyboard_arrow_down, size: 14, color: Color(0xFF1E1E1E)),
+                  const Icon(Icons.keyboard_arrow_down,
+                      size: 14, color: Color(0xFF1E1E1E)),
                 ],
               ),
             ),
@@ -250,7 +296,8 @@ class _DatesPageState extends State<DatesPage> {
             width: 32,
             height: 32,
             alignment: Alignment.center,
-            child: const Icon(Icons.chevron_right, size: 20, color: Color(0xFF1E1E1E)),
+            child: const Icon(Icons.chevron_right,
+                size: 20, color: Color(0xFF1E1E1E)),
           ),
         ),
       ],
