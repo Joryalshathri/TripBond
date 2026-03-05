@@ -19,7 +19,7 @@ class PlanItem {
 const List<PlanItem> _currentPlans = [
   PlanItem(
     name: 'Khobar',
-    image: 'assets/images/khobar.png',
+    image: 'assets/images/cities/khobar.png',
     dateRange: '9 - 13 Jan 2026',
     avatarInitials: ['K', 'L', 'H'],
   ),
@@ -28,13 +28,13 @@ const List<PlanItem> _currentPlans = [
 const List<PlanItem> _futurePlans = [
   PlanItem(
     name: 'Jeddah',
-    image: 'assets/images/jeddah.png',
+    image: 'assets/images/cities/jeddah.png',
     dateRange: '25 - 27 Feb 2026',
     avatarInitials: ['Z'],
   ),
   PlanItem(
     name: 'AlUla',
-    image: 'assets/images/AlUla.png',
+    image: 'assets/images/cities/AlUla.png',
     dateRange: '5 - 20 Apr 2026',
   ),
 ];

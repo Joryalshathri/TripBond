@@ -27,28 +27,28 @@ final List<Destination> destinations = [
   Destination(
     id: 1,
     name: 'Buraidah',
-    image: 'assets/images/Buraidah.png',
+    image: 'assets/images/places/Buraidah.png',
     stars: ['star', 'star', 'star'],
   ),
   Destination(
     id: 2,
     name: 'Khobar',
-    image: 'assets/images/Khobar.png',
+    image: 'assets/images/places/Khobar.png',
     stars: ['star', 'star', 'star'],
     featured: true,
   ),
   Destination(
     id: 3,
     name: 'Jeddah',
-    image: 'assets/images/Jeddah.png',
+    image: 'assets/images/places/Jeddah.png',
     stars: ['star', 'star', 'star'],
   ),
 ];
 
 final List<String> peopleAvatars = [
-  'assets/images/person1.png',
-  'assets/images/person2.png',
-  'assets/images/person3.png',
+  'assets/images/people/person1.png',
+  'assets/images/people/person2.png',
+  'assets/images/people/person3.png',
 ];
 
 final List<String> postAvatars = [
@@ -77,21 +77,21 @@ final List<Post> posts = [
   Post(
     userName: 'Sarah Mohamed',
     location: 'Al Khobar',
-    image: 'assets/images/khobar2.png',
+    image: 'assets/images/cities/khobar2.png',
     title: 'Family Trip',
     likes: 8,
   ),
   Post(
     userName: 'Ahmed Ali',
     location: 'Jeddah',
-    image: 'assets/images/jeddah_post.png',
+    image: 'assets/images/cities/jeddah.png',
     title: 'Weekend Gateway',
     likes: 12,
   ),
   Post(
     userName: 'Fatima Khan',
     location: 'Riyadh',
-    image: 'assets/images/riyadh_post.png',
+    image: 'assets/images/cities/riyadh.png',
     title: 'Adventure Time',
     likes: 5,
   ),

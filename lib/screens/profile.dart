@@ -21,15 +21,15 @@ class TripCard {
 const List<TripCard> _pastTrips = [
   TripCard(
       name: 'Family Trip',
-      image: 'assets/images/Khobar2.png',
+      image: 'assets/images/cities/khobar2.png',
       location: 'Al Khobar'),
   TripCard(
       name: 'Business Trip',
-      image: 'assets/images/Riyadh.png',
+      image: 'assets/images/cities/Riyadh.png',
       location: 'Riyadh'),
   TripCard(
       name: 'Relaxing trip',
-      image: 'assets/images/AlUla.png',
+      image: 'assets/images/cities/AlUla.png',
       location: 'AlUla'),
 ];
 
@@ -165,7 +165,7 @@ class _ProfileState extends State<Profile> {
           ),
           child: ClipOval(
             child: Image.asset(
-              'assets/images/profile.png',
+              'assets/images/people/profile.png',
               fit: BoxFit.cover,
               errorBuilder: (_, __, ___) => Container(
                 color: Colors.grey.shade300,
@@ -298,9 +298,9 @@ class _ProfileState extends State<Profile> {
   Widget _buildContent() {
     if (_activeTab == 'Liked Trips') {
       final images = [
-        'assets/images/Khobar2.png',
-        'assets/images/jeddah.png',
-        'assets/images/AlUla.png'
+        'assets/images/cities/Khobar2.png',
+        'assets/images/cities/jeddah.png',
+        'assets/images/cities/AlUla.png'
       ];
       return Padding(
         padding: const EdgeInsets.all(16),
@@ -330,8 +330,8 @@ class _ProfileState extends State<Profile> {
 
     if (_activeTab == 'Favorites') {
       final favs = [
-        {'name': 'Alula', 'image': 'assets/images/AlUla.png'},
-        {'name': 'Abha', 'image': 'assets/images/Abha.png'},
+        {'name': 'Alula', 'image': 'assets/images/cities/AlUla.png'},
+        {'name': 'Abha', 'image': 'assets/images/cities/Abha.png'},
       ];
       return Padding(
         padding: const EdgeInsets.all(16),
@@ -501,7 +501,7 @@ class _ProfileState extends State<Profile> {
       {
         'name': 'Ahmed Al-Said',
         'username': '@ahmed_said',
-        'image': 'assets/images/profile.png'
+        'image': 'assets/images/people/profile.png'
       },
       {
         'name': 'Fatima Hassan',
@@ -511,32 +511,32 @@ class _ProfileState extends State<Profile> {
       {
         'name': 'Mohammed Ali',
         'username': '@mo_ali',
-        'image': 'assets/images/profile.png'
+        'image': 'assets/images/people/profile.png'
       },
       {
         'name': 'Layla Ibrahim',
         'username': '@layla_i',
-        'image': 'assets/images/profile.png'
+        'image': 'assets/images/people/profile.png'
       },
       {
         'name': 'Omar Khalid',
         'username': '@omar_k',
-        'image': 'assets/images/profile.png'
+        'image': 'assets/images/people/profile.png'
       },
       {
         'name': 'Zainab Nasser',
         'username': '@zainab_n',
-        'image': 'assets/images/profile.png'
+        'image': 'assets/images/people/profile.png'
       },
       {
         'name': 'Youssef Rahman',
         'username': '@youssef_r',
-        'image': 'assets/images/profile.png'
+        'image': 'assets/images/people/profile.png'
       },
       {
         'name': 'Aisha Malik',
         'username': '@aisha_m',
-        'image': 'assets/images/profile.png'
+        'image': 'assets/images/people/profile.png'
       },
     ];
 
@@ -656,27 +656,27 @@ class _ProfileState extends State<Profile> {
       {
         'name': 'Noura Al-Qahtani',
         'username': '@noura_q',
-        'image': 'assets/images/profile.png'
+        'image': 'assets/images/people/profile.png'
       },
       {
         'name': 'Khalid Mansour',
         'username': '@khalid_m',
-        'image': 'assets/images/profile.png'
+        'image': 'assets/images/people/profile.png'
       },
       {
         'name': 'Reem Abdullah',
         'username': '@reem_a',
-        'image': 'assets/images/profile.png'
+        'image': 'assets/images/people/profile.png'
       },
       {
         'name': 'Sami Faisal',
         'username': '@sami_f',
-        'image': 'assets/images/profile.png'
+        'image': 'assets/images/people/profile.png'
       },
       {
         'name': 'Hala Zayed',
         'username': '@hala_z',
-        'image': 'assets/images/profile.png'
+        'image': 'assets/images/people/profile.png'
       },
       {
         'name': 'Tariq Nabil',

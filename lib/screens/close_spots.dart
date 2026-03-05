@@ -137,7 +137,7 @@ class CloseSpots extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Near Planned Activity',
+            'Near Planned Activities',
             style: TextStyle(
               fontFamily: 'Poppins',
               fontWeight: FontWeight.w700,

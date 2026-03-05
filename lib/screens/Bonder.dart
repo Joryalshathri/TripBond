@@ -10,11 +10,11 @@ class Bonders extends StatelessWidget {
   const Bonders({super.key});
 
   static const bonders = [
-    {'name': 'Leen', 'image': 'assets/images/persone4.png'},
-    {'name': 'Khalid', 'image': 'assets/images/persone5.png'},
-    {'name': 'Huda', 'image': 'assets/images/persone6.png'},
-    {'name': 'Ziyad', 'image': 'assets/images/persone7.png'},
-    {'name': 'Friends', 'image': 'assets/images/friends.png'},
+    {'name': 'Leen', 'image': 'assets/images/people/persone4.png'},
+    {'name': 'Khalid', 'image': 'assets/images/people/persone5.png'},
+    {'name': 'Huda', 'image': 'assets/images/people/persone6.png'},
+    {'name': 'Ziyad', 'image': 'assets/images/people/persone7.png'},
+    {'name': 'Friends', 'image': 'assets/images/people/friends.png'},
   ];
 
   @override

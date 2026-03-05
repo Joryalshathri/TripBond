@@ -26,17 +26,17 @@ final List<Map<String, dynamic>> itinerary = [
     'places': [
       const Place(
           name: 'Ithra',
-          image: 'assets/images/Ithra.png',
+          image: 'assets/images/places/Ithra.png',
           rating: 4.8,
           location: 'Dhahran'),
       const Place(
           name: 'City Walk',
-          image: 'assets/images/CityWalk.png',
+          image: 'assets/images/places/CityWalk.png',
           rating: 4.8,
           location: 'Olaya'),
       const Place(
           name: 'Salt',
-          image: 'assets/images/Salt.jpg',
+          image: 'assets/images/places/Salt.jpg',
           rating: 4.6,
           location: 'Olaya'),
     ],
@@ -46,17 +46,17 @@ final List<Map<String, dynamic>> itinerary = [
     'places': [
       const Place(
           name: 'Ajdan Walk',
-          image: 'assets/images/Khobar2.png',
+          image: 'assets/images/cities/Khobar2.png',
           rating: 4.3,
           location: 'Alkurnaish'),
       const Place(
           name: 'AMC Cinema',
-          image: 'assets/images/Cinema.png',
+          image: 'assets/images/places/Cinema.png',
           rating: 4.3,
           location: 'Alkurnaish'),
       const Place(
           name: 'The Shed',
-          image: 'assets/images/TheShed.png',
+          image: 'assets/images/places/TheShed.png',
           rating: 4.5,
           location: 'Alkurnaish'),
     ],
@@ -66,17 +66,17 @@ final List<Map<String, dynamic>> itinerary = [
     'places': [
       const Place(
           name: 'Parkers',
-          image: 'assets/images/Parkers.png',
+          image: 'assets/images/places/Parkers.png',
           rating: 4.4,
           location: 'Dhahran'),
       const Place(
           name: 'Escap The Room',
-          image: 'assets/images/escapTheRoom.png',
+          image: 'assets/images/places/escapTheRoom.png',
           rating: 4.2,
           location: 'Khobar'),
       const Place(
           name: 'AlKhobar Beach',
-          image: 'assets/images/Beach.png',
+          image: 'assets/images/places/Beach.png',
           rating: 4.2,
           location: 'Khobar'),
     ],
@@ -135,7 +135,7 @@ class AI_Plan extends StatelessWidget {
           ),
           const Spacer(),
           const Text(
-            'Your Plan',
+            'Generated Plan',
             style: TextStyle(
               fontFamily: 'Poppins',
               fontWeight: FontWeight.w700,
@@ -195,7 +195,7 @@ class AI_Plan extends StatelessWidget {
                 borderRadius: BorderRadius.circular(25),
               ),
               child: const Text(
-                'Your Plan',
+                'Generated Plan',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Colors.white,
@@ -218,7 +218,7 @@ class AI_Plan extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 10),
                 child: const Text(
-                  'Group Plan',
+                  'Calender View',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: Color(0xFF757575),
