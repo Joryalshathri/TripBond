@@ -9,7 +9,7 @@ supabase==2.3.4
 # Environment variables
 python-dotenv==1.0.0
 
-# HTTP requests (compatible with supabase)
+# HTTP requests (compatible with supabase and used for Google Places API)
 httpx>=0.24,<0.26
 
 # Pydantic for data validation

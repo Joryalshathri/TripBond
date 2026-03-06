@@ -1,35 +1,46 @@
 from pydantic_settings import BaseSettings
+from pydantic import ConfigDict
+from typing import Optional
 from functools import lru_cache
 
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
-    
+
+    model_config = ConfigDict(env_file=".env", case_sensitive=False, protected_namespaces=())
+
     # Supabase
     supabase_url: str
     supabase_key: str
     supabase_anon_key: str
-    
+    supabase_service_role_key: Optional[str] = None
+
     # JWT Authentication
     secret_key: str
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
-    
+
+    # Google Maps / Places API
+    google_maps_api_key: Optional[str] = None
+
     # ML Model
-    model_path: str
+    model_path: str = ""
     recommendation_top_k: int = 5
-    
+
     # API
     api_host: str = "0.0.0.0"
     api_port: int = 8000
+    api_version: str = "1.0.0"
     debug: bool = True
-    
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
+    allowed_origins: list[str] = ["http://localhost:3000", "http://localhost:8080"]
+    frontend_url: str = "http://localhost:3000"
 
 
 @lru_cache()
 def get_settings() -> Settings:
     """Get cached settings instance"""
-    return Settings()
+    settings = Settings()
+    # Backward compatibility: if service_role_key not set, use supabase_key
+    if not settings.supabase_service_role_key:
+        settings.supabase_service_role_key = settings.supabase_key
+    return settings

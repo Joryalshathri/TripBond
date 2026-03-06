@@ -1,53 +1,19 @@
-from fastapi import APIRouter, HTTPException, status
-from pydantic import BaseModel, EmailStr
-from typing import Optional
-from datetime import date
-from ..database import SupabaseDB
-from supabase import Client
+from fastapi import APIRouter, HTTPException, status, Depends
+from ..database import SupabaseDB, get_current_user_token, get_supabase_client_for_user
+from ..config import get_settings
+from ..schemas.auth import (
+    SignUpRequest,
+    SignInRequest,
+    AuthResponse,
+    PasswordResetRequest,
+    UpdatePasswordRequest,
+    VerifyEmailRequest,
+    ResendVerificationRequest,
+)
+import logging
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
-
-
-class SignUpRequest(BaseModel):
-    email: EmailStr
-    password: str
-    full_name: Optional[str] = None
-    date_of_birth: Optional[date] = None
-    phone_number: Optional[str] = None
-    gender: Optional[str] = None  # 'male', 'female'
-    # Personality traits (Big Five)
-    openness: Optional[float] = None
-    conscientiousness: Optional[float] = None
-    extraversion: Optional[float] = None
-    agreeableness: Optional[float] = None
-    neuroticism: Optional[float] = None
-    # Travel preferences
-    budget_level: Optional[str] = None  # 'low', 'medium', 'high'
-    travel_style: Optional[str] = None  # 'adventure', 'relax', 'cultural', 'luxury'
-    dietary_preferences: Optional[str] = None
-    preferred_accommodation: Optional[str] = None
-    preferred_transport: Optional[str] = None
-
-
-class SignInRequest(BaseModel):
-    email: EmailStr
-    password: str
-
-
-class AuthResponse(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
-    user: dict
-    message: str
-
-
-class PasswordResetRequest(BaseModel):
-    email: EmailStr
-
-
-class UpdatePasswordRequest(BaseModel):
-    access_token: str
-    new_password: str
 
 
 @router.post("/signup", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
@@ -57,6 +23,7 @@ async def sign_up(request: SignUpRequest):
     """
     try:
         db = SupabaseDB()
+        config = get_settings()
         
         # Create user with Supabase Auth
         response = db.client.auth.sign_up(
@@ -66,7 +33,8 @@ async def sign_up(request: SignUpRequest):
                 "options": {
                     "data": {
                         "full_name": request.full_name
-                    }
+                    },
+                    "email_redirect_to": f"{config.frontend_url}/verify-email"
                 }
             }
         )
@@ -80,6 +48,7 @@ async def sign_up(request: SignUpRequest):
         # Create profile in profiles table
         profile_data = {
             "id": response.user.id,  # Foreign key to auth.users
+            "email": response.user.email,  # Store email for easy access
             "full_name": request.full_name,
             "date_of_birth": request.date_of_birth.isoformat() if request.date_of_birth else None,
             "phone_number": request.phone_number,
@@ -100,6 +69,7 @@ async def sign_up(request: SignUpRequest):
         profile_data = {k: v for k, v in profile_data.items() if v is not None}
         db.client.table("profiles").insert(profile_data).execute()
         
+        # Note: access_token may be empty if email confirmation is required
         return AuthResponse(
             access_token=response.session.access_token if response.session else "",
             user={
@@ -110,10 +80,13 @@ async def sign_up(request: SignUpRequest):
             message="Account created successfully! Please check your email to verify your account."
         )
         
+    except HTTPException:
+        raise
     except Exception as e:
+        logger.exception("Signup failed")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Signup failed: {str(e)}"
+            detail="Signup failed. Please try again."
         )
 
 
@@ -140,7 +113,10 @@ async def sign_in(request: SignInRequest):
             )
         
         # Get user profile
-        profile = await db.get_user_preferences(response.user.id)
+        # TODO: Refactor to use get_supabase_client_for_user(response.session.access_token)
+        profile = db.get_user_preferences(response.user.id)
+        if hasattr(profile, '__await__'):
+            profile = await profile
         
         return AuthResponse(
             access_token=response.session.access_token,
@@ -157,31 +133,36 @@ async def sign_in(request: SignInRequest):
     except HTTPException:
         raise
     except Exception as e:
-        # Log the detailed error for debugging
-        import traceback
-        print(f"Sign in error: {str(e)}")
-        print(traceback.format_exc())
+        logger.exception("Sign in failed")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Sign in failed: {str(e)}"
+            detail="Sign in failed. Please check your credentials."
         )
 
 
 @router.post("/signout")
-async def sign_out():
+async def sign_out(token: str = Depends(get_current_user_token)):
     """
     Sign out the current user
+    
+    Requires: Authorization header with Bearer token
+    
+    Note: In Supabase architecture, signout is typically handled client-side
+    by clearing the local session. This endpoint provides server-side revocation
+    if needed, but frontend should still clear local storage.
     """
     try:
-        db = SupabaseDB()
-        db.client.auth.sign_out()
+        # Use user-authenticated client to sign out the specific session
+        client = get_supabase_client_for_user(token)
+        client.auth.sign_out()
         
-        return {"message": "Signed out successfully"}
+        return {"message": "Signed out successfully. Please clear your local session."}
         
     except Exception as e:
+        logger.exception("Sign out failed")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Sign out failed: {str(e)}"
+            detail="Sign out failed. Please try again."
         )
 
 
@@ -192,41 +173,64 @@ async def reset_password(request: PasswordResetRequest):
     """
     try:
         db = SupabaseDB()
+        config = get_settings()
         
-        db.client.auth.reset_password_for_email(request.email)
+        db.client.auth.reset_password_for_email(
+            request.email,
+            options={
+                "redirect_to": f"{config.frontend_url}/reset-password"
+            }
+        )
         
         return {
             "message": f"If an account exists with {request.email}, you will receive a password reset email."
         }
         
     except Exception as e:
+        logger.exception("Password reset request failed")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Password reset failed: {str(e)}"
+            detail="Password reset request failed. Please try again."
         )
 
 
 @router.post("/update-password")
-async def update_password(request: UpdatePasswordRequest):
+async def update_password(
+    request: UpdatePasswordRequest,
+    token: str = Depends(get_current_user_token)
+):
     """
-    Update password using access token from reset email
-    User receives access_token from password reset email link
+    Update password for authenticated user
+    
+    Requires: Authorization header with valid JWT access token.
+    
+    Flow:
+    1. User requests password reset via /reset-password
+    2. Receives email with reset link (format depends on Supabase config)
+    3. Frontend handles the reset link and extracts/exchanges for access token
+    4. Frontend calls this endpoint with Authorization: Bearer <access_token>
+    5. Password is updated for the authenticated user
+    
+    Note: Supabase password reset links may contain access_token directly,
+    or may require an additional exchange step depending on your configuration.
+    Frontend must provide a valid JWT access token in the Authorization header.
+    
+    Alternative: Use Supabase client-side updateUser() directly from frontend
+    for simpler flow and better cross-version compatibility.
     """
     try:
-        db = SupabaseDB()
+        # Use user-authenticated client so Supabase knows which user to update
+        client = get_supabase_client_for_user(token)
         
-        # Set the session with the access token from the reset email
-        db.client.auth.set_session(request.access_token, request.access_token)
-        
-        # Update the user's password
-        response = db.client.auth.update_user({
+        # Update the user's password using their authenticated session
+        response = client.auth.update_user({
             "password": request.new_password
         })
         
         if not response.user:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Failed to update password. Token may be invalid or expired."
+                detail="Failed to update password. Please try again or request a new reset link."
             )
         
         return {
@@ -236,66 +240,74 @@ async def update_password(request: UpdatePasswordRequest):
     except HTTPException:
         raise
     except Exception as e:
+        logger.exception("Password update failed")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Password update failed: {str(e)}"
+            detail="Password update failed. Please try again."
         )
 
 
-@router.get("/me")
-async def get_current_user():
+@router.post("/verify-email")
+async def verify_email(request: VerifyEmailRequest):
     """
-    Get current authenticated user information
-    Requires valid auth token in Authorization header
+    Verify user email with token hash from verification email
+    Token hash is received from the verification email link
     """
     try:
         db = SupabaseDB()
-        user = db.client.auth.get_user()
         
-        if not user:
+        # Verify the OTP/token
+        response = db.client.auth.verify_otp({
+            "token_hash": request.token_hash,
+            "type": request.type
+        })
+        
+        if not response.user:
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Not authenticated"
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid or expired verification token"
             )
         
-        # Get user profile
-        profile = await db.get_user_preferences(user.user.id)
-        
         return {
-            "id": user.user.id,
-            "email": user.user.email,
-            "profile": profile
+            "message": "Email verified successfully! You can now sign in.",
+            "user": {
+                "id": response.user.id,
+                "email": response.user.email,
+                "email_confirmed_at": response.user.email_confirmed_at
+            }
         }
         
     except HTTPException:
         raise
     except Exception as e:
+        logger.exception("Email verification failed")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get user: {str(e)}"
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email verification failed. The link may be invalid or expired."
         )
 
 
-@router.post("/verify-email")
-async def verify_email(token: str):
+@router.post("/resend-verification")
+async def resend_verification_email(request: ResendVerificationRequest):
     """
-    Verify user email with token from email
+    Resend verification email to user
     """
     try:
         db = SupabaseDB()
         
-        response = db.client.auth.verify_otp({
-            "token": token,
-            "type": "email"
+        # Resend verification email
+        db.client.auth.resend({
+            "type": "signup",
+            "email": request.email
         })
         
         return {
-            "message": "Email verified successfully!",
-            "user": response.user
+            "message": f"Verification email sent to {request.email}. Please check your inbox."
         }
         
     except Exception as e:
+        logger.exception("Failed to resend verification email")
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Email verification failed: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to resend verification email. Please try again."
         )
