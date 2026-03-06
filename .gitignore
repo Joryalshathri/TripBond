@@ -8,20 +8,35 @@
 .buildlog/
 .history
 .svn/
+<<<<<<< HEAD
 migrate_working_dir/
 
 # IntelliJ related
+=======
+.swiftpm/
+migrate_working_dir/
+Thumbs.db
+
+# IntelliJ/Android Studio
+>>>>>>> 64e63e462e56f19c432aa5a2d9c1fea7e4e4094d
 *.iml
 *.ipr
 *.iws
 .idea/
 
+<<<<<<< HEAD
+=======
+# VS Code
+.vscode/
+
+>>>>>>> 64e63e462e56f19c432aa5a2d9c1fea7e4e4094d
 # Flutter/Dart/Pub related
 **/doc/api/
 **/ios/Flutter/.last_build_id
 .dart_tool/
 .flutter-plugins
 .flutter-plugins-dependencies
+<<<<<<< HEAD
 .packages
 .pub-cache/
 .pub/
@@ -40,6 +55,28 @@ migrate_working_dir/
 **/android/**/GeneratedPluginRegistrant.java
 
 # iOS/XCode related
+=======
+.pub-cache/
+.pub/
+build/
+.packages
+
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# Android Studio build artifacts
+/android/app/debug
+/android/app/profile
+/android/app/release
+/android/.gradle
+/android/captures/
+/android/local.properties
+
+# iOS/XCode
+>>>>>>> 64e63e462e56f19c432aa5a2d9c1fea7e4e4094d
 **/ios/**/*.mode1v3
 **/ios/**/*.mode2v3
 **/ios/**/*.moved-aside
@@ -56,6 +93,7 @@ migrate_working_dir/
 **/ios/**/profile
 **/ios/**/xcuserdata
 **/ios/.generated/
+<<<<<<< HEAD
 **/ios/Flutter/App.framework
 **/ios/Flutter/Flutter.framework
 **/ios/Flutter/Flutter.podspec
@@ -76,3 +114,46 @@ app.*.symbols
 
 # Obfuscation related
 app.*.map.json
+=======
+**/ios/Flutter/ephemeral
+**/ios/Flutter/Generated.xcconfig
+
+# Web
+/web/flutter_service_worker.js
+/web/main.dart.js
+
+# Windows
+windows/flutter/generated_plugin_registrant.cc
+windows/flutter/generated_plugin_registrant.h
+windows/flutter/generated_plugins.cmake
+
+# macOS
+macos/Flutter/ephemeral/
+macos/Flutter/GeneratedPluginRegistrant.swift
+
+# Linux
+linux/flutter/generated_plugin_registrant.cc
+linux/flutter/generated_plugin_registrant.h
+linux/flutter/generated_plugins.cmake
+
+# Coverage
+coverage/
+
+# Backup files
+*.bak
+*.backup
+*.old
+*_backup.*
+*_old.*
+
+# Temporary files
+*.tmp
+*.temp
+~*
+
+# Environment
+.env
+.env.local
+# Duplicate/backup folders
+TripBond-Frontend/
+>>>>>>> 64e63e462e56f19c432aa5a2d9c1fea7e4e4094d
