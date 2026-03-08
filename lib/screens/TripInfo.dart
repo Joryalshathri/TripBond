@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'AI_Plan.dart';
+import 'DestinationLandingPage.dart';
 
 const List<String> _tripTypes = [
   'Solo Trip',
@@ -17,7 +18,9 @@ const List<String> _bonders = [
 ];
 
 class TripInfo extends StatefulWidget {
-  const TripInfo({super.key});
+  final String selectedDates; 
+
+  const TripInfo({super.key, required this.selectedDates});
 
   @override
   State<TripInfo> createState() => _TripinfoState();
@@ -43,15 +46,28 @@ class _TripinfoState extends State<TripInfo> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SizedBox(height: 16),
-                    const Center(
-                      child: Text(
-                        'Plan your Trip',
-                        style: TextStyle(
-                          fontFamily: 'Poppins',
-                          fontWeight: FontWeight.w700,
-                          fontSize: 24,
-                          color: Colors.black,
-                        ),
+                    Center(
+                      child: Column(
+                        children: [
+                          const Text(
+                            'Plan your Trip',
+                            style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontWeight: FontWeight.w700,
+                              fontSize: 24,
+                              color: Colors.black,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            "$selectedCityForTrip, Saudi Arabia", // Dynamic Global City
+                            style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 14,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 32),
@@ -119,74 +135,74 @@ class _TripinfoState extends State<TripInfo> {
   Widget _buildTopBar(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 50, 20, 12),
-      child: Row(
+      child: Stack( // Using Stack to keep the back button on the left while centering the middle content
+        alignment: Alignment.center,
         children: [
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Container(
-              width: 40,
-              height: 40,
-              alignment: Alignment.center,
-              child: const Icon(Icons.arrow_back, size: 24, color: Color(0xFF1E1E1E)),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: GestureDetector(
+              onTap: () => Navigator.pop(context),
+              child: Container(
+                width: 40,
+                height: 40,
+                alignment: Alignment.center,
+                child: const Icon(Icons.arrow_back, size: 24, color: Color(0xFF1E1E1E)),
+              ),
             ),
           ),
-          const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey.shade300),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.location_on_outlined, size: 14, color: Colors.grey.shade800),
-                const SizedBox(width: 4),
-                const Text(
-                  'Khobar',
-                  style: TextStyle(
-                    fontFamily: 'Poppins',
-                    fontWeight: FontWeight.w500,
-                    fontSize: 13,
-                    color: Colors.black,
-                  ),
+          // Centered Row for Location and Dates
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade300),
+                  borderRadius: BorderRadius.circular(20),
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey.shade300),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  '9-13 sep',
-                  style: TextStyle(
-                    fontFamily: 'Poppins',
-                    fontWeight: FontWeight.w500,
-                    fontSize: 13,
-                    color: Colors.black,
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.location_on_outlined, size: 14, color: Colors.grey.shade800),
+                    const SizedBox(width: 4),
+                    Text(
+                      selectedCityForTrip, // Global dynamic city
+                      style: const TextStyle(
+                        fontFamily: 'Poppins',
+                        fontWeight: FontWeight.w500,
+                        fontSize: 13,
+                        color: Colors.black,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 4),
-                Icon(Icons.keyboard_arrow_down, size: 16, color: Colors.grey.shade800),
-              ],
-            ),
-          ),
-          const Spacer(),
-          GestureDetector(
-            onTap: () {},
-            child: Container(
-              width: 40,
-              height: 40,
-              alignment: Alignment.center,
-              child: const Icon(Icons.menu, size: 24, color: Color(0xFF1E1E1E)),
-            ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade300),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      widget.selectedDates, // Displaying dates
+                      style: const TextStyle(
+                        fontFamily: 'Poppins',
+                        fontWeight: FontWeight.w500,
+                        fontSize: 13,
+                        color: Colors.black,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(Icons.keyboard_arrow_down, size: 16, color: Colors.grey.shade800),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),

@@ -120,13 +120,15 @@ class _MbtiScreenState extends State<MbtiScreen> {
     }
   }
 
-  void _handleBack() {
+ /* whats the benfit of this ? if we dont have a back botton 
+ void _handleBack() {
     if (_currentScreen > 0) {
       setState(() {
         _currentScreen--;
       });
     }
   }
+*/
 
   Future<void> _completeAssessment() async {
     // Calculate MBTI type based on answers

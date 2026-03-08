@@ -4,8 +4,13 @@ import 'DatesPage.dart';
 import 'Bonder.dart';
 import 'profile.dart';
 import 'close_spots.dart';
-import 'group_suggested_itinerary.dart';
+import 'AI_Plan.dart';
 import '../core/animations/animation_constants.dart';
+
+List<Map<String, String>> likedPosts = [];
+
+// GLOBAL VARIABLE: stores city name and sends it to "trip info"
+String selectedCityForTrip = "";
 
 class Destination {
   final int id;
@@ -27,20 +32,20 @@ final List<Destination> destinations = [
   Destination(
     id: 1,
     name: 'Buraidah',
-    image: 'assets/images/places/Buraidah.png',
+    image: 'assets/images/cities/Buraidah.png',
     stars: ['star', 'star', 'star'],
   ),
   Destination(
     id: 2,
     name: 'Khobar',
-    image: 'assets/images/places/Khobar.png',
+    image: 'assets/images/cities/Khobar.png',
     stars: ['star', 'star', 'star'],
     featured: true,
   ),
   Destination(
     id: 3,
     name: 'Jeddah',
-    image: 'assets/images/places/Jeddah.png',
+    image: 'assets/images/cities/jeddah.png',
     stars: ['star', 'star', 'star'],
   ),
 ];
@@ -91,15 +96,20 @@ final List<Post> posts = [
   Post(
     userName: 'Fatima Khan',
     location: 'Riyadh',
-    image: 'assets/images/cities/riyadh.png',
+    image: 'assets/images/cities/Riyadh.png',
     title: 'Adventure Time',
     likes: 5,
   ),
 ];
 
-class DestinationLandingPage extends StatelessWidget {
+class DestinationLandingPage extends StatefulWidget {
   const DestinationLandingPage({super.key});
 
+  @override
+  State<DestinationLandingPage> createState() => _DestinationLandingPageState();
+}
+
+class _DestinationLandingPageState extends State<DestinationLandingPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -135,15 +145,13 @@ class DestinationLandingPage extends StatelessWidget {
                         child: _buildPostCard(posts[index])
                             .animate()
                             .fadeIn(
-                              delay:
-                                  Duration(milliseconds: 450 + (index * 100)),
+                              delay: Duration(milliseconds: 450 + (index * 100)),
                               duration: Duration(
                                   milliseconds: AnimationConstants.normal),
                               curve: AnimationConstants.cubicEaseOut,
                             )
                             .slideY(
-                              delay:
-                                  Duration(milliseconds: 450 + (index * 100)),
+                              delay: Duration(milliseconds: 450 + (index * 100)),
                               begin: 0.15,
                               end: 0,
                               duration: Duration(
@@ -180,7 +188,12 @@ class DestinationLandingPage extends StatelessWidget {
             ),
           ),
           IconButton(
-            onPressed: () {},
+            onPressed: () {
+showSearch(
+      context: context,
+      delegate: DestinationSearchDelegate(),
+    );
+            },
             icon: const Icon(Icons.search, size: 28, color: Colors.black),
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(),
@@ -213,6 +226,8 @@ class DestinationLandingPage extends StatelessWidget {
           return _DestinationCard(
             destination: destinations[index],
             onTap: () {
+              // Setting the global location directly
+              selectedCityForTrip = destinations[index].name;
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const DatesPage()),
@@ -310,7 +325,10 @@ class DestinationLandingPage extends StatelessWidget {
         );
   }
 
-  Widget _buildPostCard(Post post) {
+ Widget _buildPostCard(Post post) {
+    // Checking if the post is currently in the shared liked list
+    bool isLiked = likedPosts.any((element) => element['name'] == post.title);
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
@@ -352,13 +370,11 @@ class DestinationLandingPage extends StatelessWidget {
                         fontWeight: FontWeight.w600,
                         fontSize: 14,
                         color: Color(0xFF121212),
-                        letterSpacing: 0.28,
                       ),
                     ),
                     Row(
                       children: [
-                        const Icon(Icons.location_on,
-                            size: 14, color: Color(0xFF6F7789)),
+                        const Icon(Icons.location_on, size: 14, color: Color(0xFF6F7789)),
                         const SizedBox(width: 4),
                         Text(
                           post.location,
@@ -373,48 +389,37 @@ class DestinationLandingPage extends StatelessWidget {
                   ],
                 ),
               ),
-              Icon(Icons.favorite_border, size: 20, color: Colors.grey[600])
-                  .animate(
-                      onPlay: (controller) => controller.repeat(reverse: true))
-                  .scale(
-                    begin: const Offset(1.0, 1.0),
-                    end: const Offset(1.08, 1.08),
-                    duration: 1500.ms,
-                    curve: Curves.easeInOut,
-                  ),
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    if (!isLiked) {
+                      likedPosts.add({
+                        'name': post.title,
+                        'location': post.location,
+                        'image': post.image,
+                      });
+                    } else {
+                      likedPosts.removeWhere(
+                          (element) => element['name'] == post.title);
+                    }
+                  });
+                },
+                child: Icon(
+                  isLiked ? Icons.favorite : Icons.favorite_border,
+                  size: 20,
+                  color: isLiked ? Colors.red : Colors.grey[600],
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 12),
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
-            child: Container(
+            child: Image.asset(
+              post.image,
               width: double.infinity,
               height: 180,
-              color: Colors.grey[200],
-              child: Image.asset(
-                post.image,
-                width: double.infinity,
-                height: 180,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    width: double.infinity,
-                    height: 180,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          const Color(0xFF4675B8).withOpacity(0.3),
-                          const Color(0xFF4675B8).withOpacity(0.1),
-                        ],
-                      ),
-                    ),
-                    child: const Icon(Icons.image,
-                        size: 50, color: Color(0xFF4675B8)),
-                  );
-                },
-              ),
+              fit: BoxFit.cover,
             ),
           ),
           const SizedBox(height: 12),
@@ -428,105 +433,37 @@ class DestinationLandingPage extends StatelessWidget {
               color: Color(0xFF121212),
             ),
           ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              SizedBox(
-                width: 50,
-                height: 24,
-                child: Stack(
-                  children: List.generate(3, (i) {
-                    return Positioned(
-                      left: i * 16.0,
-                      child: Container(
-                        width: 24,
-                        height: 24,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF4675B8),
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 2),
-                        ),
-                        child: const Icon(Icons.person,
-                            size: 12, color: Colors.white),
-                      ),
-                    );
-                  }),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                '+${post.likes} people like this Post',
-                style: const TextStyle(
-                  fontFamily: 'Poppins',
-                  fontSize: 12,
-                  color: Color(0xFF6F7789),
-                  letterSpacing: 0.36,
-                ),
-              ),
-            ],
-          ),
         ],
       ),
     );
   }
-
+  
   Widget _buildBottomNav(BuildContext context) {
     return Positioned(
-      bottom: 0,
-      left: 0,
-      right: 0,
+      bottom: 0, left: 0, right: 0,
       child: Container(
-        height: 80,
+        height: 70,
         decoration: const BoxDecoration(
           color: Color(0xFF4675B8),
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(25),
-            topRight: Radius.circular(25),
+          borderRadius: BorderRadius.only(topLeft: Radius.circular(25), topRight: Radius.circular(25)),
+          boxShadow: [BoxShadow(color: Color(0x1A000000), blurRadius: 20, offset: Offset(0, -4))],
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Color(0x33000000),
-              blurRadius: 24,
-              offset: Offset(0, -8),
-            ),
-          ],
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 32),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            _navIcon(Icons.search, active: true, onTap: () {}, index: 0),
-            _navIcon(Icons.location_on_outlined, onTap: () {
-              Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const CloseSpots()));
-            }, index: 1),
-            _navIcon(Icons.airplanemode_active, onTap: () {
-              Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (_) => const GroupSuggestedItinerary()));
-            }, index: 2),
-            _navIcon(Icons.group_outlined, onTap: () {
-              Navigator.push(
-                  context, MaterialPageRoute(builder: (_) => const Bonders()));
-            }, index: 3),
-            _navIcon(Icons.person_outline, onTap: () {
-              Navigator.push(
-                  context, MaterialPageRoute(builder: (_) => const Profile()));
-            }, index: 4),
+            _navIcon(Icons.search, active: true),
+            _navIcon(Icons.location_on_outlined, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CloseSpots()))),
+            _navIcon(Icons.airplanemode_active, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AI_Plan()))),
+            _navIcon(Icons.group_outlined, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const Bonders()))),
+            _navIcon(Icons.person_outline, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const Profile()))),
           ],
+            ),
         ),
-      ).animate().slideY(
-            begin: 1.0,
-            end: 0,
-            duration: Duration(milliseconds: AnimationConstants.medium),
-            curve: AnimationConstants.cubicEaseOut,
-          ),
-    );
-  }
+      );   
+  } 
 
-  Widget _navIcon(IconData icon,
-      {VoidCallback? onTap, bool active = false, int index = 0}) {
+ Widget _navIcon(IconData icon, {VoidCallback? onTap, bool active = false}) {
     return GestureDetector(
       onTap: onTap,
       child: Column(
@@ -535,35 +472,11 @@ class DestinationLandingPage extends StatelessWidget {
           Icon(icon, size: 24, color: Colors.white),
           if (active) ...[
             const SizedBox(height: 4),
-            Container(
-              width: 20,
-              height: 2,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(1),
-              ),
-            )
-                .animate(onPlay: (controller) => controller.repeat())
-                .fadeIn(duration: 800.ms)
-                .then()
-                .fadeOut(duration: 800.ms),
+            Container(width: 20, height: 2, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(1))),
           ],
         ],
       ),
-    )
-        .animate()
-        .fadeIn(
-          delay: Duration(milliseconds: 500 + (index * 50)),
-          duration: Duration(milliseconds: AnimationConstants.fast),
-          curve: AnimationConstants.cubicEaseOut,
-        )
-        .scale(
-          delay: Duration(milliseconds: 500 + (index * 50)),
-          begin: const Offset(0.7, 0.7),
-          end: const Offset(1.0, 1.0),
-          duration: Duration(milliseconds: AnimationConstants.normal),
-          curve: AnimationConstants.cubicEaseOut,
-        );
+    );
   }
 }
 
@@ -678,16 +591,13 @@ class _DestinationCardState extends State<_DestinationCard>
                     child: Container(
                       padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.3),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.favorite_border,
-                          size: 16, color: Colors.white),
                     ),
                   ),
                 ),
                 Positioned(
-                  bottom: 40,
+                  bottom: 10,
                   left: 0,
                   right: 0,
                   child: Text(
@@ -708,25 +618,63 @@ class _DestinationCardState extends State<_DestinationCard>
                     ),
                   ),
                 ),
-                Positioned(
-                  bottom: 12,
-                  left: 0,
-                  right: 0,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: widget.destination.stars.map((star) {
-                      return const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 2),
-                        child: Icon(Icons.star, color: Colors.amber, size: 16),
-                      );
-                    }).toList(),
-                  ),
-                ),
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+class DestinationSearchDelegate extends SearchDelegate {
+  // "X" button to clear the text
+  @override
+  List<Widget>? buildActions(BuildContext context) {
+    return [
+      IconButton(
+        icon: const Icon(Icons.clear),
+        onPressed: () => query = '', // 'query' is the text the user types
+      ),
+    ];
+  }
+
+  //  Back button to close search
+  @override
+  Widget? buildLeading(BuildContext context) {
+    return IconButton(
+      icon: const Icon(Icons.arrow_back),
+      onPressed: () => close(context, null),
+    );
+  }
+
+  // What shows up when they press "Enter" (results)
+  @override
+  Widget buildResults(BuildContext context) {
+    return Center(child: Text('Searching for "$query"...'));
+  }
+
+  // What shows up while they are typing (Suggestions)
+  @override
+  Widget buildSuggestions(BuildContext context) {
+    // Filtering the existing destinations list based on the search query
+    final suggestionList = destinations.where((city) {
+      return city.name.toLowerCase().contains(query.toLowerCase());
+    }).toList();
+
+    return ListView.builder(
+      itemCount: suggestionList.length,
+      itemBuilder: (context, index) {
+        return ListTile(
+          leading: const Icon(Icons.location_city),
+          title: Text(suggestionList[index].name),
+          onTap: () {
+            query = suggestionList[index].name;
+            showResults(context);
+            // Navigating directly to the city page 
+          },
+        );
+      },
     );
   }
 }

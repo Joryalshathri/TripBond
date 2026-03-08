@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../core/animations/animation_constants.dart';
+import 'AI_Plan.dart';
+import 'bonder.dart';
+import 'close_spots.dart';
+import 'DestinationLandingPage.dart';
+import 'profile.dart';
+
 
 class PlanItem {
   final String name;
@@ -88,7 +94,7 @@ class _PlansListState extends State<PlansList> {
               ),
             ],
           ),
-          _buildBottomNav(),
+          _buildBottomNav(context),
         ],
       ),
     );
@@ -99,11 +105,7 @@ class _PlansListState extends State<PlansList> {
       padding: const EdgeInsets.fromLTRB(20, 50, 20, 12),
       child: Row(
         children: [
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: const Icon(Icons.arrow_back,
-                size: 24, color: Color(0xFF1E1E1E)),
-          ),
+          const SizedBox(width: 24),
           const Spacer(),
           const Text(
             "Sara's Plans",
@@ -164,134 +166,145 @@ class _PlansListState extends State<PlansList> {
       ],
     );
   }
-
-  Widget _buildPlanCard(PlanItem plan) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: Colors.grey.shade200),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: Image.asset(
-              plan.image,
-              width: 90,
-              height: 90,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Container(
+Widget _buildPlanCard(PlanItem plan) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const AI_Plan()),
+        );
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border.all(color: Colors.grey.shade200),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Image.asset(
+                plan.image,
                 width: 90,
                 height: 90,
-                color: Colors.grey.shade300,
-                child: const Icon(Icons.image, color: Colors.grey),
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(
+                  width: 90,
+                  height: 90,
+                  color: Colors.grey.shade300,
+                  child: const Icon(Icons.image, color: Colors.grey),
+                ),
               ),
             ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  plan.name,
-                  style: const TextStyle(
-                    fontFamily: 'Poppins',
-                    fontWeight: FontWeight.w700,
-                    fontSize: 16,
-                    color: Colors.black,
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    plan.name,
+                    style: const TextStyle(
+                      fontFamily: 'Poppins',
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                      color: Colors.black,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    const Icon(Icons.calendar_today,
-                        size: 14, color: Color(0xFF666666)),
-                    const SizedBox(width: 6),
-                    Text(
-                      plan.dateRange,
-                      style: TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 13,
-                        color: Colors.grey.shade500,
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Icon(Icons.calendar_today,
+                          size: 14, color: Color(0xFF666666)),
+                      const SizedBox(width: 6),
+                      Text(
+                        plan.dateRange,
+                        style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 13,
+                          color: Colors.grey.shade500,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (plan.avatarInitials.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      height: 24,
+                      child: Stack(
+                        children: List.generate(plan.avatarInitials.length, (i) {
+                          return Positioned(
+                            left: i * 18.0,
+                            child: Container(
+                              width: 24,
+                              height: 24,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: _avatarColors[i % _avatarColors.length],
+                                border: Border.all(color: Colors.white, width: 2),
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(
+                                plan.avatarInitials[i],
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          );
+                        }),
                       ),
                     ),
                   ],
-                ),
-                if (plan.avatarInitials.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    height: 24,
-                    child: Stack(
-                      children: List.generate(plan.avatarInitials.length, (i) {
-                        return Positioned(
-                          left: i * 18.0,
-                          child: Container(
-                            width: 24,
-                            height: 24,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: _avatarColors[i % _avatarColors.length],
-                              border: Border.all(color: Colors.white, width: 2),
-                            ),
-                            alignment: Alignment.center,
-                            child: Text(
-                              plan.avatarInitials[i],
-                              style: const TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                        );
-                      }),
-                    ),
-                  ),
                 ],
-              ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildBottomNav() {
+  Widget _buildBottomNav(BuildContext context) {
     return Positioned(
-      bottom: 0,
-      left: 0,
-      right: 0,
+      bottom: 0, left: 0, right: 0,
       child: Container(
         height: 70,
         decoration: const BoxDecoration(
           color: Color(0xFF4675B8),
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(25),
-            topRight: Radius.circular(25),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Color(0x1A000000),
-              blurRadius: 20,
-              offset: Offset(0, -4),
-            ),
-          ],
+          borderRadius: BorderRadius.only(topLeft: Radius.circular(25), topRight: Radius.circular(25)),
         ),
         padding: const EdgeInsets.symmetric(horizontal: 32),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: const [
-            Icon(Icons.search, size: 24, color: Colors.white),
-            Icon(Icons.location_on_outlined, size: 24, color: Colors.white),
-            Icon(Icons.airplanemode_active, size: 24, color: Colors.white),
-            Icon(Icons.group_outlined, size: 24, color: Colors.white),
-            Icon(Icons.person_outline, size: 24, color: Colors.white),
+          children: [
+            _navIcon(Icons.search, onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const DestinationLandingPage()))),
+            _navIcon(Icons.location_on_outlined, onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const CloseSpots()))),
+            _navIcon(Icons.airplanemode_active, onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const AI_Plan()))),
+            _navIcon(Icons.group_outlined, onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const Bonders()))),
+            _navIcon(Icons.person_outline, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const Profile()))),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _navIcon(IconData icon, {VoidCallback? onTap, bool active = false}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 24, color: Colors.white),
+          if (active) ...[
+            const SizedBox(height: 4),
+            Container(width: 20, height: 2, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(1))),
+          ],
+        ],
       ),
     );
   }
