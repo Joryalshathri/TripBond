@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, status, Depends
-from ..database import SupabaseDB, get_current_user_token, get_supabase_client_for_user
+from fastapi.concurrency import run_in_threadpool
+from ..database import SupabaseDB, get_current_user_token, get_supabase_client_for_user, get_supabase_admin_client
 from ..config import get_settings
 from ..schemas.auth import (
     SignUpRequest,
@@ -9,7 +10,11 @@ from ..schemas.auth import (
     UpdatePasswordRequest,
     VerifyEmailRequest,
     ResendVerificationRequest,
+    SendVerificationCodeRequest,
+    VerifyEmailCodeRequest,
 )
+from ..services import verification_store
+from ..services.email_service import send_verification_code_email
 import logging
 
 logger = logging.getLogger(__name__)
@@ -69,10 +74,21 @@ async def sign_up(request: SignUpRequest):
         profile_data = {k: v for k, v in profile_data.items() if v is not None}
         
         print(f"🔵 Inserting profile: {profile_data}")
-        db.client.table("profiles").insert(profile_data).execute()
+        admin_client = get_supabase_admin_client()
+        await run_in_threadpool(lambda: admin_client.table("profiles").insert(profile_data).execute())
         
         print(f"🔵 Profile created successfully!")
-        
+
+        # Generate and send 6-digit email verification code
+        code = verification_store.generate_code()
+        verification_store.store_code(request.email, code, response.user.id)
+        send_verification_code_email(
+            to_email=request.email,
+            code=code,
+            name=request.full_name,
+        )
+        print(f"🔵 Verification code sent to {request.email}")
+
         # Note: access_token may be empty if email confirmation is required
         return AuthResponse(
             access_token=response.session.access_token if response.session else "",
@@ -81,7 +97,7 @@ async def sign_up(request: SignUpRequest):
                 "email": response.user.email,
                 "full_name": request.full_name
             },
-            message="Account created successfully! Please check your email to verify your account."
+            message="Account created! A 6-digit verification code has been sent to your email."
         )
         
     except HTTPException:
@@ -119,11 +135,12 @@ async def sign_in(request: SignInRequest):
                 detail="Invalid email or password"
             )
         
-        # Get user profile
-        # TODO: Refactor to use get_supabase_client_for_user(response.session.access_token)
-        profile = db.get_user_preferences(response.user.id)
-        if hasattr(profile, '__await__'):
-            profile = await profile
+        # Get user profile using the authenticated user's token (respects RLS)
+        user_client = get_supabase_client_for_user(response.session.access_token)
+        profile_result = await run_in_threadpool(
+            lambda: user_client.table("profiles").select("*").eq("id", response.user.id).execute()
+        )
+        profile = profile_result.data[0] if profile_result.data else None
         
         return AuthResponse(
             access_token=response.session.access_token,
@@ -317,4 +334,83 @@ async def resend_verification_email(request: ResendVerificationRequest):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to resend verification email. Please try again."
+        )
+
+
+# ── 6-digit email verification code endpoints ──────────────────────────────
+
+
+@router.post("/send-verification-code")
+async def send_email_verification_code(request: SendVerificationCodeRequest):
+    """
+    Generate a 6-digit verification code and send it to the given email.
+    Call this to resend/refresh the code (e.g., if the user clicks 'Resend').
+    """
+    try:
+        admin_client = get_supabase_admin_client()
+
+        # Look up the user by email using the admin API
+        users_response = await run_in_threadpool(
+            lambda: admin_client.auth.admin.list_users()
+        )
+
+        user = next(
+            (u for u in users_response if u.email and u.email.lower() == request.email.lower()),
+            None,
+        )
+        if not user:
+            # Don't reveal whether the email exists
+            return {"message": "If an account exists for this email, a verification code has been sent."}
+
+        code = verification_store.generate_code()
+        verification_store.store_code(request.email, code, user.id)
+        send_verification_code_email(to_email=request.email, code=code, name="")
+
+        return {"message": "A new verification code has been sent to your email."}
+
+    except Exception as e:
+        logger.exception("Failed to send verification code")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to send verification code. Please try again.",
+        )
+
+
+@router.post("/verify-email-code")
+async def verify_email_code(request: VerifyEmailCodeRequest):
+    """
+    Verify the 6-digit code submitted by the user.
+    On success, confirms the user's email in Supabase so they can log in.
+    """
+    try:
+        user_id = verification_store.verify_and_consume(request.email, request.code)
+
+        if not user_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid or expired verification code. Please request a new one.",
+            )
+
+        # Confirm the email via Supabase admin API
+        admin_client = get_supabase_admin_client()
+        await run_in_threadpool(
+            lambda: admin_client.auth.admin.update_user_by_id(
+                user_id,
+                {"email_confirm": True},
+            )
+        )
+
+        logger.info(f"Email verified for user {user_id}")
+        return {
+            "message": "Email verified successfully! You can now sign in.",
+            "email": request.email,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Email code verification failed")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Email verification failed. Please try again.",
         )

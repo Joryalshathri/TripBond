@@ -1,7 +1,7 @@
 class ApiConfig {
   // Backend API base URL
   // Use your computer's IP address for Android emulator
-  static const String baseUrl = 'http://192.168.3.114:8000';
+  static const String baseUrl = 'http://localhost:8000';
 
   // API endpoints
   static const String authPath = '/api/auth';

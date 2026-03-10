@@ -35,6 +35,13 @@ class Settings(BaseSettings):
     allowed_origins: list[str] = ["http://localhost:3000", "http://localhost:8080", "http://10.0.2.2:8000", "http://192.168.3.114:8000", "*"]
     frontend_url: str = "http://192.168.3.114:8000"
 
+    # Email / SMTP  (set these in your .env to send real emails)
+    smtp_host: Optional[str] = None
+    smtp_port: int = 587
+    smtp_user: Optional[str] = None
+    smtp_password: Optional[str] = None
+    smtp_from_email: Optional[str] = None
+
 
 @lru_cache()
 def get_settings() -> Settings:

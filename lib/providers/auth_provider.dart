@@ -106,11 +106,20 @@ class AuthProvider with ChangeNotifier {
       // Backend returns {access_token, user, message} on success
       if (response['user'] != null) {
         final user = response['user'] as Map<String, dynamic>;
-        _userId = user['id'] as String;
-        _userEmail = user['email'] as String;
+        _userId = user['id'] as String?;
+        _userEmail = user['email'] as String?;
         _userName =
             user['full_name'] as String? ?? user['name'] as String? ?? name;
-        _status = AuthStatus.authenticated;
+
+        final token = response['token'] as String? ?? '';
+        if (token.isNotEmpty) {
+          // Fully registered and logged in (email confirmation not required)
+          _status = AuthStatus.authenticated;
+        } else {
+          // Registered but email confirmation required before login
+          _status = AuthStatus.unauthenticated;
+          _errorMessage = 'email_verification_required';
+        }
         notifyListeners();
         return true;
       } else {
@@ -144,6 +153,35 @@ class AuthProvider with ChangeNotifier {
     }
 
     notifyListeners();
+  }
+
+  // Send 6-digit email verification code
+  Future<void> sendVerificationCode(String email) async {
+    try {
+      await _authService.sendVerificationCode(email);
+    } catch (e) {
+      _errorMessage = e.toString().replaceAll('Exception: ', '');
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  // Verify 6-digit email code — returns true on success
+  Future<bool> verifyEmailCode(String email, String code) async {
+    _errorMessage = null;
+    notifyListeners();
+    try {
+      final success = await _authService.verifyEmailCode(email, code);
+      if (!success) {
+        _errorMessage = 'Invalid verification code. Please try again.';
+        notifyListeners();
+      }
+      return success;
+    } catch (e) {
+      _errorMessage = e.toString().replaceAll('Exception: ', '');
+      notifyListeners();
+      return false;
+    }
   }
 
   // Clear error message

@@ -251,4 +251,30 @@ class AuthService {
       throw Exception('Failed to resend verification: ${e.toString()}');
     }
   }
+
+  // Send 6-digit email verification code
+  Future<void> sendVerificationCode(String email) async {
+    try {
+      await _apiService.post(
+        '${ApiConfig.authPath}/send-verification-code',
+        {'email': email},
+      );
+    } catch (e) {
+      throw Exception('Failed to send verification code: ${e.toString()}');
+    }
+  }
+
+  // Verify the 6-digit email code — returns true on success
+  Future<bool> verifyEmailCode(String email, String code) async {
+    try {
+      final response = await _apiService.post(
+        '${ApiConfig.authPath}/verify-email-code',
+        {'email': email, 'code': code},
+      );
+      // Backend returns {message, email} on success
+      return response['email'] != null || response['message'] != null;
+    } catch (e) {
+      throw Exception('Email verification failed: ${e.toString()}');
+    }
+  }
 }

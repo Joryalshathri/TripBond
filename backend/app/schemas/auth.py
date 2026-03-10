@@ -45,3 +45,16 @@ class VerifyEmailRequest(BaseModel):
 
 class ResendVerificationRequest(BaseModel):
     email: EmailStr
+
+
+# ── 6-digit email verification code flow ─────────────────────────────────────
+
+class SendVerificationCodeRequest(BaseModel):
+    """Request to send (or resend) a 6-digit verification code to an email."""
+    email: EmailStr
+
+
+class VerifyEmailCodeRequest(BaseModel):
+    """Request to verify a 6-digit code submitted by the user."""
+    email: EmailStr
+    code: str

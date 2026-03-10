@@ -79,7 +79,7 @@ class _SettingsScreenState extends State<Settings> {
           Switch(
             value: _notificationsOn,
             onChanged: (v) => setState(() => _notificationsOn = v),
-            activeThumbColor: const Color(0xFF4675B8),
+            activeColor: const Color(0xFF4675B8),
           ),
         ],
       ),

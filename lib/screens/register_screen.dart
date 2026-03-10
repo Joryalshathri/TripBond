@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 import 'login_screen.dart';
+import 'email_verification_screen.dart';
 import 'widgets/custom_loading_spinner.dart';
 import '../core/animations/page_transitions.dart';
 import '../core/animations/animation_constants.dart';
@@ -95,11 +96,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (!mounted) return;
 
     if (success) {
-      // Navigate to MBTI assessment and remove all auth screens from stack
-      Navigator.of(context).pushAndRemoveUntil(
-        SharedAxisPageRoute(page: const MbtiScreen()),
-        (route) => false,
-      );
+      final needsVerification =
+          authProvider.errorMessage == 'email_verification_required';
+
+      if (needsVerification) {
+        authProvider.clearError();
+        // Navigate to the 6-digit email verification screen
+        Navigator.of(context).push(
+          SharedAxisPageRoute(
+            page: EmailVerificationScreen(email: _emailController.text.trim()),
+          ),
+        );
+      } else {
+        // Fully authenticated — proceed to MBTI assessment
+        Navigator.of(context).pushAndRemoveUntil(
+          SharedAxisPageRoute(page: const MbtiScreen()),
+          (route) => false,
+        );
+      }
     } else {
       // Show error message
       ScaffoldMessenger.of(context).showSnackBar(
