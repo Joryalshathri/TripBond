@@ -1,49 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:provider/provider.dart';
 import '../core/animations/animation_constants.dart';
-
-class PlanItem {
-  final String name;
-  final String image;
-  final String dateRange;
-  final List<String> avatarInitials;
-
-  const PlanItem({
-    required this.name,
-    required this.image,
-    required this.dateRange,
-    this.avatarInitials = const [],
-  });
-}
-
-const List<PlanItem> _currentPlans = [
-  PlanItem(
-    name: 'Khobar',
-    image: 'assets/images/cities/khobar.png',
-    dateRange: '9 - 13 Jan 2026',
-    avatarInitials: ['K', 'L', 'H'],
-  ),
-];
-
-const List<PlanItem> _futurePlans = [
-  PlanItem(
-    name: 'Jeddah',
-    image: 'assets/images/cities/jeddah.png',
-    dateRange: '25 - 27 Feb 2026',
-    avatarInitials: ['Z'],
-  ),
-  PlanItem(
-    name: 'AlUla',
-    image: 'assets/images/cities/AlUla.png',
-    dateRange: '5 - 20 Apr 2026',
-  ),
-];
-
-const List<Color> _avatarColors = [
-  Color(0xFF4675B8),
-  Color(0xFFC4A44A),
-  Color(0xFFE87C5D),
-];
+import '../providers/trip_provider.dart';
 
 class PlansList extends StatefulWidget {
   const PlansList({super.key});
@@ -57,39 +16,84 @@ class _PlansListState extends State<PlansList> {
   bool _futureOpen = true;
 
   @override
+  void initState() {
+    super.initState();
+    Future.microtask(() {
+      Provider.of<TripProvider>(context, listen: false).fetchMyTrips();
+    });
+  }
+
+  List<Map<String, dynamic>> _filterTripsByDate(
+      List<Map<String, dynamic>> trips, bool isCurrent) {
+    final now = DateTime.now();
+    return trips.where((trip) {
+      final startDate = trip['start_date'] != null
+          ? DateTime.tryParse(trip['start_date'])
+          : null;
+      final endDate =
+          trip['end_date'] != null ? DateTime.tryParse(trip['end_date']) : null;
+
+      if (startDate == null || endDate == null) {
+        return !isCurrent; // Put trips without dates in future
+      }
+
+      if (isCurrent) {
+        // Current: ongoing trips (started but not ended)
+        return startDate.isBefore(now) && endDate.isAfter(now);
+      } else {
+        // Future: trips that haven't started yet
+        return startDate.isAfter(now);
+      }
+    }).toList();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
-      body: Stack(
-        children: [
-          Column(
+      body: Consumer<TripProvider>(
+        builder: (context, tripProvider, child) {
+          final currentTrips = _filterTripsByDate(tripProvider.myTrips, true);
+          final futureTrips = _filterTripsByDate(tripProvider.myTrips, false);
+
+          return Stack(
             children: [
-              _buildTopBar(),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.only(bottom: 90),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(height: 8),
-                        _buildSection('Current Plans', _currentOpen, () {
-                          setState(() => _currentOpen = !_currentOpen);
-                        }, _currentPlans),
-                        const SizedBox(height: 16),
-                        _buildSection('Future Plans', _futureOpen, () {
-                          setState(() => _futureOpen = !_futureOpen);
-                        }, _futurePlans),
-                      ],
-                    ),
+              Column(
+                children: [
+                  _buildTopBar(),
+                  Expanded(
+                    child: tripProvider.isLoading
+                        ? const Center(child: CircularProgressIndicator())
+                        : SingleChildScrollView(
+                            padding: const EdgeInsets.only(bottom: 90),
+                            child: Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 20),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const SizedBox(height: 8),
+                                  _buildSection('Current Plans', _currentOpen,
+                                      () {
+                                    setState(
+                                        () => _currentOpen = !_currentOpen);
+                                  }, currentTrips),
+                                  const SizedBox(height: 16),
+                                  _buildSection('Future Plans', _futureOpen,
+                                      () {
+                                    setState(() => _futureOpen = !_futureOpen);
+                                  }, futureTrips),
+                                ],
+                              ),
+                            ),
+                          ),
                   ),
-                ),
+                ],
               ),
+              _buildBottomNav(),
             ],
-          ),
-          _buildBottomNav(),
-        ],
+          );
+        },
       ),
     );
   }
@@ -132,8 +136,8 @@ class _PlansListState extends State<PlansList> {
         );
   }
 
-  Widget _buildSection(
-      String title, bool isOpen, VoidCallback onToggle, List<PlanItem> plans) {
+  Widget _buildSection(String title, bool isOpen, VoidCallback onToggle,
+      List<Map<String, dynamic>> plans) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -165,7 +169,25 @@ class _PlansListState extends State<PlansList> {
     );
   }
 
-  Widget _buildPlanCard(PlanItem plan) {
+  Widget _buildPlanCard(Map<String, dynamic> trip) {
+    final title = trip['title'] ?? 'Untitled Trip';
+    final imageUrl = trip['image_url'];
+
+    // Format date range
+    String dateRange = '';
+    if (trip['start_date'] != null && trip['end_date'] != null) {
+      try {
+        final start = DateTime.parse(trip['start_date']);
+        final end = DateTime.parse(trip['end_date']);
+        dateRange =
+            '${start.day} - ${end.day} ${_getMonthName(end.month)} ${end.year}';
+      } catch (e) {
+        dateRange = 'Date not set';
+      }
+    } else {
+      dateRange = 'Date not set';
+    }
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
@@ -178,18 +200,15 @@ class _PlansListState extends State<PlansList> {
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(16),
-            child: Image.asset(
-              plan.image,
-              width: 90,
-              height: 90,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Container(
-                width: 90,
-                height: 90,
-                color: Colors.grey.shade300,
-                child: const Icon(Icons.image, color: Colors.grey),
-              ),
-            ),
+            child: imageUrl != null
+                ? Image.network(
+                    imageUrl,
+                    width: 90,
+                    height: 90,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => _defaultTripImage(),
+                  )
+                : _defaultTripImage(),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -197,7 +216,7 @@ class _PlansListState extends State<PlansList> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  plan.name,
+                  title,
                   style: const TextStyle(
                     fontFamily: 'Poppins',
                     fontWeight: FontWeight.w700,
@@ -212,7 +231,7 @@ class _PlansListState extends State<PlansList> {
                         size: 14, color: Color(0xFF666666)),
                     const SizedBox(width: 6),
                     Text(
-                      plan.dateRange,
+                      dateRange,
                       style: TextStyle(
                         fontFamily: 'Poppins',
                         fontSize: 13,
@@ -221,43 +240,44 @@ class _PlansListState extends State<PlansList> {
                     ),
                   ],
                 ),
-                if (plan.avatarInitials.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    height: 24,
-                    child: Stack(
-                      children: List.generate(plan.avatarInitials.length, (i) {
-                        return Positioned(
-                          left: i * 18.0,
-                          child: Container(
-                            width: 24,
-                            height: 24,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: _avatarColors[i % _avatarColors.length],
-                              border: Border.all(color: Colors.white, width: 2),
-                            ),
-                            alignment: Alignment.center,
-                            child: Text(
-                              plan.avatarInitials[i],
-                              style: const TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                        );
-                      }),
-                    ),
-                  ),
-                ],
               ],
             ),
           ),
         ],
       ),
     );
+  }
+
+  Widget _defaultTripImage() {
+    return Container(
+      width: 90,
+      height: 90,
+      color: const Color(0xFF4675B8).withOpacity(0.1),
+      child: const Icon(
+        Icons.travel_explore,
+        size: 40,
+        color: Color(0xFF4675B8),
+      ),
+    );
+  }
+
+  String _getMonthName(int month) {
+    const months = [
+      '',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
+    ];
+    return months[month];
   }
 
   Widget _buildBottomNav() {

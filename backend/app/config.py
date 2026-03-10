@@ -32,8 +32,8 @@ class Settings(BaseSettings):
     api_port: int = 8000
     api_version: str = "1.0.0"
     debug: bool = True
-    allowed_origins: list[str] = ["http://localhost:3000", "http://localhost:8080"]
-    frontend_url: str = "http://localhost:3000"
+    allowed_origins: list[str] = ["http://localhost:3000", "http://localhost:8080", "http://10.0.2.2:8000", "http://192.168.3.114:8000", "*"]
+    frontend_url: str = "http://192.168.3.114:8000"
 
 
 @lru_cache()

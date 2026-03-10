@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:provider/provider.dart';
 import 'settings.dart';
 import 'editProfile.dart';
 import 'DestinationLandingPage.dart';
@@ -8,30 +9,8 @@ import 'close_spots.dart';
 import 'group_suggested_itinerary.dart';
 import 'plans_list.dart';
 import '../core/animations/animation_constants.dart';
-
-class TripCard {
-  final String name;
-  final String image;
-  final String location;
-
-  const TripCard(
-      {required this.name, required this.image, required this.location});
-}
-
-const List<TripCard> _pastTrips = [
-  TripCard(
-      name: 'Family Trip',
-      image: 'assets/images/cities/khobar2.png',
-      location: 'Al Khobar'),
-  TripCard(
-      name: 'Business Trip',
-      image: 'assets/images/cities/Riyadh.png',
-      location: 'Riyadh'),
-  TripCard(
-      name: 'Relaxing trip',
-      image: 'assets/images/cities/AlUla.png',
-      location: 'AlUla'),
-];
+import '../providers/user_provider.dart';
+import '../providers/trip_provider.dart';
 
 const List<String> _tabs = ['Past Trips', 'Liked Trips', 'Favorites'];
 
@@ -46,8 +25,21 @@ class _ProfileState extends State<Profile> {
   String _activeTab = 'Past Trips';
   bool _isFollowing = false;
   int _followerCount = 503;
-  int _followingCount = 600;
-  int _tripCount = 50;
+  final int _followingCount = 600;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfileData();
+  }
+
+  Future<void> _loadProfileData() async {
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    final tripProvider = Provider.of<TripProvider>(context, listen: false);
+
+    await userProvider.fetchMyProfile();
+    await tripProvider.fetchMyTrips();
+  }
 
   void _toggleFollow() {
     setState(() {
@@ -154,82 +146,119 @@ class _ProfileState extends State<Profile> {
   }
 
   Widget _buildProfileInfo() {
-    return Column(
-      children: [
-        Container(
-          width: 100,
-          height: 100,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(color: const Color(0xFF4675B8), width: 3),
-          ),
-          child: ClipOval(
-            child: Image.asset(
-              'assets/images/people/profile.png',
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Container(
-                color: Colors.grey.shade300,
-                child: const Icon(Icons.person, size: 48, color: Colors.grey),
+    return Consumer<UserProvider>(
+      builder: (context, userProvider, child) {
+        final profile = userProvider.currentProfile;
+        final fullName =
+            profile?['full_name'] ?? profile?['username'] ?? 'User';
+        final avatarUrl = profile?['avatar_url'];
+        final bio = profile?['bio'];
+        final pastTripsCount = profile?['past_trips_count'] ?? 0;
+        final favoritesCount = profile?['favorites_count'] ?? 0;
+
+        return Column(
+          children: [
+            Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFF4675B8), width: 3),
+              ),
+              child: ClipOval(
+                child: avatarUrl != null
+                    ? Image.network(
+                        avatarUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => _defaultAvatar(),
+                      )
+                    : Image.asset(
+                        'assets/images/people/profile.png',
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => _defaultAvatar(),
+                      ),
+              ),
+            )
+                .animate()
+                .scale(
+                  delay: Duration(milliseconds: 100),
+                  begin: const Offset(0.8, 0.8),
+                  end: const Offset(1.0, 1.0),
+                  duration: Duration(milliseconds: AnimationConstants.medium),
+                  curve: AnimationConstants.cubicEaseOut,
+                )
+                .fadeIn(
+                  delay: Duration(milliseconds: 100),
+                  duration: Duration(milliseconds: AnimationConstants.normal),
+                ),
+            const SizedBox(height: 12),
+            Text(
+              fullName,
+              style: const TextStyle(
+                fontFamily: 'Poppins',
+                fontWeight: FontWeight.w700,
+                fontSize: 20,
+                color: Colors.black,
               ),
             ),
-          ),
-        )
-            .animate()
-            .scale(
-              delay: Duration(milliseconds: 100),
-              begin: const Offset(0.8, 0.8),
-              end: const Offset(1.0, 1.0),
-              duration: Duration(milliseconds: AnimationConstants.medium),
-              curve: AnimationConstants.cubicEaseOut,
-            )
-            .fadeIn(
-              delay: Duration(milliseconds: 100),
-              duration: Duration(milliseconds: AnimationConstants.normal),
+            if (bio != null && bio.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 32),
+                child: Text(
+                  bio,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Color(0xFF6B7280),
+                  ),
+                ),
+              ),
+            ],
+            const SizedBox(height: 12),
+            ElevatedButton(
+              onPressed: _toggleFollow,
+              style: ElevatedButton.styleFrom(
+                backgroundColor:
+                    _isFollowing ? Colors.grey[300] : const Color(0xFFC4A44A),
+                foregroundColor: _isFollowing ? Colors.black87 : Colors.white,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(24)),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 32, vertical: 10),
+                elevation: _isFollowing ? 0 : 2,
+              ),
+              child: Text(
+                _isFollowing ? 'Following' : 'Follow',
+                style: const TextStyle(
+                    fontFamily: 'Poppins',
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14),
+              ),
             ),
-        const SizedBox(height: 12),
-        const Text(
-          'Sarah Mohamed',
-          style: TextStyle(
-            fontFamily: 'Poppins',
-            fontWeight: FontWeight.w700,
-            fontSize: 20,
-            color: Colors.black,
-          ),
-        ),
-        const SizedBox(height: 12),
-        ElevatedButton(
-          onPressed: _toggleFollow,
-          style: ElevatedButton.styleFrom(
-            backgroundColor:
-                _isFollowing ? Colors.grey[300] : const Color(0xFFC4A44A),
-            foregroundColor: _isFollowing ? Colors.black87 : Colors.white,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 10),
-            elevation: _isFollowing ? 0 : 2,
-          ),
-          child: Text(
-            _isFollowing ? 'Following' : 'Follow',
-            style: const TextStyle(
-                fontFamily: 'Poppins',
-                fontWeight: FontWeight.w600,
-                fontSize: 14),
-          ),
-        ),
-        const SizedBox(height: 20),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _buildStat('Trips', _tripCount.toString(), _showTripsList),
-            const SizedBox(width: 40),
-            _buildStat(
-                'Followers', _followerCount.toString(), _showFollowersList),
-            const SizedBox(width: 40),
-            _buildStat(
-                'Following', _followingCount.toString(), _showFollowingList),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _buildStat('Trips', pastTripsCount.toString(), _showTripsList),
+                const SizedBox(width: 40),
+                _buildStat(
+                    'Followers', _followerCount.toString(), _showFollowersList),
+                const SizedBox(width: 40),
+                _buildStat(
+                    'Favorites', favoritesCount.toString(), _showFollowingList),
+              ],
+            ),
           ],
-        ),
-      ],
+        );
+      },
+    );
+  }
+
+  Widget _defaultAvatar() {
+    return Container(
+      color: Colors.grey.shade300,
+      child: const Icon(Icons.person, size: 48, color: Colors.grey),
     );
   }
 
@@ -377,73 +406,119 @@ class _ProfileState extends State<Profile> {
       );
     }
 
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Wrap(
-        spacing: 12,
-        runSpacing: 12,
-        children: _pastTrips
-            .map((trip) => SizedBox(
-                  width: (MediaQuery.of(context).size.width - 44) / 2,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      border: Border.all(color: Colors.grey.shade200),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Image.asset(
-                          trip.image,
-                          height: 100,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Container(
-                            height: 100,
-                            color: Colors.grey.shade300,
-                            child: const Center(
-                                child: Icon(Icons.image, color: Colors.grey)),
-                          ),
+    // Past Trips tab - use real data from TripProvider
+    return Consumer<TripProvider>(
+      builder: (context, tripProvider, child) {
+        if (tripProvider.isLoading) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final trips = tripProvider.myTrips;
+
+        if (trips.isEmpty) {
+          return const Padding(
+            padding: EdgeInsets.all(32),
+            child: Center(
+              child: Text(
+                'No trips yet',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Color(0xFF6B7280),
+                ),
+              ),
+            ),
+          );
+        }
+
+        return Padding(
+          padding: const EdgeInsets.all(16),
+          child: Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: trips
+                .map((trip) => SizedBox(
+                      width: (MediaQuery.of(context).size.width - 44) / 2,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          border: Border.all(color: Colors.grey.shade200),
+                          borderRadius: BorderRadius.circular(16),
                         ),
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                trip.name,
-                                style: const TextStyle(
-                                    fontFamily: 'Poppins',
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 13,
-                                    color: Colors.black),
-                              ),
-                              const SizedBox(height: 2),
-                              Row(
+                        clipBehavior: Clip.antiAlias,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            trip['image_url'] != null
+                                ? Image.network(
+                                    trip['image_url']!,
+                                    height: 100,
+                                    width: double.infinity,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => Container(
+                                      height: 100,
+                                      color: Colors.grey.shade300,
+                                      child: const Icon(Icons.image,
+                                          color: Colors.grey),
+                                    ),
+                                  )
+                                : Container(
+                                    height: 100,
+                                    color: const Color(0xFF4675B8)
+                                        .withOpacity(0.1),
+                                    child: const Center(
+                                      child: Icon(
+                                        Icons.travel_explore,
+                                        size: 40,
+                                        color: Color(0xFF4675B8),
+                                      ),
+                                    ),
+                                  ),
+                            Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Icon(Icons.location_on,
-                                      size: 10, color: Color(0xFF4675B8)),
-                                  const SizedBox(width: 4),
                                   Text(
-                                    trip.location,
-                                    style: TextStyle(
-                                        fontFamily: 'Poppins',
-                                        fontSize: 11,
-                                        color: Colors.grey.shade500),
+                                    trip['title'] ?? 'Untitled Trip',
+                                    style: const TextStyle(
+                                      fontFamily: 'Poppins',
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 14,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.location_on,
+                                          size: 14, color: Color(0xFF6B7280)),
+                                      const SizedBox(width: 4),
+                                      Expanded(
+                                        child: Text(
+                                          trip['destination'] ?? 'Unknown',
+                                          style: const TextStyle(
+                                            fontFamily: 'Poppins',
+                                            fontSize: 12,
+                                            color: Color(0xFF6B7280),
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                  ),
-                ))
-            .toList(),
-      ),
+                      ),
+                    ))
+                .toList(),
+          ),
+        );
+      },
     );
   }
 

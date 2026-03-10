@@ -56,17 +56,19 @@ class AuthProvider with ChangeNotifier {
         password: password,
       );
 
-      if (response['success'] == true) {
+      // Backend returns {access_token, user, message} on success
+      if (response['user'] != null) {
         final user = response['user'] as Map<String, dynamic>;
         _userId = user['id'] as String;
         _userEmail = user['email'] as String;
-        _userName = user['name'] as String;
+        _userName =
+            user['full_name'] as String? ?? user['name'] as String? ?? '';
         _status = AuthStatus.authenticated;
         notifyListeners();
         return true;
       } else {
         _status = AuthStatus.unauthenticated;
-        _errorMessage = 'Login failed';
+        _errorMessage = response['message'] as String? ?? 'Login failed';
         notifyListeners();
         return false;
       }
@@ -101,17 +103,19 @@ class AuthProvider with ChangeNotifier {
         gender: gender,
       );
 
-      if (response['success'] == true) {
+      // Backend returns {access_token, user, message} on success
+      if (response['user'] != null) {
         final user = response['user'] as Map<String, dynamic>;
         _userId = user['id'] as String;
         _userEmail = user['email'] as String;
-        _userName = user['name'] as String;
+        _userName =
+            user['full_name'] as String? ?? user['name'] as String? ?? name;
         _status = AuthStatus.authenticated;
         notifyListeners();
         return true;
       } else {
         _status = AuthStatus.unauthenticated;
-        _errorMessage = 'Registration failed';
+        _errorMessage = response['message'] as String? ?? 'Registration failed';
         notifyListeners();
         return false;
       }

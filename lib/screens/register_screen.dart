@@ -61,7 +61,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
     if (picked != null) {
       setState(() {
-        _dobController.text = '${picked.day}/${picked.month}/${picked.year}';
+        // Format date as ISO 8601 (YYYY-MM-DD) for backend
+        final formattedDate =
+            '${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
+        _dobController.text = formattedDate;
       });
     }
   }

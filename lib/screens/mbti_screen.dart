@@ -4,6 +4,8 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../core/animations/page_transitions.dart';
 import '../core/animations/animation_constants.dart';
 import '../core/constants/constants.dart';
+import '../services/personality_service.dart';
+import '../services/auth_service.dart';
 import 'DestinationLandingPage.dart';
 
 class MbtiScreen extends StatefulWidget {
@@ -120,29 +122,86 @@ class _MbtiScreenState extends State<MbtiScreen> {
     }
   }
 
-  void _handleBack() {
-    if (_currentScreen > 0) {
-      setState(() {
-        _currentScreen--;
+  Future<void> _completeAssessment() async {
+    try {
+      // Get user ID
+      final authService = AuthService();
+      final userId = await authService.getUserId();
+
+      if (userId == null) {
+        throw Exception('User not authenticated');
+      }
+
+      // Prepare answers for backend API
+      final answersForApi = <Map<String, dynamic>>[];
+      _answers.forEach((index, answer) {
+        if (index > 0 && index < _questions.length) {
+          final question = _questions[index];
+          answersForApi.add({
+            'question_number': index,
+            'question_text': question['text'],
+            'dimension': question['dimension'],
+            'answer': answer,
+          });
+        }
       });
+
+      // Submit to backend
+      final personalityService = PersonalityService();
+      final scores = await personalityService.submitQuiz(userId, answersForApi);
+
+      // Calculate MBTI type from scores
+      final mbtiType = _calculateMbtiTypeFromScores(scores);
+
+      // Save to SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('user_mbti_type', mbtiType);
+      await prefs.setBool('mbti_completed', true);
+
+      if (!mounted) return;
+
+      // Navigate to destination landing page
+      Navigator.of(context).pushReplacement(
+        SharedAxisPageRoute(page: const DestinationLandingPage()),
+      );
+    } catch (e) {
+      // Handle error
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to save assessment: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+
+      // Still navigate but with local calculation
+      final mbtiType = _calculateMbtiType();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('user_mbti_type', mbtiType);
+      await prefs.setBool('mbti_completed', true);
+
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(
+        SharedAxisPageRoute(page: const DestinationLandingPage()),
+      );
     }
   }
 
-  Future<void> _completeAssessment() async {
-    // Calculate MBTI type based on answers
-    final mbtiType = _calculateMbtiType();
+  String _calculateMbtiTypeFromScores(Map<String, dynamic> scores) {
+    // Extract Big Five scores and convert to MBTI type
+    final extraversion = scores['extraversion'] ?? 0.5;
+    final openness = scores['openness'] ?? 0.5;
+    final agreeableness = scores['agreeableness'] ?? 0.5;
+    final conscientiousness = scores['conscientiousness'] ?? 0.5;
 
-    // Save to SharedPreferences
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('user_mbti_type', mbtiType);
-    await prefs.setBool('mbti_completed', true);
+    String type = '';
+    type += extraversion > 0.5 ? 'E' : 'I';
+    type += openness > 0.5 ? 'N' : 'S';
+    type += agreeableness > 0.5 ? 'F' : 'T';
+    type += conscientiousness > 0.5 ? 'J' : 'P';
 
-    if (!mounted) return;
-
-    // Navigate to destination landing page
-    Navigator.of(context).pushReplacement(
-      SharedAxisPageRoute(page: const DestinationLandingPage()),
-    );
+    return type;
   }
 
   String _calculateMbtiType() {

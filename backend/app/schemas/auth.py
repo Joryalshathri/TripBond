@@ -9,24 +9,13 @@ from datetime import date
 
 
 class SignUpRequest(BaseModel):
+    # Basic registration info only
     email: EmailStr
     password: str
-    full_name: Optional[str] = None
+    full_name: str
     date_of_birth: Optional[date] = None
     phone_number: Optional[str] = None
     gender: Optional[str] = None  # 'male', 'female'
-    # Personality traits (Big Five)
-    openness: Optional[float] = None
-    conscientiousness: Optional[float] = None
-    extraversion: Optional[float] = None
-    agreeableness: Optional[float] = None
-    neuroticism: Optional[float] = None
-    # Travel preferences
-    budget_level: Optional[str] = None  # 'low', 'medium', 'high'
-    travel_style: Optional[str] = None  # 'adventure', 'relax', 'cultural', 'luxury'
-    dietary_preferences: Optional[str] = None
-    preferred_accommodation: Optional[str] = None
-    preferred_transport: Optional[str] = None
 
 
 class SignInRequest(BaseModel):

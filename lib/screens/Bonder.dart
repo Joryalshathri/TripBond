@@ -154,7 +154,7 @@ class Bonders extends StatelessWidget {
                                             AnimationConstants.normal),
                                     curve: AnimationConstants.cubicEaseOut,
                                   ));
-                        }).toList(),
+                        }),
                       ],
                     ),
                   ),

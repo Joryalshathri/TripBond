@@ -131,7 +131,7 @@ class _GroupSuggestedItineraryState extends State<GroupSuggestedItinerary> {
                         const SizedBox(height: 20),
 
                         // Week calendar
-                        Container(
+                        SizedBox(
                           height: 70,
                           child: TableCalendar(
                             firstDay: DateTime(2026, 1, 1),

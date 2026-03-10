@@ -22,9 +22,15 @@ async def sign_up(request: SignUpRequest):
     Register a new user with email and password
     """
     try:
+        print(f"\n🔵 SIGNUP REQUEST RECEIVED")
+        print(f"Email: {request.email}")
+        print(f"Name: {request.full_name}")
+        print(f"DOB: {request.date_of_birth}")
+        
         db = SupabaseDB()
         config = get_settings()
         
+        print(f"🔵 Creating Supabase auth user...")
         # Create user with Supabase Auth
         response = db.client.auth.sign_up(
             credentials={
@@ -39,13 +45,17 @@ async def sign_up(request: SignUpRequest):
             }
         )
         
+        print(f"🔵 Auth response: {response}")
+        
         if not response.user:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Failed to create user. Email may already be in use."
             )
         
-        # Create profile in profiles table
+        print(f"🔵 User created: {response.user.id}")
+        
+        # Create profile in profiles table (basic info only)
         profile_data = {
             "id": response.user.id,  # Foreign key to auth.users
             "email": response.user.email,  # Store email for easy access
@@ -53,21 +63,15 @@ async def sign_up(request: SignUpRequest):
             "date_of_birth": request.date_of_birth.isoformat() if request.date_of_birth else None,
             "phone_number": request.phone_number,
             "gender": request.gender,
-            "openness": request.openness,
-            "conscientiousness": request.conscientiousness,
-            "extraversion": request.extraversion,
-            "agreeableness": request.agreeableness,
-            "neuroticism": request.neuroticism,
-            "budget_level": request.budget_level,
-            "travel_style": request.travel_style,
-            "dietary_preferences": request.dietary_preferences,
-            "preferred_accommodation": request.preferred_accommodation,
-            "preferred_transport": request.preferred_transport
         }
         
         # Insert profile (ignore None values)
         profile_data = {k: v for k, v in profile_data.items() if v is not None}
+        
+        print(f"🔵 Inserting profile: {profile_data}")
         db.client.table("profiles").insert(profile_data).execute()
+        
+        print(f"🔵 Profile created successfully!")
         
         # Note: access_token may be empty if email confirmation is required
         return AuthResponse(
@@ -83,6 +87,9 @@ async def sign_up(request: SignUpRequest):
     except HTTPException:
         raise
     except Exception as e:
+        print(f"\n🔴 SIGNUP ERROR: {type(e).__name__}: {str(e)}")
+        import traceback
+        traceback.print_exc()
         logger.exception("Signup failed")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

@@ -1,5 +1,7 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../core/api_service.dart';
+import '../core/api_config.dart';
 
 class AuthService {
   static final AuthService _instance = AuthService._internal();
@@ -7,6 +9,7 @@ class AuthService {
   AuthService._internal();
 
   final _secureStorage = const FlutterSecureStorage();
+  final _apiService = ApiService();
 
   // Keys
   static const String _tokenKey = 'auth_token';
@@ -79,34 +82,33 @@ class AuthService {
     required String password,
   }) async {
     try {
-      // TODO: Replace with actual API call
-      // Simulate API call
-      await Future.delayed(const Duration(seconds: 1));
-
-      // Mock response
-      final response = {
-        'success': true,
-        'token': 'mock_token_${DateTime.now().millisecondsSinceEpoch}',
-        'refreshToken': 'mock_refresh_token',
-        'user': {
-          'id': '12345',
+      final response = await _apiService.post(
+        '${ApiConfig.authPath}/signin',
+        {
           'email': email,
-          'name': 'User Name',
+          'password': password,
         },
-      };
-
-      // Save tokens and user data
-      await saveAuthToken(response['token'] as String);
-      await saveRefreshToken(response['refreshToken'] as String);
-
-      final user = response['user'] as Map<String, dynamic>;
-      await saveUserData(
-        userId: user['id'] as String,
-        email: user['email'] as String,
-        name: user['name'] as String,
       );
 
-      return response;
+      if (response['access_token'] != null) {
+        // Save tokens and user data
+        await saveAuthToken(response['access_token'] as String);
+
+        final user = response['user'] as Map<String, dynamic>;
+        await saveUserData(
+          userId: user['id'] as String,
+          email: user['email'] as String,
+          name: user['full_name'] as String? ?? user['email'] as String,
+        );
+
+        return {
+          'success': true,
+          'token': response['access_token'],
+          'user': user,
+        };
+      } else {
+        throw Exception('Invalid response from server');
+      }
     } catch (e) {
       throw Exception('Login failed: ${e.toString()}');
     }
@@ -122,34 +124,45 @@ class AuthService {
     required String gender,
   }) async {
     try {
-      // TODO: Replace with actual API call
-      await Future.delayed(const Duration(seconds: 1));
-
-      // Mock response
-      final response = {
-        'success': true,
-        'token': 'mock_token_${DateTime.now().millisecondsSinceEpoch}',
-        'refreshToken': 'mock_refresh_token',
-        'user': {
-          'id': '12345',
-          'email': email,
-          'name': name,
-        },
+      final requestBody = {
+        'full_name': name,
+        'email': email,
+        'password': password,
+        'phone_number': phone,
+        'date_of_birth': dob,
+        'gender': gender,
       };
 
-      // Save tokens and user data
-      await saveAuthToken(response['token'] as String);
-      await saveRefreshToken(response['refreshToken'] as String);
-
-      final user = response['user'] as Map<String, dynamic>;
-      await saveUserData(
-        userId: user['id'] as String,
-        email: user['email'] as String,
-        name: user['name'] as String,
+      final response = await _apiService.post(
+        '${ApiConfig.authPath}/signup',
+        requestBody,
       );
 
-      return response;
+      if (response['access_token'] != null) {
+        // Only save if we have a token (email might need verification)
+        if ((response['access_token'] as String).isNotEmpty) {
+          await saveAuthToken(response['access_token'] as String);
+
+          final user = response['user'] as Map<String, dynamic>;
+          await saveUserData(
+            userId: user['id'] as String,
+            email: user['email'] as String,
+            name: user['full_name'] as String? ?? name,
+          );
+        }
+
+        return {
+          'success': true,
+          'message': response['message'] ?? 'Registration successful',
+          'token': response['access_token'],
+          'user': response['user'],
+        };
+      } else {
+        throw Exception('Invalid response from server');
+      }
     } catch (e) {
+      // Print detailed error for debugging
+      print('Registration error: $e');
       throw Exception('Registration failed: ${e.toString()}');
     }
   }
@@ -173,8 +186,10 @@ class AuthService {
   // Send password reset code
   Future<void> sendPasswordResetCode(String email) async {
     try {
-      // TODO: Replace with actual API call
-      await Future.delayed(const Duration(seconds: 1));
+      await _apiService.post(
+        '${ApiConfig.authPath}/password-reset',
+        {'email': email},
+      );
     } catch (e) {
       throw Exception('Failed to send reset code: ${e.toString()}');
     }
@@ -183,9 +198,14 @@ class AuthService {
   // Verify reset code
   Future<bool> verifyResetCode(String email, String code) async {
     try {
-      // TODO: Replace with actual API call
-      await Future.delayed(const Duration(seconds: 1));
-      return true; // Mock success
+      final response = await _apiService.post(
+        '${ApiConfig.authPath}/verify-reset-code',
+        {
+          'email': email,
+          'code': code,
+        },
+      );
+      return response['valid'] == true;
     } catch (e) {
       throw Exception('Failed to verify code: ${e.toString()}');
     }
@@ -195,10 +215,40 @@ class AuthService {
   Future<void> resetPassword(
       String email, String code, String newPassword) async {
     try {
-      // TODO: Replace with actual API call
-      await Future.delayed(const Duration(seconds: 1));
+      await _apiService.post(
+        '${ApiConfig.authPath}/update-password',
+        {
+          'email': email,
+          'code': code,
+          'new_password': newPassword,
+        },
+      );
     } catch (e) {
       throw Exception('Failed to reset password: ${e.toString()}');
+    }
+  }
+
+  // Verify email
+  Future<void> verifyEmail(String token) async {
+    try {
+      await _apiService.post(
+        '${ApiConfig.authPath}/verify-email',
+        {'token': token},
+      );
+    } catch (e) {
+      throw Exception('Failed to verify email: ${e.toString()}');
+    }
+  }
+
+  // Resend verification email
+  Future<void> resendVerificationEmail(String email) async {
+    try {
+      await _apiService.post(
+        '${ApiConfig.authPath}/resend-verification',
+        {'email': email},
+      );
+    } catch (e) {
+      throw Exception('Failed to resend verification: ${e.toString()}');
     }
   }
 }

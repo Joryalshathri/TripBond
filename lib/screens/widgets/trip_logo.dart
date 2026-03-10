@@ -17,10 +17,6 @@ class TripLogo extends StatelessWidget {
 class TripLogoPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..style = PaintingStyle.fill
-      ..strokeCap = StrokeCap.round;
-
     // Draw the winding path
     final pathPaint = Paint()
       ..color = Colors.black87
@@ -31,20 +27,28 @@ class TripLogoPainter extends CustomPainter {
     final path = Path();
     path.moveTo(size.width * 0.15, size.height * 0.85);
     path.quadraticBezierTo(
-      size.width * 0.25, size.height * 0.65,
-      size.width * 0.30, size.height * 0.55,
+      size.width * 0.25,
+      size.height * 0.65,
+      size.width * 0.30,
+      size.height * 0.55,
     );
     path.quadraticBezierTo(
-      size.width * 0.35, size.height * 0.45,
-      size.width * 0.45, size.height * 0.50,
+      size.width * 0.35,
+      size.height * 0.45,
+      size.width * 0.45,
+      size.height * 0.50,
     );
     path.quadraticBezierTo(
-      size.width * 0.55, size.height * 0.55,
-      size.width * 0.60, size.height * 0.40,
+      size.width * 0.55,
+      size.height * 0.55,
+      size.width * 0.60,
+      size.height * 0.40,
     );
     path.quadraticBezierTo(
-      size.width * 0.65, size.height * 0.25,
-      size.width * 0.75, size.height * 0.20,
+      size.width * 0.65,
+      size.height * 0.25,
+      size.width * 0.75,
+      size.height * 0.20,
     );
     canvas.drawPath(path, pathPaint);
 

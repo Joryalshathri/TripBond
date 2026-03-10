@@ -84,10 +84,22 @@ app.include_router(places.router, prefix="/api/places", tags=["Google Places"])
 @app.get("/")
 async def root(request: Request):
     """Root endpoint - service information"""
+    print(f"🟢 ROOT ENDPOINT HIT from {request.client}")
     return {
         "status": "online",
         "service": "TripBond API",
         "version": request.app.state.config.api_version
+    }
+
+
+@app.get("/api/test")
+async def test_endpoint(request: Request):
+    """Test endpoint to verify connectivity"""
+    print(f"🟢 TEST ENDPOINT HIT from {request.client}")
+    return {
+        "status": "success",
+        "message": "Backend is reachable!",
+        "client": str(request.client)
     }
 
 
