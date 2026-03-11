@@ -111,12 +111,13 @@ class AuthProvider with ChangeNotifier {
         _userName =
             user['full_name'] as String? ?? user['name'] as String? ?? name;
 
-        final token = response['token'] as String? ?? '';
-        if (token.isNotEmpty) {
-          // Fully registered and logged in (email confirmation not required)
+        final emailVerified = user['email_verified'] as bool? ?? false;
+
+        if (emailVerified) {
+          // Fully registered and email verified
           _status = AuthStatus.authenticated;
         } else {
-          // Registered but email confirmation required before login
+          // Registered but email verification required
           _status = AuthStatus.unauthenticated;
           _errorMessage = 'email_verification_required';
         }
@@ -182,6 +183,12 @@ class AuthProvider with ChangeNotifier {
       notifyListeners();
       return false;
     }
+  }
+
+  // Set authenticated status after email verification
+  void setAuthenticatedStatus() {
+    _status = AuthStatus.authenticated;
+    notifyListeners();
   }
 
   // Clear error message

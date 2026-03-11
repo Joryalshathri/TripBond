@@ -6,11 +6,12 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../core/animations/page_transitions.dart';
 import 'login_screen.dart';
+import 'mbti_screen.dart';
 import 'widgets/custom_loading_spinner.dart';
 
 /// Shown right after a user registers.
 /// The user enters the 6-digit code that was emailed to them.
-/// On success, the email is confirmed and the user is sent to the login screen.
+/// On success, the email is confirmed and the user proceeds to MBTI assessment.
 class EmailVerificationScreen extends StatefulWidget {
   final String email;
 
@@ -93,14 +94,18 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
       if (!mounted) return;
 
       if (success) {
+        // Email verified! User is now authenticated
+        authProvider.setAuthenticatedStatus();
+        
         _showSnack(
-          'Email verified! You can now sign in.',
+          'Email verified successfully!',
           isError: false,
-          duration: const Duration(seconds: 4),
+          duration: const Duration(seconds: 2),
         );
-        // Navigate to login, removing all previous routes
+        
+        // Navigate to MBTI screen (onboarding continues)
         Navigator.of(context).pushAndRemoveUntil(
-          FadePageRoute(page: const LoginScreen()),
+          FadePageRoute(page: const MbtiScreen()),
           (route) => false,
         );
       } else {

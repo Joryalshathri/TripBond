@@ -17,24 +17,24 @@ async def get_my_profile(user_context: tuple[str, str] = Depends(get_current_use
     """Get the current authenticated user's full profile with stats."""
     user_id, token = user_context
     try:
-        client = get_supabase_client_for_user(token)
+        # Use admin client to fetch profile (no longer using RLS with Supabase Auth)
+        db = SupabaseDB(admin=True)
         profile_response = await run_in_threadpool(
-            lambda: client.table("profiles").select("*").eq("id", user_id).execute()
+            lambda: db.client.table("profiles").select("*").eq("id", user_id).execute()
         )
         if not profile_response.data:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profile not found")
         profile = profile_response.data[0]
 
-        db = SupabaseDB(admin=True)
         trips_response = await run_in_threadpool(
-            lambda: db.client.table("trips").select("id", count="exact").eq("user_id", user_id).execute()
+            lambda: db.client.table("trips").select("id", count="exact").eq("created_by", user_id).execute()
         )
         favorites_response = await run_in_threadpool(
             lambda: db.client.table("user_favorites").select("id", count="exact").eq("user_id", user_id).execute()
         )
         return ProfileResponse(
             id=profile["id"],
-            email=profile.get("email", ""),
+            email=profile.get("email_address", ""),  # Updated to use email_address
             full_name=profile.get("full_name"),
             username=profile.get("username"),
             phone_number=profile.get("phone_number"),
@@ -79,7 +79,7 @@ async def get_user_profile(user_id: str):
             )
 
         trips_response = await run_in_threadpool(
-            lambda: db.client.table("trips").select("id", count="exact").eq("user_id", user_id).execute()
+            lambda: db.client.table("trips").select("id", count="exact").eq("created_by", user_id).execute()
         )
         favorites_response = await run_in_threadpool(
             lambda: db.client.table("user_favorites").select("id", count="exact").eq("user_id", user_id).execute()
@@ -132,7 +132,7 @@ async def update_profile(
 
         db = SupabaseDB(admin=True)
         trips_response = await run_in_threadpool(
-            lambda: db.client.table("trips").select("id", count="exact").eq("user_id", user_id).execute()
+            lambda: db.client.table("trips").select("id", count="exact").eq("created_by", user_id).execute()
         )
         favorites_response = await run_in_threadpool(
             lambda: db.client.table("user_favorites").select("id", count="exact").eq("user_id", user_id).execute()

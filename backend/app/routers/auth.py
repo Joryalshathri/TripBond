@@ -16,6 +16,10 @@ from ..schemas.auth import (
 from ..services import verification_store
 from ..services.email_service import send_verification_code_email
 import logging
+import bcrypt
+import jwt
+import uuid
+from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -24,64 +28,61 @@ router = APIRouter()
 @router.post("/signup", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
 async def sign_up(request: SignUpRequest):
     """
-    Register a new user with email and password
+    Register a new user with email and password (Custom Auth - No Supabase Auth)
     """
     try:
-        print(f"\n🔵 SIGNUP REQUEST RECEIVED")
+        print(f"\n🔵 CUSTOM SIGNUP REQUEST RECEIVED")
         print(f"Email: {request.email}")
         print(f"Name: {request.full_name}")
         print(f"DOB: {request.date_of_birth}")
         
-        db = SupabaseDB()
+        admin_client = get_supabase_admin_client()
         config = get_settings()
         
-        print(f"🔵 Creating Supabase auth user...")
-        # Create user with Supabase Auth
-        response = db.client.auth.sign_up(
-            credentials={
-                "email": request.email,
-                "password": request.password,
-                "options": {
-                    "data": {
-                        "full_name": request.full_name
-                    },
-                    "email_redirect_to": f"{config.frontend_url}/verify-email"
-                }
-            }
+        # Check if user already exists
+        print(f"🔵 Checking if user exists...")
+        existing_user = await run_in_threadpool(
+            lambda: admin_client.table("profiles").select("id").eq("email_address", request.email.lower()).execute()
         )
         
-        print(f"🔵 Auth response: {response}")
-        
-        if not response.user:
+        if existing_user.data:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Failed to create user. Email may already be in use."
+                detail="Email already registered"
             )
         
-        print(f"🔵 User created: {response.user.id}")
+        # Generate user ID
+        user_id = str(uuid.uuid4())
+        print(f"🔵 Generated user ID: {user_id}")
         
-        # Create profile in profiles table (basic info only)
+        # Hash password
+        password_hash = bcrypt.hashpw(request.password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        print(f"🔵 Password hashed")
+        
+        # Create profile with hashed password
         profile_data = {
-            "id": response.user.id,  # Foreign key to auth.users
-            "email": response.user.email,  # Store email for easy access
+            "id": user_id,
+            "email_address": request.email.lower(),
+            "password_hash": password_hash,
             "full_name": request.full_name,
             "date_of_birth": request.date_of_birth.isoformat() if request.date_of_birth else None,
             "phone_number": request.phone_number,
-            "gender": request.gender,
+            "gender": request.gender.lower() if request.gender else None,
+            "email_verified": False,  # Not verified yet
+            "created_at": datetime.utcnow().isoformat(),
         }
         
         # Insert profile (ignore None values)
         profile_data = {k: v for k, v in profile_data.items() if v is not None}
         
         print(f"🔵 Inserting profile: {profile_data}")
-        admin_client = get_supabase_admin_client()
         await run_in_threadpool(lambda: admin_client.table("profiles").insert(profile_data).execute())
         
         print(f"🔵 Profile created successfully!")
 
         # Generate and send 6-digit email verification code
         code = verification_store.generate_code()
-        verification_store.store_code(request.email, code, response.user.id)
+        verification_store.store_code(request.email, code, user_id)
         send_verification_code_email(
             to_email=request.email,
             code=code,
@@ -89,13 +90,22 @@ async def sign_up(request: SignUpRequest):
         )
         print(f"🔵 Verification code sent to {request.email}")
 
-        # Note: access_token may be empty if email confirmation is required
+        # Generate JWT token (unverified)
+        token_payload = {
+            "sub": user_id,
+            "email": request.email.lower(),
+            "email_verified": False,
+            "exp": datetime.utcnow() + timedelta(days=30)
+        }
+        access_token = jwt.encode(token_payload, config.secret_key, algorithm=config.algorithm)
+
         return AuthResponse(
-            access_token=response.session.access_token if response.session else "",
+            access_token=access_token,
             user={
-                "id": response.user.id,
-                "email": response.user.email,
-                "full_name": request.full_name
+                "id": user_id,
+                "email": request.email.lower(),
+                "full_name": request.full_name,
+                "email_verified": False
             },
             message="Account created! A 6-digit verification code has been sent to your email."
         )
@@ -109,47 +119,66 @@ async def sign_up(request: SignUpRequest):
         logger.exception("Signup failed")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Signup failed. Please try again."
+            detail=f"Signup failed: {str(e)}"
         )
 
 
 @router.post("/signin", response_model=AuthResponse)
 async def sign_in(request: SignInRequest):
     """
-    Sign in user with email and password
+    Sign in user with email and password (Custom Auth - No Supabase Auth)
     """
     try:
-        db = SupabaseDB()
+        print(f"\n🔵 CUSTOM SIGNIN REQUEST")
+        print(f"Email: {request.email}")
         
-        # Sign in with Supabase Auth
-        response = db.client.auth.sign_in_with_password(
-            credentials={
-                "email": request.email,
-                "password": request.password
-            }
+        admin_client = get_supabase_admin_client()
+        config = get_settings()
+        
+        # Get user by email
+        user_result = await run_in_threadpool(
+            lambda: admin_client.table("profiles")
+            .select("id, email_address, password_hash, full_name, username, avatar_url, email_verified")
+            .eq("email_address", request.email.lower())
+            .execute()
         )
         
-        if not response.user or not response.session:
+        if not user_result.data:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid email or password"
             )
         
-        # Get user profile using the authenticated user's token (respects RLS)
-        user_client = get_supabase_client_for_user(response.session.access_token)
-        profile_result = await run_in_threadpool(
-            lambda: user_client.table("profiles").select("*").eq("id", response.user.id).execute()
-        )
-        profile = profile_result.data[0] if profile_result.data else None
+        user = user_result.data[0]
+        
+        # Verify password
+        if not bcrypt.checkpw(request.password.encode('utf-8'), user["password_hash"].encode('utf-8')):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid email or password"
+            )
+        
+        print(f"🔵 Password verified for user: {user['id']}")
+        
+        # Generate JWT token
+        token_payload = {
+            "sub": user["id"],
+            "email": user["email_address"],
+            "email_verified": user.get("email_verified", False),
+            "exp": datetime.utcnow() + timedelta(days=30)
+        }
+        access_token = jwt.encode(token_payload, config.secret_key, algorithm=config.algorithm)
+        
+        print(f"🔵 Signin successful!")
         
         return AuthResponse(
-            access_token=response.session.access_token,
+            access_token=access_token,
             user={
-                "id": response.user.id,
-                "email": response.user.email,
-                "full_name": profile.get("full_name") if profile else None,
-                "username": profile.get("username") if profile else None,
-                "avatar_url": profile.get("avatar_url") if profile else None
+                "id": user["id"],
+                "email": user["email_address"],
+                "full_name": user.get("full_name"),
+                "username": user.get("username"),
+                "avatar_url": user.get("avatar_url")
             },
             message="Signed in successfully!"
         )
@@ -157,6 +186,7 @@ async def sign_in(request: SignInRequest):
     except HTTPException:
         raise
     except Exception as e:
+        print(f"\n🔴 SIGNIN ERROR: {type(e).__name__}: {str(e)}")
         logger.exception("Sign in failed")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -380,7 +410,7 @@ async def send_email_verification_code(request: SendVerificationCodeRequest):
 async def verify_email_code(request: VerifyEmailCodeRequest):
     """
     Verify the 6-digit code submitted by the user.
-    On success, confirms the user's email in Supabase so they can log in.
+    On success, marks the user's email as verified and returns an access token.
     """
     try:
         user_id = verification_store.verify_and_consume(request.email, request.code)
@@ -391,19 +421,50 @@ async def verify_email_code(request: VerifyEmailCodeRequest):
                 detail="Invalid or expired verification code. Please request a new one.",
             )
 
-        # Confirm the email via Supabase admin API
+        # Update email_verified in profiles table
         admin_client = get_supabase_admin_client()
         await run_in_threadpool(
-            lambda: admin_client.auth.admin.update_user_by_id(
-                user_id,
-                {"email_confirm": True},
-            )
+            lambda: admin_client.table("profiles")
+            .update({"email_verified": True})
+            .eq("id", user_id)
+            .execute()
         )
+
+        # Get user details for token generation
+        user_result = await run_in_threadpool(
+            lambda: admin_client.table("profiles")
+            .select("id, email_address, full_name, username, avatar_url")
+            .eq("id", user_id)
+            .execute()
+        )
+
+        if not user_result.data or len(user_result.data) == 0:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        user = user_result.data[0]
+
+        # Generate access token with email_verified = true
+        token_payload = {
+            "sub": user["id"],
+            "email": user["email_address"],
+            "email_verified": True,
+            "exp": datetime.utcnow() + timedelta(days=30)
+        }
+        access_token = jwt.encode(token_payload, config.secret_key, algorithm=config.algorithm)
 
         logger.info(f"Email verified for user {user_id}")
         return {
-            "message": "Email verified successfully! You can now sign in.",
+            "message": "Email verified successfully!",
             "email": request.email,
+            "access_token": access_token,
+            "user": {
+                "id": user["id"],
+                "email": user["email_address"],
+                "full_name": user["full_name"],
+                "username": user["username"],
+                "avatar_url": user["avatar_url"],
+                "email_verified": True
+            }
         }
 
     except HTTPException:

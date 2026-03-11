@@ -44,34 +44,82 @@ def send_verification_code_email(to_email: str, code: str, name: str = "") -> bo
 
     html_body = f"""
 <!DOCTYPE html>
-<html>
-<body style="margin:0;padding:0;background:#f5f5f5;font-family:Arial,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0">
-    <tr><td align="center" style="padding:40px 16px;">
-      <table width="500" style="background:#fff;border-radius:16px;overflow:hidden;">
-        <tr><td style="background:#4675B8;padding:32px;text-align:center;">
-          <h1 style="margin:0;color:#fff;font-size:28px;letter-spacing:1px;">TripBond</h1>
-        </td></tr>
-        <tr><td style="padding:40px 40px 16px;text-align:center;">
-          <p style="color:#555;font-size:15px;line-height:1.6;margin:0 0 24px;">{greeting}<br>
-          Please verify your email address to start your travel journey.</p>
-          <div style="background:#f0f4ff;border-radius:12px;padding:28px 24px;display:inline-block;">
-            <p style="margin:0 0 10px;color:#888;font-size:12px;letter-spacing:1px;text-transform:uppercase;">
-              Your verification code
-            </p>
-            <div style="font-size:38px;font-weight:bold;letter-spacing:14px;color:#4675B8;
-                        font-family:monospace;padding:0 8px;">{code}</div>
-          </div>
-          <p style="color:#aaa;font-size:12px;margin:24px 0 0;line-height:1.6;">
-            This code expires in <strong>10 minutes</strong>.<br>
-            If you didn&rsquo;t create a TripBond account, you can safely ignore this email.
-          </p>
-        </td></tr>
-        <tr><td style="padding:16px 40px 40px;text-align:center;">
-          <p style="color:#ccc;font-size:11px;margin:0;">&copy; TripBond. All rights reserved.</p>
-        </td></tr>
-      </table>
-    </td></tr>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TripBond Email Verification</title>
+</head>
+<body style="margin:0;padding:0;background:#f5f7fa;font-family:'Segoe UI',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+    <tr>
+      <td align="center" style="padding:40px 20px;">
+        <table width="600" cellpadding="0" cellspacing="0" border="0" style="background:#ffffff;border-radius:20px;box-shadow:0 4px 20px rgba(0,0,0,0.08);overflow:hidden;max-width:100%;">
+          <!-- Header with Logo -->
+          <tr>
+            <td style="background:linear-gradient(135deg, #4675B8 0%, #5A8CD9 100%);padding:40px 30px;text-align:center;">
+              <div style="display:inline-block;background:#ffffff;padding:15px 25px;border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,0.1);">
+                <h1 style="margin:0;color:#4675B8;font-size:36px;font-weight:700;letter-spacing:2px;font-family:'Segoe UI',Arial,sans-serif;">
+                  Trip<span style="color:#5A8CD9;">B</span><span style="position:relative;display:inline-block;">
+                    <span style="color:#4675B8;">o</span>
+                    <svg viewBox="0 0 24 24" style="position:absolute;top:-8px;right:-12px;width:20px;height:20px;fill:#5A8CD9;">
+                      <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                    </svg>
+                  </span>nd
+                </h1>
+              </div>
+              <p style="color:#ffffff;font-size:16px;margin:20px 0 0;font-weight:300;letter-spacing:0.5px;">Your Travel Companion</p>
+            </td>
+          </tr>
+          
+          <!-- Content -->
+          <tr>
+            <td style="padding:50px 40px 30px;">
+              <h2 style="color:#2c3e50;font-size:24px;margin:0 0 20px;font-weight:600;text-align:center;">
+                Welcome to TripBond! 🌍
+              </h2>
+              <p style="color:#5a5a5a;font-size:16px;line-height:1.8;margin:0 0 30px;text-align:center;">
+                {greeting}<br>
+                We're excited to have you join our community of travelers!<br>
+                Please verify your email address to start planning your next adventure.
+              </p>
+              
+              <!-- Verification Code Box -->
+              <div style="background:linear-gradient(135deg, #f0f5ff 0%, #e6f2ff 100%);border-radius:16px;padding:35px 30px;margin:0 0 30px;text-align:center;border:2px solid #d0e4ff;">
+                <p style="margin:0 0 15px;color:#7a8a99;font-size:13px;letter-spacing:2px;text-transform:uppercase;font-weight:600;">
+                  Your Verification Code
+                </p>
+                <div style="background:#ffffff;border-radius:12px;padding:20px;display:inline-block;box-shadow:0 2px 8px rgba(70,117,184,0.15);">
+                  <div style="font-size:42px;font-weight:bold;letter-spacing:16px;color:#4675B8;font-family:'Courier New',monospace;padding:0 12px;">
+                    {code}
+                  </div>
+                </div>
+                <p style="color:#7a8a99;font-size:13px;margin:20px 0 0;line-height:1.6;">
+                  ⏱️ This code expires in <strong style="color:#4675B8;">10 minutes</strong>
+                </p>
+              </div>
+              
+              <p style="color:#8a8a8a;font-size:14px;line-height:1.7;margin:0;text-align:center;padding:0 20px;">
+                If you didn't create a TripBond account, you can safely ignore this email.
+                No further action is required.
+              </p>
+            </td>
+          </tr>
+          
+          <!-- Footer -->
+          <tr>
+            <td style="background:#f8f9fb;padding:30px 40px;text-align:center;border-top:1px solid #e5e8eb;">
+              <p style="color:#b8bcc4;font-size:12px;margin:0 0 8px;line-height:1.6;">
+                This is an automated message from TripBond. Please do not reply to this email.
+              </p>
+              <p style="color:#b8bcc4;font-size:11px;margin:0;">
+                &copy; 2026 TripBond. All rights reserved.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
   </table>
 </body>
 </html>

@@ -17,10 +17,11 @@ logger = logging.getLogger(__name__)
 
 async def get_user_trips(user_id: str, token: str) -> List[dict]:
     """Get all trips created by user."""
-    client = get_supabase_client_for_user(token)
+    # Use admin client since we're using custom JWT (not Supabase Auth)
+    db = SupabaseDB(admin=True)
     
     response = await run_in_threadpool(
-        lambda: client.table("trips")
+        lambda: db.client.table("trips")
         .select("*")
         .eq("created_by", user_id)
         .order("created_at", desc=True)
@@ -60,7 +61,8 @@ def get_user_trips_all(user_id: str) -> List[dict]:
 
 async def create_trip(user_id: str, token: str, trip_data: dict) -> dict:
     """Create a new trip."""
-    client = get_supabase_client_for_user(token)
+    # Use admin client since we're using custom JWT (not Supabase Auth)
+    db = SupabaseDB(admin=True)
     
     # Add creator ID
     trip_data["created_by"] = user_id
@@ -69,7 +71,7 @@ async def create_trip(user_id: str, token: str, trip_data: dict) -> dict:
     trip_data = {k: v for k, v in trip_data.items() if v is not None}
     
     response = await run_in_threadpool(
-        lambda: client.table("trips").insert(trip_data).execute()
+        lambda: db.client.table("trips").insert(trip_data).execute()
     )
     
     if not response.data:
