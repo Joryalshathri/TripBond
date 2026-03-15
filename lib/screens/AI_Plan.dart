@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'DestinationLandingPage.dart';
-//import 'Bonder.dart';
 import 'profile.dart';
 import 'close_spots.dart';
 import 'group_suggested_itinerary.dart';
@@ -135,7 +134,6 @@ class _AI_PlanState extends State<AI_Plan> {
               fontSize: 22,
             ),
           ),
-          // MODIFIED: Combined icons into a tight row with compact density to fix the 18px overflow
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -170,7 +168,7 @@ class _AI_PlanState extends State<AI_Plan> {
               IconButton(
                 visualDensity: VisualDensity.compact,
                 padding: EdgeInsets.zero,
-                icon: Icon(isEditMode ? Icons.check : Icons.edit, size: 22),
+                icon: Icon(isEditMode ? Icons.check : Icons.edit_outlined, size: 22),
                 onPressed: () => setState(() => isEditMode = !isEditMode),
               ),
             ],
@@ -243,11 +241,18 @@ class _AI_PlanState extends State<AI_Plan> {
                   decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
                 ),
               ),
-              const Padding(
+                const Padding(
                 padding: EdgeInsets.fromLTRB(24, 8, 24, 12),
                 child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text('Bonders Suggestions', style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 22)),
+                  alignment: Alignment.center,
+                  child: Text(
+                    'Bonders Suggestions',
+                    style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontWeight: FontWeight.w700,
+                      fontSize: 22,
+                    ),
+                  ),
                 ),
               ),
               Padding(
@@ -301,7 +306,6 @@ class _AI_PlanState extends State<AI_Plan> {
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
                                       Text(s['name'] as String, style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 16, color: isHighlight ? Colors.white : Colors.black)),
-                                      // MODIFIED: Properly spaced row for Heart and Close icons
                                       Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
@@ -390,7 +394,6 @@ class _AI_PlanState extends State<AI_Plan> {
               itemBuilder: (context, index) {
                 final place = places[index];
                 final bool isDeleted = deletedPlaceNames.contains(place.name);
-
                 return Opacity(
                   opacity: isDeleted ? 0.4 : 1.0,
                   child: AbsorbPointer(

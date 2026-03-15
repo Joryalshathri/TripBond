@@ -7,10 +7,10 @@ import 'group_suggested_itinerary.dart';
 
 // Global "Bonders" list
 List<Map<String, String>> globalBonders = [
-  {'name': 'Leen', 'image': 'assets/images/people/persone4.png', 'lastMsg': 'Hey! How are you?'},
-  {'name': 'Khalid', 'image': 'assets/images/people/persone5.png', 'lastMsg': 'The trip was amazing!'},
-  {'name': 'Huda', 'image': 'assets/images/people/persone6.png', 'lastMsg': 'Check this out.'},
-  {'name': 'Ziyad', 'image': 'assets/images/people/persone7.png', 'lastMsg': 'Let\'s go!'},
+  {'name': 'Leen', 'image': 'assets/images/people/person4.png', 'lastMsg': 'Hey! How are you?'},
+  {'name': 'Khalid', 'image': 'assets/images/people/person5.png', 'lastMsg': 'The trip was amazing!'},
+  {'name': 'Huda', 'image': 'assets/images/people/person6.png', 'lastMsg': 'Check this out.'},
+  {'name': 'Ziyad', 'image': 'assets/images/people/person7.png', 'lastMsg': 'Let\'s go!'},
   {'name': 'Friends', 'image': 'assets/images/people/friends.png', 'lastMsg': 'Group chat active'},
 ];
 
@@ -29,7 +29,7 @@ class _BondersState extends State<Bonders> {
   @override
   void initState() {
     super.initState();
-    _filteredBonders = globalBonders;
+    _filteredBonders = List.from(globalBonders);
   }
 
   void _filterList(String query) {
@@ -39,6 +39,28 @@ class _BondersState extends State<Bonders> {
               bonder['name']!.toLowerCase().contains(query.toLowerCase()))
           .toList();
     });
+  }
+
+  // --- DELETE CONFIRMATION DIALOG ---
+  Future<bool?> _confirmDelete(String name) async {
+    return showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text("Delete Conversation", style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.bold)),
+        content: Text("Are you sure you want to delete your conversation with $name? This action can't be undone."),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("Cancel", style: TextStyle(color: Colors.grey, fontFamily: 'Poppins')),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text("Delete", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontFamily: 'Poppins')),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showFilterSheet() {
@@ -61,7 +83,9 @@ class _BondersState extends State<Bonders> {
                 leading: const Icon(Icons.sort_by_alpha),
                 title: const Text("Sort A-Z"),
                 onTap: () {
-                  setState(() => _filteredBonders.sort((a, b) => a['name']!.compareTo(b['name']!)));
+                  setState(() {
+                    _filteredBonders.sort((a, b) => a['name']!.toLowerCase().compareTo(b['name']!.toLowerCase()));
+                  });
                   Navigator.pop(context);
                 },
               ),
@@ -69,8 +93,9 @@ class _BondersState extends State<Bonders> {
                 leading: const Icon(Icons.history),
                 title: const Text("Recent First"),
                 onTap: () {
-                  // Re-sync with global list which is already ordered by most recent activity
-                  setState(() => _filteredBonders = List.from(globalBonders));
+                  setState(() {
+                    _filteredBonders = List.from(globalBonders);
+                  });
                   Navigator.pop(context);
                 },
               ),
@@ -127,7 +152,7 @@ class _BondersState extends State<Bonders> {
                                   _isSearching = !_isSearching;
                                   if (!_isSearching) {
                                     _searchController.clear();
-                                    _filteredBonders = globalBonders;
+                                    _filteredBonders = List.from(globalBonders);
                                   }
                                 });
                               },
@@ -145,56 +170,77 @@ class _BondersState extends State<Bonders> {
                         ..._filteredBonders.asMap().entries.map((entry) {
                           final index = entry.key;
                           final b = entry.value;
-                          return GestureDetector(
-                            onTap: () async {
-                              // MODIFIED 
-                              await Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => ChatPage(
-                                    name: b['name']!, 
-                                    imagePath: b['image']!
-                                  ),
-                                ),
-                              );
-                              // the following code runs when the user returns back from the chat page
+                          
+                          // --- WRAPPED IN DISMISSIBLE FOR SWIPE-TO-DELETE ---
+                          return Dismissible(
+                            key: Key(b['name']!),
+                            direction: DismissDirection.endToStart, // Swipe left
+                            confirmDismiss: (direction) => _confirmDelete(b['name']!),
+                            onDismissed: (direction) {
                               setState(() {
-                                _filteredBonders = List.from(globalBonders);
+                                globalBonders.removeWhere((element) => element['name'] == b['name']);
+                                _filteredBonders.removeAt(index);
                               });
                             },
-                            child: Container(
+                            background: Container(
+                              alignment: Alignment.centerRight,
+                              padding: const EdgeInsets.symmetric(horizontal: 20),
                               margin: const EdgeInsets.only(bottom: 16),
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                               decoration: BoxDecoration(
-                                color: Colors.white,
+                                color: Colors.red.shade400,
                                 borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: Colors.grey.shade200),
                               ),
-                              child: Row(
-                                children: [
-                                  CircleAvatar(
-                                    radius: 28,
-                                    backgroundImage: AssetImage(b['image']!),
-                                  ),
-                                  const SizedBox(width: 16),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          b['name']!,
-                                          style: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 18),
-                                        ),
-                                        Text(
-                                          b['lastMsg'] ?? 'No messages yet',
-                                          style: TextStyle(fontFamily: 'Poppins', color: Colors.grey.shade600, fontSize: 13),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ],
+                              child: const Icon(Icons.delete, color: Colors.white),
+                            ),
+                            child: GestureDetector(
+                              onTap: () async {
+                                await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => ChatPage(
+                                      name: b['name']!, 
+                                      imagePath: b['image']!
                                     ),
                                   ),
-                                ],
+                                );
+                                setState(() {
+                                  _filteredBonders = List.from(globalBonders);
+                                });
+                              },
+                              child: Container(
+                                margin: const EdgeInsets.only(bottom: 16),
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(color: Colors.grey.shade200),
+                                ),
+                                child: Row(
+                                  children: [
+                                    CircleAvatar(
+                                      radius: 28,
+                                      backgroundImage: AssetImage(b['image']!),
+                                    ),
+                                    const SizedBox(width: 16),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            b['name']!,
+                                            style: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 18),
+                                          ),
+                                          Text(
+                                            b['lastMsg'] ?? 'No messages yet',
+                                            style: TextStyle(fontFamily: 'Poppins', color: Colors.grey.shade600, fontSize: 13),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ).animate().fadeIn(delay: Duration(milliseconds: 50 * index)).slideX(begin: 0.1, end: 0);
@@ -220,17 +266,16 @@ class _BondersState extends State<Bonders> {
         decoration: const BoxDecoration(
           color: Color(0xFF4675B8),
           borderRadius: BorderRadius.only(topLeft: Radius.circular(25), topRight: Radius.circular(25)),
-          boxShadow: [BoxShadow(color: Color(0x1A000000), blurRadius: 20, offset: Offset(0, -4))],
         ),
         padding: const EdgeInsets.symmetric(horizontal: 32),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            _navIcon(Icons.search, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DestinationLandingPage()))),
-            _navIcon(Icons.location_on_outlined, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CloseSpots()))),
-            _navIcon(Icons.airplanemode_active, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const GroupSuggestedItinerary()))),
+            _navIcon(Icons.search, onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const DestinationLandingPage()))),
+            _navIcon(Icons.location_on_outlined, onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const CloseSpots()))),
+            _navIcon(Icons.airplanemode_active, onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const GroupSuggestedItinerary()))),
             _navIcon(Icons.group_outlined, active: true),
-            _navIcon(Icons.person_outline, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const Profile()))),
+            _navIcon(Icons.person_outline, onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const Profile()))),
           ],
         ),
       ),
@@ -253,7 +298,6 @@ class _BondersState extends State<Bonders> {
     );
   }
 }
-
 class ChatPage extends StatefulWidget {
   final String name;
   final String imagePath;
@@ -272,19 +316,12 @@ class _ChatPageState extends State<ChatPage> {
     if (text.isNotEmpty) {
       setState(() {
         _messages.add(text);
-        
-        // Find the index of the person in the global list
         int existingIndex = globalBonders.indexWhere((b) => b['name'] == widget.name);
-        
         if (existingIndex != -1) {
-          // Remove them from current position
           Map<String, String> updatedBonder = globalBonders.removeAt(existingIndex);
-          // Update the last message
           updatedBonder['lastMsg'] = text;
-          // Re-insert at the top (index 0)
           globalBonders.insert(0, updatedBonder);
         }
-        
         _messageController.clear();
       });
     }

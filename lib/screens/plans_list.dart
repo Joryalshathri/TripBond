@@ -22,28 +22,43 @@ class PlanItem {
   });
 }
 
-const List<PlanItem> _currentPlans = [
+const List<PlanItem> currentPlans = [
   PlanItem(
     name: 'Khobar',
     image: 'assets/images/cities/khobar.png',
-    dateRange: '9 - 13 Jan 2026',
+    dateRange: '9 - 11 Apr 2026',
     avatarInitials: ['K', 'L', 'H'],
   ),
 ];
 
-const List<PlanItem> _futurePlans = [
+const List<PlanItem> futurePlans = [
   PlanItem(
     name: 'Jeddah',
     image: 'assets/images/cities/jeddah.png',
-    dateRange: '25 - 27 Feb 2026',
+    dateRange: '25 - 27 Jul 2026',
     avatarInitials: ['Z'],
   ),
   PlanItem(
     name: 'AlUla',
     image: 'assets/images/cities/AlUla.png',
-    dateRange: '5 - 20 Apr 2026',
+    dateRange: '5 - 20 Oct 2026',
   ),
 ];
+
+const List<PlanItem> pastPlans = [
+  PlanItem(
+    name: 'Abha',
+    image: 'assets/images/cities/Abha.png',
+    dateRange: '2 - 7 Jan 2026',
+    avatarInitials: ['Z'],
+  ),
+  PlanItem(
+    name: 'Riyadh',
+    image: 'assets/images/cities/Riyadh.png',
+    dateRange: '5 - 20 Oct 2026',
+  ),
+];
+
 
 const List<Color> _avatarColors = [
   Color(0xFF4675B8),
@@ -59,8 +74,9 @@ class PlansList extends StatefulWidget {
 }
 
 class _PlansListState extends State<PlansList> {
-  bool _currentOpen = true;
-  bool _futureOpen = true;
+  bool currentOpen = true;
+  bool futureOpen = true;
+  bool pastOpen = true; 
 
   @override
   Widget build(BuildContext context) {
@@ -79,14 +95,18 @@ class _PlansListState extends State<PlansList> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const SizedBox(height: 8),
-                        _buildSection('Current Plans', _currentOpen, () {
-                          setState(() => _currentOpen = !_currentOpen);
-                        }, _currentPlans),
                         const SizedBox(height: 16),
-                        _buildSection('Future Plans', _futureOpen, () {
-                          setState(() => _futureOpen = !_futureOpen);
-                        }, _futurePlans),
+                        _buildSection('Current Plans', currentOpen, () {
+                          setState(() => currentOpen = !currentOpen);
+                        }, currentPlans),
+                        const SizedBox(height: 16),
+                        _buildSection('Future Plans', futureOpen, () {
+                          setState(() => futureOpen = !futureOpen);
+                        }, futurePlans),
+                        const SizedBox(height: 16),
+                        _buildSection('Past Plans', pastOpen, () {
+                          setState(() => pastOpen = !pastOpen);
+                        }, pastPlans),
                       ],
                     ),
                   ),
@@ -152,7 +172,7 @@ class _PlansListState extends State<PlansList> {
                   color: Colors.black,
                 ),
               ),
-              const SizedBox(width: 8),
+              const Spacer(),
               Icon(
                 isOpen ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
                 size: 20,

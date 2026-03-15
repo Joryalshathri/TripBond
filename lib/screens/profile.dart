@@ -2,51 +2,54 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'settings.dart';
 import 'editProfile.dart';
-import 'DestinationLandingPage.dart';
-import 'Bonder.dart'; // to access globalBonders 
+import 'DestinationLandingPage.dart'; 
+import 'Bonder.dart'; 
 import 'close_spots.dart';
-import 'plans_list.dart';
 import 'AI_Plan.dart';
-//import '../core/animations/animation_constants.dart';
 import 'package:top_snackbar_flutter/top_snack_bar.dart';
 import 'package:top_snackbar_flutter/custom_snack_bar.dart';
 
-class TripCard {
-  final String name;
-  final String image;
-  final String location;
-
-  const TripCard({required this.name, required this.image, required this.location});
-}
-
-const List<TripCard> _pastTrips = [
-  TripCard(name: 'Family Trip', image: 'assets/images/cities/khobar2.png', location: 'Al Khobar'),
-  TripCard(name: 'Business Trip', image: 'assets/images/cities/Riyadh.png', location: 'Riyadh'),
-  TripCard(name: 'Relaxing trip', image: 'assets/images/cities/AlUla.png', location: 'AlUla'),
-];
-
-const List<String> _tabs = ['Past Trips', 'Liked Trips'];
+const List<String> _tabs = ['Posted Trips', 'Liked Trips'];
 
 class Profile extends StatefulWidget {
   const Profile({super.key});
-
   @override
   State<Profile> createState() => _ProfileState();
 }
 
 class _ProfileState extends State<Profile> {
-  String _activeTab = 'Past Trips';
+  String _activeTab = 'Posted Trips';
   bool _isFollowing = false;
   int _followerCount = 503;
   final int _followingCount = 600;
-  final int _tripCount = 50;
+
+  final List<Map<String, String>> _followerData = [
+    {'name': 'Leen', 'image': 'assets/images/people/person4.png'},
+    {'name': 'Khalid', 'image': 'assets/images/people/person5.png'},
+    {'name': 'Fatima Khan', 'image': ''}, 
+    {'name': 'Ahmed Ali', 'image': 'assets/images/cities/jeddah.png'},
+  ];
+
+  final List<Map<String, String>> _followingData = [
+    {'name': 'Huda', 'image': ''}, 
+    {'name': 'Ziyad', 'image': 'assets/images/people/person7.png'},
+    {'name': 'Friends', 'image': 'assets/images/people/friends.png'},
+    {'name': 'Leen', 'image': 'assets/images/people/person4.png'},
+  ];
+
+  String _getTimeAgo(DateTime dateTime) {
+    final duration = DateTime.now().difference(dateTime);
+    if (duration.inDays > 0) return '${duration.inDays}d ago';
+    if (duration.inHours > 0) return '${duration.inHours}h ago';
+    if (duration.inMinutes > 0) return '${duration.inMinutes}m ago';
+    return 'Just now';
+  }
 
   void _toggleFollow() {
     setState(() {
       _isFollowing = !_isFollowing;
       _followerCount += _isFollowing ? 1 : -1;
     });
-
     showTopSnackBar(
       Overlay.of(context),
       CustomSnackBar.success(
@@ -58,38 +61,77 @@ class _ProfileState extends State<Profile> {
     );
   }
 
-  void _showFollowersList() {
-    showModalBottomSheet(
+  // ---  DELETE DIALOG ---
+  Future<void> _confirmDelete(Post post) async {
+    return showDialog(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => _buildFollowersModal(),
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: Colors.white,
+        title: Column(
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 40),
+            const SizedBox(height: 10),
+            const Text("Delete Post", 
+              style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.bold, fontSize: 18)),
+          ],
+        ),
+        content: const Text(
+          "Are you sure you want to delete this trip post? This action cannot be undone.",
+          textAlign: TextAlign.center,
+          style: TextStyle(fontFamily: 'Poppins', fontSize: 13, color: Colors.grey),
+        ),
+        actionsAlignment: MainAxisAlignment.spaceEvenly,
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel", style: TextStyle(color: Colors.grey, fontFamily: 'Poppins', fontWeight: FontWeight.w600)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              setState(() {
+                posts.remove(post);
+              });
+              Navigator.pop(context);
+              // Success Notification
+              showTopSnackBar(
+                Overlay.of(context),
+                const CustomSnackBar.success(
+                  message: "Post deleted successfully",
+                  backgroundColor: Color(0xFF4675B8),
+                  icon: Icon(Icons.delete_outline, color: Colors.white24, size: 80),
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text("Delete", style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
     );
+  }
+
+  void _showFollowersList() {
+    showModalBottomSheet(context: context, isScrollControlled: true, backgroundColor: Colors.transparent, builder: (context) => _buildFollowersModal());
   }
 
   void _showFollowingList() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => _buildFollowingModal(),
-    );
-  }
-
-  void _showTripsList() {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => const PlansList()));
+    showModalBottomSheet(context: context, isScrollControlled: true, backgroundColor: Colors.transparent, builder: (context) => _buildFollowingModal());
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
-      resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
           Positioned.fill(
             child: SingleChildScrollView(
-              physics: const ClampingScrollPhysics(),
               padding: const EdgeInsets.only(bottom: 100),
               child: Column(
                 children: [
@@ -113,45 +155,25 @@ class _ProfileState extends State<Profile> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          GestureDetector(
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const editprofile())),
-            child: const Icon(Icons.edit_outlined, size: 20, color: Color(0xFF1E1E1E)),
-          ),
-          GestureDetector(
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const Settings())),
-            child: const Icon(Icons.more_vert, size: 20, color: Color(0xFF1E1E1E)),
-          ),
+          GestureDetector(onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const editprofile())),
+            child: const Icon(Icons.edit_outlined, size: 20, color: Color(0xFF1E1E1E))),
+          GestureDetector(onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const Settings())),
+            child: const Icon(Icons.more_vert, size: 20, color: Color(0xFF1E1E1E))),
         ],
       ),
-    ).animate().fadeIn(duration: 400.ms).slideY(begin: -0.1, end: 0);
+    );
   }
 
   Widget _buildProfileInfo() {
+    final int userTripCount = posts.where((p) => p.userName == 'Sarah Mohamed').length;
     return Column(
       children: [
-        Container(
-          width: 100,
-          height: 100,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(color: const Color.fromARGB(255, 244, 242, 242), width: 3),
-          ),
-          child: ClipOval(
-            child: Image.asset(
-              'assets/images/people/profile.png',
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Container(
-                color: Colors.grey.shade300,
-                child: const Icon(Icons.person, size: 48, color: Colors.grey),
-              ),
-            ),
-          ),
+        Container(width: 100, height: 100,
+          decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: const Color.fromARGB(255, 244, 242, 242), width: 3)),
+          child: ClipOval(child: Image.asset('assets/images/people/profile.png', fit: BoxFit.cover)),
         ).animate().scale(delay: 100.ms).fadeIn(),
         const SizedBox(height: 12),
-        const Text(
-          'Sarah Mohamed',
-          style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 20),
-        ),
+        const Text('Sarah Mohamed', style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 20)),
         const SizedBox(height: 12),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -162,32 +184,16 @@ class _ProfileState extends State<Profile> {
                 backgroundColor: _isFollowing ? Colors.grey[300] : const Color(0xFFC4A44A),
                 foregroundColor: _isFollowing ? Colors.black87 : Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 10),
               ),
               child: Text(_isFollowing ? 'Following' : 'Follow', style: const TextStyle(fontFamily: 'Poppins')),
             ),
             if (_isFollowing) ...[
               const SizedBox(width: 8),
               ElevatedButton(
-                onPressed: () async {
-                  // Added async/await and setState to refresh state after chat
-                  await Navigator.push(
-                    context, 
-                    MaterialPageRoute(
-                      builder: (_) => const ChatPage(
-                        name: 'Sarah Mohamed', 
-                        imagePath: 'assets/images/people/profile.png'
-                      )
-                    )
-                  );
-                  setState(() {}); 
+                onPressed: () {
+                   Navigator.push(context, MaterialPageRoute(builder: (context) => const ChatPage(name: 'Sarah Mohamed', imagePath: 'assets/images/people/profile.png')));
                 },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF4675B8),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 10),
-                ),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4675B8), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24))),
                 child: const Text('Message', style: TextStyle(fontFamily: 'Poppins')),
               ).animate().fadeIn().scale(),
             ],
@@ -197,7 +203,7 @@ class _ProfileState extends State<Profile> {
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            _buildStat('Trips', _tripCount.toString(), _showTripsList),
+            _buildStat('Trips', userTripCount.toString(), () {}),
             const SizedBox(width: 40),
             _buildStat('Followers', _followerCount.toString(), _showFollowersList),
             const SizedBox(width: 40),
@@ -209,16 +215,10 @@ class _ProfileState extends State<Profile> {
   }
 
   Widget _buildStat(String label, String value, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Column(
-        children: [
-          Text(label, style: TextStyle(fontFamily: 'Poppins', fontSize: 12, color: Colors.grey.shade400)),
-          Text(value, style: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 18)),
-        ],
-      ),
-    );
+    return InkWell(onTap: onTap, child: Column(children: [
+      Text(label, style: TextStyle(fontFamily: 'Poppins', fontSize: 12, color: Colors.grey.shade400)),
+      Text(value, style: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 18)),
+    ]));
   }
 
   Widget _buildTabs() {
@@ -235,9 +235,9 @@ class _ProfileState extends State<Profile> {
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Column(
                 children: [
-                  Text(tab, style: TextStyle(fontFamily: 'Poppins', color: isActive ? Colors.black : Colors.grey.shade400, fontWeight: FontWeight.w500)),
+                  Text(tab, style: TextStyle(fontFamily: 'Poppins', color: isActive ? Colors.black : Colors.grey.shade400)),
                   const SizedBox(height: 12),
-                  Container(height: 2, width: 60, color: isActive ? Colors.black : Colors.transparent),
+                  Container(height: 2, width: 80, color: isActive ? Colors.black : Colors.transparent),
                 ],
               ),
             ),
@@ -248,191 +248,110 @@ class _ProfileState extends State<Profile> {
   }
 
   Widget _buildContent() {
-    if (_activeTab == 'Liked Trips') {
-      if (likedPosts.isEmpty) {
-        return const Padding(
-          padding: EdgeInsets.all(40),
-          child: Center(
-            child: Text(
-              "No liked trips yet! Like a post to see it here.",
-              textAlign: TextAlign.center,
-              style: TextStyle(fontFamily: 'Poppins', color: Colors.grey),
-            ),
-          ),
-        );
-      }
-
-      return Padding(
-        padding: const EdgeInsets.all(16),
-        child: Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: likedPosts.asMap().entries.map((entry) {
-            int index = entry.key;
-            var trip = entry.value;
-
-            return SizedBox(
-              width: (MediaQuery.of(context).size.width - 44) / 2,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  border: Border.all(color: Colors.grey.shade200),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Stack(
-                      children: [
-                        Image.asset(
-                          trip['image'] ?? '',
-                          height: 100,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Container(
-                            height: 100, 
-                            color: Colors.grey.shade300, 
-                            child: const Icon(Icons.image, color: Colors.grey),
-                          ),
-                        ),
-                        Positioned(
-                          top: 8,
-                          right: 8,
-                          child: GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                String removedTrip = trip['name'] ?? 'Trip';
-                                likedPosts.removeAt(index);
-                                showTopSnackBar(
-                                  Overlay.of(context),
-                                  CustomSnackBar.success(
-                                    message: 'Removed $removedTrip from Liked Trips',
-                                    backgroundColor: const Color(0xFFEF4444),
-                                    icon: const Icon(Icons.delete, color: Colors.transparent),
-                                  ),
-                                  displayDuration: const Duration(seconds: 2),
-                                );
-                              });
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.all(4),
-                              decoration: const BoxDecoration(
-                                color: Colors.white70, 
-                                shape: BoxShape.circle
-                              ),
-                              child: const Icon(
-                                Icons.favorite, 
-                                size: 18, 
-                                color: Color(0xFFEF4444)
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            trip['name'] ?? 'No Name', 
-                            style: const TextStyle(
-                              fontFamily: 'Poppins', 
-                              fontWeight: FontWeight.w700, 
-                              fontSize: 13, 
-                              color: Colors.black
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 2),
-                          Row(
-                            children: [
-                              const Icon(Icons.location_on, size: 10, color: Color(0xFF4675B8)),
-                              const SizedBox(width: 4),
-                              Expanded(
-                                child: Text(
-                                  trip['location'] ?? 'Location', 
-                                  style: TextStyle(
-                                    fontFamily: 'Poppins', 
-                                    fontSize: 11, 
-                                    color: Colors.grey.shade500
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-      );
-    }
-
+    if (_activeTab == 'Liked Trips') return _buildLikedGrid();
+    final userPosts = posts.where((p) => p.userName == 'Sarah Mohamed').toList();
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Wrap(
-        spacing: 12,
-        runSpacing: 12,
-        children: _pastTrips.map((trip) => SizedBox(
+        spacing: 12, runSpacing: 12,
+        children: userPosts.map((post) => SizedBox(
           width: (MediaQuery.of(context).size.width - 44) / 2,
           child: Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border.all(color: Colors.grey.shade200),
-              borderRadius: BorderRadius.circular(16),
-            ),
+            decoration: BoxDecoration(color: Colors.white, border: Border.all(color: Colors.grey.shade200), borderRadius: BorderRadius.circular(16)),
             clipBehavior: Clip.antiAlias,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Image.asset(trip.image, height: 100, width: double.infinity, fit: BoxFit.cover),
+                Stack(
+                  children: [
+                    Image.asset(post.image, height: 110, width: double.infinity, fit: BoxFit.cover),
+                    // Glass-morphic Delete Icon
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: GestureDetector(
+                        onTap: () => _confirmDelete(post),
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.9),
+                            shape: BoxShape.circle,
+                            boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 4)],
+                          ),
+                          child: const Icon(
+                            Icons.delete_outline_rounded,
+                            color: Colors.redAccent,
+                            size: 18,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+                  padding:const EdgeInsets.all(10),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(trip.name, style: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 13)),
-                      const SizedBox(height: 2),
-                      Row(
-                        children: [
-                          const Icon(Icons.location_on, size: 10, color: Color(0xFF4675B8)),
-                          const SizedBox(width: 4),
-                          Text(trip.location, style: const TextStyle(fontFamily: 'Poppins', fontSize: 11, color: Color(0xFF9E9E9E))),
-                        ],
-                      ),
+                      Text(post.title, style: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis),
+                      Row(children: [const Icon(Icons.location_on, size: 10, color: Color(0xFF4675B8)), const SizedBox(width: 4), Expanded(child: Text(post.location, style: const TextStyle(fontSize: 10, color: Color(0xFF9E9E9E)), maxLines: 1, overflow: TextOverflow.ellipsis))]),
+                      Text(_getTimeAgo(post.timestamp), style: TextStyle(fontSize: 10, color: Colors.grey.shade400, fontStyle: FontStyle.italic)),
                     ],
                   ),
                 ),
               ],
             ),
           ),
-        )).toList(),
+        ).animate().fadeIn(duration: 400.ms).scale(delay: 100.ms) // Entrance animation
+        ).toList(),
+      ),
+    );
+  }
+
+  Widget _buildLikedGrid() {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Wrap(
+        spacing: 12, runSpacing: 12,
+        children: likedPosts.asMap().entries.map((entry) {
+          var trip = entry.value;
+          return SizedBox(
+            width: (MediaQuery.of(context).size.width - 44) / 2,
+            child: Container(
+              decoration: BoxDecoration(color: Colors.white, border: Border.all(color: Colors.grey.shade200), borderRadius: BorderRadius.circular(16)),
+              clipBehavior: Clip.antiAlias,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Stack(children: [
+                    Image.asset(trip['image'] ?? '', height: 100, width: double.infinity, fit: BoxFit.cover),
+                    Positioned(top: 8, right: 8, child: GestureDetector(onTap: () => setState(() => likedPosts.removeAt(entry.key)), child: const Icon(Icons.favorite, size: 18, color: Color(0xFFEF4444)))),
+                  ]),
+                  Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(trip['name'] ?? '', style: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 13)),
+                        Row(children: [const Icon(Icons.location_on, size: 10, color: Color(0xFF4675B8)), const SizedBox(width: 4), Expanded(child: Text(trip['location'] ?? 'Location', style: const TextStyle(fontSize: 10, color: Color(0xFF9E9E9E)), maxLines: 1, overflow: TextOverflow.ellipsis))]),
+                        Text(trip['time'] ?? 'Recently', style: TextStyle(fontSize: 8, color: Colors.grey.shade400)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ).animate().fadeIn(duration: 400.ms).scale(delay: 50.ms);
+        }).toList(),
       ),
     );
   }
 
   Widget _buildBottomNav(BuildContext context) {
-    return Positioned(
-      bottom: 0, left: 0, right: 0,
-      child: Container(
-        height: 70,
-        decoration: const BoxDecoration(
-          color: Color(0xFF4675B8),
-          borderRadius: BorderRadius.only(topLeft: Radius.circular(25), topRight: Radius.circular(25)),
-        ),
+    return Positioned(bottom: 0, left: 0, right: 0,
+      child: Container(height: 70, decoration: const BoxDecoration(color: Color(0xFF4675B8), borderRadius: BorderRadius.only(topLeft: Radius.circular(25), topRight: Radius.circular(25))),
         padding: const EdgeInsets.symmetric(horizontal: 32),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             _navIcon(Icons.search, onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const DestinationLandingPage()))),
             _navIcon(Icons.location_on_outlined, onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const CloseSpots()))),
@@ -446,21 +365,78 @@ class _ProfileState extends State<Profile> {
   }
 
   Widget _navIcon(IconData icon, {VoidCallback? onTap, bool active = false}) {
-    return GestureDetector(
-      onTap: onTap,
+    return GestureDetector(onTap: onTap, child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(icon, size: 24, color: Colors.white), if (active) ...[const SizedBox(height: 4), Container(width: 20, height: 2, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(1)))]]));
+  }
+
+  Widget _buildFollowersModal() { return _buildUserListModal("Followers", _followerData); }
+  Widget _buildFollowingModal() { return _buildUserListModal("Following", _followingData); }
+
+  Widget _buildUserListModal(String title, List<Map<String, String>> users) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.6,
+      decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 24, color: Colors.white),
-          if (active) ...[
-            const SizedBox(height: 4),
-            Container(width: 20, height: 2, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(1))),
-          ],
+          Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10))),
+          const SizedBox(height: 20),
+          Text(title, style: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.bold, fontSize: 20)),
+          const Divider(),
+          Expanded(
+            child: ListView.builder(
+              itemCount: users.length,
+              itemBuilder: (context, index) {
+                final user = users[index];
+                bool hasImage = user['image'] != null && user['image']!.isNotEmpty;
+                return ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: CircleAvatar(
+                    radius: 24,
+                    backgroundColor: hasImage ? Colors.transparent : const Color(0xFF4675B8),
+                    backgroundImage: hasImage ? AssetImage(user['image']!) : null,
+                    child: !hasImage 
+                      ? Text(user['name']![0].toUpperCase(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)) 
+                      : null,
+                  ),
+                  title: Text(user['name']!, style: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600)),
+                  trailing: PopupMenuButton<String>(
+                    icon: const Icon(Icons.more_horiz, color: Colors.grey),
+                    onSelected: (value) {
+                      if (value == 'message') {
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => ChatPage(name: user['name']!, imagePath: user['image'] ?? '')));
+                      } else if (value == 'remove') {
+                        setState(() { users.removeAt(index); });
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      PopupMenuItem(
+                        value: 'message', 
+                        child: Row(
+                          children: const [
+                            Icon(Icons.message_outlined, size: 18, color: Colors.black),
+                            SizedBox(width: 10),
+                            Text("Message"),
+                          ],
+                        )
+                      ),
+                      PopupMenuItem(
+                        value: 'remove', 
+                        child: Row(
+                          children: [
+                            Icon(title == "Followers" ? Icons.person_remove_outlined : Icons.remove_circle_outline, size: 18, color: Colors.red),
+                            const SizedBox(width: 10),
+                            Text(title == "Followers" ? "Remove Follower" : "Unfollow", style: const TextStyle(color: Colors.red)),
+                          ],
+                        )
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
         ],
       ),
     );
   }
-
-  Widget _buildFollowersModal() { return Container(color: Colors.white, padding: const EdgeInsets.all(20), child: const Text("Followers List")); }
-  Widget _buildFollowingModal() { return Container(color: Colors.white, padding: const EdgeInsets.all(20), child: const Text("Following List")); }
 }
