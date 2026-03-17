@@ -1,22 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'TripInfo.dart';
-import '../core/animations/animation_constants.dart';
 
 const List<String> _days = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 const List<String> _months = [
-  'Jan',
-  'Feb',
-  'Mar',
-  'Apr',
-  'May',
-  'Jun',
-  'Jul',
-  'Aug',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dec'
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
 ];
 
 class DatesPage extends StatefulWidget {
@@ -27,10 +16,21 @@ class DatesPage extends StatefulWidget {
 }
 
 class _DatesPageState extends State<DatesPage> {
-  int _currentMonth = 8;
-  int _currentYear = 2025;
-  int? _startDate = 9;
-  int? _endDate = 13;
+  // Useing late to initialize based on current date
+  late int _currentMonth;
+  late int _currentYear;
+  int? _startDate;
+  int? _endDate;
+
+  final DateTime _today = DateTime.now();
+
+  @override
+  void initState() {
+    super.initState();
+    //  to match the Dropdown items
+    _currentMonth = _today.month - 1;
+    _currentYear = _today.year;
+  }
 
   int _daysInMonth(int year, int month) {
     return DateTime(year, month + 1, 0).day;
@@ -40,7 +40,14 @@ class _DatesPageState extends State<DatesPage> {
     return DateTime(year, month + 1, 1).weekday % 7;
   }
 
+  bool _isPast(int day) {
+    final cellDate = DateTime(_currentYear, _currentMonth + 1, day);
+    return cellDate.isBefore(DateTime(_today.year, _today.month, _today.day));
+  }
+
   void _handleDayTap(int day) {
+    if (_isPast(day)) return;
+
     setState(() {
       if (_startDate == null || (_startDate != null && _endDate != null)) {
         _startDate = day;
@@ -63,7 +70,13 @@ class _DatesPageState extends State<DatesPage> {
     return day == _startDate || day == _endDate;
   }
 
+  bool _canGoBack() {
+    if (_currentYear > _today.year) return true;
+    return _currentMonth > (_today.month - 1);
+  }
+
   void _prevMonth() {
+    if (!_canGoBack()) return;
     setState(() {
       if (_currentMonth == 0) {
         _currentMonth = 11;
@@ -71,6 +84,8 @@ class _DatesPageState extends State<DatesPage> {
       } else {
         _currentMonth--;
       }
+      _startDate = null;
+      _endDate = null;
     });
   }
 
@@ -82,6 +97,8 @@ class _DatesPageState extends State<DatesPage> {
       } else {
         _currentMonth++;
       }
+      _startDate = null;
+      _endDate = null;
     });
   }
 
@@ -92,18 +109,17 @@ class _DatesPageState extends State<DatesPage> {
     final prevMonthDays = _currentMonth == 0
         ? _daysInMonth(_currentYear - 1, 11)
         : _daysInMonth(_currentYear, _currentMonth - 1);
+    
     final totalCells = ((firstDay + daysInMonth + 6) ~/ 7) * 7;
 
     final cells = <_CalendarCell>[];
     for (int i = 0; i < totalCells; i++) {
       if (i < firstDay) {
-        cells.add(_CalendarCell(
-            day: prevMonthDays - firstDay + i + 1, isCurrentMonth: false));
+        cells.add(_CalendarCell(day: prevMonthDays - firstDay + i + 1, isCurrentMonth: false));
       } else if (i - firstDay < daysInMonth) {
         cells.add(_CalendarCell(day: i - firstDay + 1, isCurrentMonth: true));
       } else {
-        cells.add(_CalendarCell(
-            day: i - firstDay - daysInMonth + 1, isCurrentMonth: false));
+        cells.add(_CalendarCell(day: i - firstDay - daysInMonth + 1, isCurrentMonth: false));
       }
     }
 
@@ -117,55 +133,25 @@ class _DatesPageState extends State<DatesPage> {
               alignment: Alignment.centerLeft,
               child: GestureDetector(
                 onTap: () => Navigator.pop(context),
-                child: Container(
-                  width: 40,
-                  height: 40,
-                  alignment: Alignment.center,
-                  child: const Icon(Icons.arrow_back,
-                      size: 24, color: Color(0xFF1E1E1E)),
-                ),
+                child: const Icon(Icons.arrow_back, size: 24, color: Color(0xFF1E1E1E)),
               ),
             ),
-          ).animate().fadeIn(
-                duration: Duration(milliseconds: AnimationConstants.fast),
-                curve: AnimationConstants.cubicEaseOut,
-              ),
+          ).animate().fadeIn(duration: 400.ms),
+          
           const Text(
             'Choose Your Dates',
-            style: TextStyle(
-              fontFamily: 'Poppins',
-              fontWeight: FontWeight.w700,
-              fontSize: 22,
-              color: Colors.black,
-            ),
-          )
-              .animate()
-              .fadeIn(
-                delay: Duration(milliseconds: 100),
-                duration: Duration(milliseconds: AnimationConstants.normal),
-                curve: AnimationConstants.cubicEaseOut,
-              )
-              .slideY(
-                delay: Duration(milliseconds: 100),
-                begin: -0.1,
-                end: 0,
-                duration: Duration(milliseconds: AnimationConstants.normal),
-                curve: AnimationConstants.cubicEaseOut,
-              ),
+            style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 22),
+          ).animate().fadeIn(delay: 100.ms).slideY(begin: -0.1, end: 0),
+
           const SizedBox(height: 24),
+
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 27),
             child: Container(
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
+                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2))],
               ),
               padding: const EdgeInsets.all(20),
               child: Column(
@@ -177,22 +163,11 @@ class _DatesPageState extends State<DatesPage> {
                   _buildCalendarGrid(cells),
                 ],
               ),
-            )
-                .animate()
-                .fadeIn(
-                  delay: Duration(milliseconds: 200),
-                  duration: Duration(milliseconds: AnimationConstants.medium),
-                  curve: AnimationConstants.cubicEaseOut,
-                )
-                .scale(
-                  delay: Duration(milliseconds: 200),
-                  begin: const Offset(0.95, 0.95),
-                  end: const Offset(1.0, 1.0),
-                  duration: Duration(milliseconds: AnimationConstants.medium),
-                  curve: AnimationConstants.cubicEaseOut,
-                ),
+            ).animate().fadeIn(delay: 200.ms).scale(begin: const Offset(0.95, 0.95), end: const Offset(1.0, 1.0)),
           ),
+
           const Spacer(),
+
           Padding(
             padding: const EdgeInsets.fromLTRB(30, 24, 30, 40),
             child: SizedBox(
@@ -200,25 +175,34 @@ class _DatesPageState extends State<DatesPage> {
               height: 56,
               child: ElevatedButton(
                 onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const TripInfo()),
-                  );
+                  if (_startDate != null) {
+                    String monthName = _months[_currentMonth];
+                    String range;
+                    if (_endDate != null) {
+                      range = "$_startDate-$_endDate $monthName";
+                    } else {
+                      range = "$_startDate $monthName";
+                    }
+
+                    Navigator.push(
+                      context, 
+                      MaterialPageRoute(
+                        builder: (_) => TripInfo(
+                          selectedDates: range,
+                        )
+                      )
+                    );
+                  }
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF4675B8),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   elevation: 4,
-                  textStyle: const TextStyle(
-                    fontFamily: 'Poppins',
-                    fontWeight: FontWeight.w600,
-                    fontSize: 18,
-                  ),
                 ),
-                child: const Text('Choose Dates'),
+                child: const Text(
+                  'Choose Dates',
+                  style: TextStyle(color: Colors.white, fontFamily: 'Poppins', fontWeight: FontWeight.w600, fontSize: 18),
+                ),
               ),
             ),
           ),
@@ -232,96 +216,79 @@ class _DatesPageState extends State<DatesPage> {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         GestureDetector(
-          onTap: _prevMonth,
-          child: Container(
-            width: 32,
-            height: 32,
-            alignment: Alignment.center,
-            child: const Icon(Icons.chevron_left,
-                size: 20, color: Color(0xFF1E1E1E)),
-          ),
+          onTap: _canGoBack() ? _prevMonth : null,
+          child: Icon(Icons.chevron_left, color: _canGoBack() ? Colors.black : Colors.grey.shade300),
         ),
         Row(
           children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey.shade300),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Row(
-                children: [
-                  Text(
-                    _months[_currentMonth],
-                    style: const TextStyle(
-                      fontFamily: 'Poppins',
-                      fontWeight: FontWeight.w500,
-                      fontSize: 14,
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  const Icon(Icons.keyboard_arrow_down,
-                      size: 14, color: Color(0xFF1E1E1E)),
-                ],
-              ),
+            _customDropdown<int>(
+              value: _currentMonth,
+              items: List.generate(12, (i) => DropdownMenuItem(value: i, child: Text(_months[i]))),
+              onChanged: (val) {
+                if (val != null) {
+                  if (_currentYear == _today.year && val < _today.month - 1) return;
+                  setState(() {
+                    _currentMonth = val;
+                    _startDate = null;
+                    _endDate = null;
+                  });
+                }
+              },
             ),
-            const SizedBox(width: 12),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey.shade300),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Row(
-                children: [
-                  Text(
-                    '$_currentYear',
-                    style: const TextStyle(
-                      fontFamily: 'Poppins',
-                      fontWeight: FontWeight.w500,
-                      fontSize: 14,
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  const Icon(Icons.keyboard_arrow_down,
-                      size: 14, color: Color(0xFF1E1E1E)),
-                ],
-              ),
+            const SizedBox(width: 8),
+            _customDropdown<int>(
+              value: _currentYear,
+              // Generate years starting from the current year (2026+)
+              items: List.generate(5, (i) {
+                int year = _today.year + i;
+                return DropdownMenuItem(value: year, child: Text('$year'));
+              }),
+              onChanged: (val) {
+                if (val != null) {
+                  setState(() {
+                    _currentYear = val;
+                    if (_currentYear == _today.year && _currentMonth < _today.month - 1) {
+                      _currentMonth = _today.month - 1;
+                    }
+                    _startDate = null;
+                    _endDate = null;
+                  });
+                }
+              },
             ),
           ],
         ),
-        GestureDetector(
-          onTap: _nextMonth,
-          child: Container(
-            width: 32,
-            height: 32,
-            alignment: Alignment.center,
-            child: const Icon(Icons.chevron_right,
-                size: 20, color: Color(0xFF1E1E1E)),
-          ),
-        ),
+        GestureDetector(onTap: _nextMonth, child: const Icon(Icons.chevron_right)),
       ],
+    );
+  }
+
+  Widget _customDropdown<T>({required T value, required List<DropdownMenuItem<T>> items, required ValueChanged<T?> onChanged}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey.shade300),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<T>(
+          value: value,
+          items: items,
+          onChanged: onChanged,
+          icon: const Icon(Icons.keyboard_arrow_down, size: 14),
+          style: const TextStyle(fontFamily: 'Poppins', color: Colors.black, fontSize: 14),
+        ),
+      ),
     );
   }
 
   Widget _buildDayHeaders() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceAround,
-      children: _days.map((day) {
-        return SizedBox(
-          width: 36,
-          child: Text(
-            day,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontFamily: 'Poppins',
-              fontWeight: FontWeight.w500,
-              fontSize: 12,
-              color: Colors.grey.shade500,
-            ),
-          ),
-        );
-      }).toList(),
+      children: _days.map((day) => SizedBox(
+        width: 36,
+        child: Text(day, textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+      )).toList(),
     );
   }
 
@@ -336,50 +303,19 @@ class _DatesPageState extends State<DatesPage> {
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: rowCells.map((cell) {
               if (!cell.isCurrentMonth) {
-                return SizedBox(
-                  width: 36,
-                  height: 36,
-                  child: Center(
-                    child: Text(
-                      '${cell.day}',
-                      style: TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 14,
-                        color: Colors.grey.shade300,
-                      ),
-                    ),
-                  ),
-                );
+                return const SizedBox(width: 36, height: 36);
               }
 
+              final isPast = _isPast(cell.day);
               final inRange = _isInRange(cell.day);
               final isEdge = _isEdge(cell.day);
-
-              Color bgColor;
-              Color textColor;
-              FontWeight fontWeight;
-
-              if (isEdge) {
-                bgColor = const Color(0xFF2D2D2D);
-                textColor = Colors.white;
-                fontWeight = FontWeight.w600;
-              } else if (inRange) {
-                bgColor = const Color(0xFF4675B8);
-                textColor = Colors.white;
-                fontWeight = FontWeight.w500;
-              } else {
-                bgColor = Colors.transparent;
-                textColor = Colors.black;
-                fontWeight = FontWeight.w400;
-              }
 
               return GestureDetector(
                 onTap: () => _handleDayTap(cell.day),
                 child: Container(
-                  width: 36,
-                  height: 36,
+                  width: 36, height: 36,
                   decoration: BoxDecoration(
-                    color: bgColor,
+                    color: isEdge ? const Color(0xFF2D2D2D) : (inRange ? const Color(0xFF4675B8) : Colors.transparent),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   alignment: Alignment.center,
@@ -387,9 +323,8 @@ class _DatesPageState extends State<DatesPage> {
                     '${cell.day}',
                     style: TextStyle(
                       fontFamily: 'Poppins',
-                      fontSize: 14,
-                      fontWeight: fontWeight,
-                      color: textColor,
+                      fontWeight: isEdge || inRange ? FontWeight.w600 : FontWeight.w400,
+                      color: isPast ? Colors.grey.shade300 : (isEdge || inRange ? Colors.white : Colors.black),
                     ),
                   ),
                 ),
@@ -406,6 +341,5 @@ class _DatesPageState extends State<DatesPage> {
 class _CalendarCell {
   final int day;
   final bool isCurrentMonth;
-
   const _CalendarCell({required this.day, required this.isCurrentMonth});
 }

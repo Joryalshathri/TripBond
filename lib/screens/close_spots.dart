@@ -3,7 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'DestinationLandingPage.dart';
 import 'Bonder.dart';
 import 'profile.dart';
-import 'group_suggested_itinerary.dart';
+import 'AI_Plan.dart';
 import '../core/animations/animation_constants.dart';
 
 class NearActivity {
@@ -216,7 +216,7 @@ class CloseSpots extends StatelessWidget {
       left: 0,
       right: 0,
       child: Container(
-        height: 80,
+        height: 70,
         decoration: const BoxDecoration(
           color: Color(0xFF4675B8),
           borderRadius: BorderRadius.only(
@@ -246,7 +246,7 @@ class CloseSpots extends StatelessWidget {
               Navigator.push(
                   context,
                   MaterialPageRoute(
-                      builder: (_) => const GroupSuggestedItinerary()));
+                      builder: (_) => const AI_Plan()));
             }),
             _navIcon(Icons.group_outlined, onTap: () {
               Navigator.push(
