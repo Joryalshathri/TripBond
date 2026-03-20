@@ -11,11 +11,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:tripbond_app/main.dart';
 
 void main() {
-  testWidgets('App smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
+  testWidgets('App starts without crashing', (WidgetTester tester) async {
+    // Build the app and trigger a frame.
     await tester.pumpWidget(const TripBondApp());
 
-    // Verify that the app builds without errors.
+    // A basic smoke test just ensures the widget tree can be built.
     expect(find.byType(MaterialApp), findsOneWidget);
   });
 }

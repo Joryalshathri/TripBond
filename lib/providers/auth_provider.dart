@@ -196,4 +196,13 @@ class AuthProvider with ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
   }
+
+  /// Set the authenticated status without changing stored user data.
+  ///
+  /// Useful after completing an email verification flow where login state
+  /// should transition to authenticated.
+  void setAuthenticatedStatus() {
+    _status = AuthStatus.authenticated;
+    notifyListeners();
+  }
 }

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:provider/provider.dart';
 import 'settings.dart';
 import 'editProfile.dart';
 import 'DestinationLandingPage.dart'; 
@@ -9,9 +8,9 @@ import 'close_spots.dart';
 import 'AI_Plan.dart';
 import 'package:top_snackbar_flutter/top_snack_bar.dart';
 import 'package:top_snackbar_flutter/custom_snack_bar.dart';
-import '../core/animations/animation_constants.dart';
-import '../providers/user_provider.dart';
-import '../providers/trip_provider.dart';
+import '../services/profileService.dart';
+import '../models/profile_model.dart';
+import '../models.dart';
 
 const List<String> _tabs = ['Posted Trips', 'Liked Trips'];
 
@@ -23,22 +22,32 @@ class Profile extends StatefulWidget {
 
 class _ProfileState extends State<Profile> {
   String _activeTab = 'Posted Trips';
-  bool _isFollowing = false;
-  int _followerCount = 503;
-  final int _followingCount = 600;
+  //int _followerCount = 503;
+  //final int _followingCount = 600;
+
+  UserProfile? _userProfile;
+  bool _isLoading = true;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
-    _loadProfileData();
+    _loadProfile();
   }
 
-  Future<void> _loadProfileData() async {
-    final userProvider = Provider.of<UserProvider>(context, listen: false);
-    final tripProvider = Provider.of<TripProvider>(context, listen: false);
-
-    await userProvider.fetchMyProfile();
-    await tripProvider.fetchMyTrips();
+  Future<void> _loadProfile() async {
+    try {
+      final profile = await ProfileService().fetchProfile();
+      setState(() {
+        _userProfile = profile;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
+    }
   }
 
   final List<Map<String, String>> _followerData = [
@@ -63,100 +72,73 @@ class _ProfileState extends State<Profile> {
     return 'Just now';
   }
 
-  void _toggleFollow() {
-    setState(() {
-      _isFollowing = !_isFollowing;
-      _followerCount += _isFollowing ? 1 : -1;
-    });
-    showTopSnackBar(
-      Overlay.of(context),
-      CustomSnackBar.success(
-        message: _isFollowing ? 'Following Sarah Mohamed' : 'Unfollow Sarah Mohamed',
-        backgroundColor: const Color.fromARGB(255, 112, 204, 76),
-        icon: const Icon(Icons.check, color: Colors.transparent),
-      ),
-      displayDuration: const Duration(seconds: 2),
-    );
+  String _displayName() {
+    final fullName = _userProfile?.fullName?.trim();
+    if (fullName != null && fullName.isNotEmpty) return fullName;
+
+    final username = _userProfile?.username?.trim();
+    if (username != null && username.isNotEmpty) return username;
+
+    final email = _userProfile?.email.trim();
+    if (email != null && email.isNotEmpty) return email.split('@').first;
+
+    return 'User';
   }
 
   // ---  DELETE DIALOG ---
-  Future<void> _confirmDeleteTrip(
-    Map<String, dynamic> trip, TripProvider tripProvider) async {
-  return showDialog(
-    context: context,
-    builder: (context) => AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      backgroundColor: Colors.white,
-      title: Column(
-        children: const [
-          Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 40),
-          SizedBox(height: 10),
-          Text(
-            "Delete Post",
-            style: TextStyle(
-              fontFamily: 'Poppins',
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
+  Future<void> _confirmDelete(Post post) async {
+    return showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: Colors.white,
+        title: Column(
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 40),
+            const SizedBox(height: 10),
+            const Text("Delete Post", 
+              style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.bold, fontSize: 18)),
+          ],
+        ),
+        content: const Text(
+          "Are you sure you want to delete this trip post? This action cannot be undone.",
+          textAlign: TextAlign.center,
+          style: TextStyle(fontFamily: 'Poppins', fontSize: 13, color: Colors.grey),
+        ),
+        actionsAlignment: MainAxisAlignment.spaceEvenly,
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel", style: TextStyle(color: Colors.grey, fontFamily: 'Poppins', fontWeight: FontWeight.w600)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              setState(() {
+                posts.remove(post);
+              });
+              Navigator.pop(context);
+              // Success Notification
+              showTopSnackBar(
+                Overlay.of(context),
+                const CustomSnackBar.success(
+                  message: "Post deleted successfully",
+                  backgroundColor: Color(0xFF4675B8),
+                  icon: Icon(Icons.delete_outline, color: Colors.white24, size: 80),
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
+            child: const Text("Delete", style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.bold)),
           ),
         ],
       ),
-      content: const Text(
-        "Are you sure you want to delete this trip post? This action cannot be undone.",
-        textAlign: TextAlign.center,
-        style: TextStyle(
-          fontFamily: 'Poppins',
-          fontSize: 13,
-          color: Colors.grey,
-        ),
-      ),
-      actionsAlignment: MainAxisAlignment.spaceEvenly,
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text(
-            "Cancel",
-            style: TextStyle(
-              color: Colors.grey,
-              fontFamily: 'Poppins',
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-        ElevatedButton(
-          onPressed: () async {
-            // Deletes from backend via TripProvider
-            await tripProvider.deleteTrip(trip['id']);
-            Navigator.pop(context);
-            showTopSnackBar(
-              Overlay.of(context),
-              const CustomSnackBar.success(
-                message: "Post deleted successfully",
-                backgroundColor: Color(0xFF4675B8),
-                icon: Icon(Icons.delete_outline,
-                    color: Colors.white24, size: 80),
-              ),
-            );
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.redAccent,
-            foregroundColor: Colors.white,
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12)),
-          ),
-          child: const Text(
-            "Delete",
-            style: TextStyle(
-              fontFamily: 'Poppins',
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-      ],
-    ),
-  );
-}
+    );
+  }
 
   void _showFollowersList() {
     showModalBottomSheet(context: context, isScrollControlled: true, backgroundColor: Colors.transparent, builder: (context) => _buildFollowersModal());
@@ -165,16 +147,19 @@ class _ProfileState extends State<Profile> {
   void _showFollowingList() {
     showModalBottomSheet(context: context, isScrollControlled: true, backgroundColor: Colors.transparent, builder: (context) => _buildFollowingModal());
   }
-  
-  //
-  void _showTripsList() {
-  setState(() {
-    _activeTab = 'Posted Trips';
-  });
-}
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (_error != null) {
+      return Scaffold(
+        body: Center(child: Text('Error: $_error')),
+      );
+    }
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       body: Stack(
@@ -214,170 +199,45 @@ class _ProfileState extends State<Profile> {
   }
 
   Widget _buildProfileInfo() {
-  return Consumer<UserProvider>(
-    builder: (context, userProvider, child) {
-      final profile = userProvider.currentProfile;
-      final fullName = profile?['full_name'] ?? profile?['username'] ?? 'User';
-      final avatarUrl = profile?['avatar_url'];
-      final bio = profile?['bio'];
-      final pastTripsCount = profile?['past_trips_count'] ?? 0;
-      final favoritesCount = profile?['favorites_count'] ?? 0;
-
-      return Column(
-        children: [
-          // Avatar 
-          Container(
-            width: 100,
-            height: 100,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: const Color(0xFF4675B8), width: 3),
-            ),
-            child: ClipOval(
-              child: avatarUrl != null
-                  ? Image.network(
-                      avatarUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => _defaultAvatar(),
-                    )
-                  : Image.asset(
-                      'assets/images/people/profile.png',
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => _defaultAvatar(),
-                    ),
-            ),
-          )
-              .animate()
-              .scale(
-                delay: const Duration(milliseconds: 100),
-                begin: const Offset(0.8, 0.8),
-                end: const Offset(1.0, 1.0),
-                duration: Duration(milliseconds: AnimationConstants.medium),
-                curve: AnimationConstants.cubicEaseOut,
-              )
-              .fadeIn(
-                delay: const Duration(milliseconds: 100),
-                duration: Duration(milliseconds: AnimationConstants.normal),
-              ),
-
-          const SizedBox(height: 12),
-
-          //  Name 
-          Text(
-            fullName,
-            style: const TextStyle(
-              fontFamily: 'Poppins',
-              fontWeight: FontWeight.w700,
-              fontSize: 20,
-            ),
+    final displayName = _displayName();
+    final int userTripCount = posts.where((p) => p.userName == displayName).length;
+    return Column(
+      children: [
+        Container(width: 100, height: 100,
+          decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: const Color.fromARGB(255, 244, 242, 242), width: 3)),
+          child: ClipOval(
+            child: _userProfile?.avatarUrl != null && _userProfile!.avatarUrl!.isNotEmpty
+              ? Image.network(_userProfile!.avatarUrl!, fit: BoxFit.cover)
+              : Image.asset('assets/images/people/profile.png', fit: BoxFit.cover),
           ),
-
-          //  Bio 
-          if (bio != null && bio.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 32),
-              child: Text(
-                bio,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: Color(0xFF6B7280),
-                ),
-              ),
-            ),
+        ).animate().scale(delay: 100.ms).fadeIn(),
+        const SizedBox(height: 12),
+        Text(displayName, style: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 20)),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const editprofile())),
+          icon: const Icon(Icons.edit_outlined, size: 18),
+          label: const Text('Edit Profile', style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600)),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: const Color(0xFF4675B8),
+            side: const BorderSide(color: Color(0xFF4675B8)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          ),
+        ),
+        const SizedBox(height: 12),
+        const SizedBox(height: 20),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _buildStat('Trips', userTripCount.toString(), () {}),
+            const SizedBox(width: 40),
+            _buildStat('Followers', (_userProfile?.followers ?? 0).toString(), _showFollowersList),
+            const SizedBox(width: 40),
+            _buildStat('Following', (_userProfile?.following ?? 0).toString(), _showFollowingList),
           ],
-
-          const SizedBox(height: 12),
-
-          //  Follow / Message buttons (newly added features) 
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              ElevatedButton(
-                onPressed: _toggleFollow,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _isFollowing
-                      ? Colors.grey[300]
-                      : const Color(0xFFC4A44A),
-                  foregroundColor:
-                      _isFollowing ? Colors.black87 : Colors.white,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(24)),
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 32, vertical: 10),
-                  elevation: _isFollowing ? 0 : 2,
-                ),
-                child: Text(
-                  _isFollowing ? 'Following' : 'Follow',
-                  style: const TextStyle(
-                    fontFamily: 'Poppins',
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                  ),
-                ),
-              ),
-
-              // Message button — only shows when following
-              if (_isFollowing) ...[
-                const SizedBox(width: 8),
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => ChatPage(
-                          // Uses real name from backend instead of hardcoded
-                          name: fullName,
-                          imagePath: avatarUrl ?? 'assets/images/people/profile.png',
-                        ),
-                      ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF4675B8),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(24)),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 24, vertical: 10),
-                  ),
-                  child: const Text(
-                    'Message',
-                    style: TextStyle(
-                      fontFamily: 'Poppins',
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
-                    ),
-                  ),
-                ).animate().fadeIn().scale(),
-              ],
-            ],
-          ),
-
-          const SizedBox(height: 20),
-
-          // Stats row (real backend counts) 
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _buildStat('Trips', pastTripsCount.toString(), _showTripsList),
-              const SizedBox(width: 40),
-              _buildStat('Followers', _followerCount.toString(), _showFollowersList),
-              const SizedBox(width: 40),
-              _buildStat('Favorites', favoritesCount.toString(), _showFollowingList),
-            ],
-          ),
-        ],
-      );
-    },
-  );
-}
-
-  Widget _defaultAvatar() {
-    return Container(
-      color: Colors.grey.shade300,
-      child: const Icon(Icons.person, size: 48, color: Colors.grey),
+        ),
+      ],
     );
   }
 
@@ -415,165 +275,65 @@ class _ProfileState extends State<Profile> {
   }
 
   Widget _buildContent() {
-  if (_activeTab == 'Liked Trips') return _buildLikedGrid();
-
-  // Posted Trips — real backend data via TripProvider
-  return Consumer<TripProvider>(
-    builder: (context, tripProvider, child) {
-      //  Loading state 
-      if (tripProvider.isLoading) {
-        return const Padding(
-          padding: EdgeInsets.all(32),
-          child: Center(child: CircularProgressIndicator(color: Color(0xFF4675B8))),
-        );
-      }
-
-      //  Empty state 
-      if (tripProvider.myTrips.isEmpty) {
-        return const Padding(
-          padding: EdgeInsets.all(32),
-          child: Center(
-            child: Text(
-              'No posted trips yet',
-              style: TextStyle(
-                fontFamily: 'Poppins',
-                fontSize: 16,
-                color: Color(0xFF6B7280),
-              ),
-            ),
-          ),
-        );
-      }
-
-      //  Posted trips grid 
-      return Padding(
-        padding: const EdgeInsets.all(16),
-        child: Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: tripProvider.myTrips.map((trip) {
-            return SizedBox(
-              width: (MediaQuery.of(context).size.width - 44) / 2,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  border: Border.all(color: Colors.grey.shade200),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+    if (_activeTab == 'Liked Trips') return _buildLikedGrid();
+    final userPosts = posts.where((p) => p.userName == _displayName()).toList();
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Wrap(
+        spacing: 12, runSpacing: 12,
+        children: userPosts.map((post) => SizedBox(
+          width: (MediaQuery.of(context).size.width - 44) / 2,
+          child: Container(
+            decoration: BoxDecoration(color: Colors.white, border: Border.all(color: Colors.grey.shade200), borderRadius: BorderRadius.circular(16)),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Stack(
                   children: [
-                    //  Image + delete button 
-                    Stack(
-                      children: [
-                        // Network image with local asset fallback
-                        trip['image_url'] != null
-                            ? Image.network(
-                                trip['image_url']!,
-                                height: 110,
-                                width: double.infinity,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => Container(
-                                  height: 110,
-                                  color: const Color(0xFF4675B8).withOpacity(0.1),
-                                  child: const Center(
-                                    child: Icon(Icons.travel_explore,
-                                        size: 40, color: Color(0xFF4675B8)),
-                                  ),
-                                ),
-                              )
-                            : Container(
-                                height: 110,
-                                color: const Color(0xFF4675B8).withOpacity(0.1),
-                                child: const Center(
-                                  child: Icon(Icons.travel_explore,
-                                      size: 40, color: Color(0xFF4675B8)),
-                                ),
-                              ),
-
-                        //   delete button (newly added feature) 
-                        Positioned(
-                          top: 8,
-                          right: 8,
-                          child: GestureDetector(
-                            onTap: () => _confirmDeleteTrip(trip, tripProvider),
-                            child: Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.9),
-                                shape: BoxShape.circle,
-                                boxShadow: const [
-                                  BoxShadow(color: Colors.black12, blurRadius: 4)
-                                ],
-                              ),
-                              child: const Icon(
-                                Icons.delete_outline_rounded,
-                                color: Colors.redAccent,
-                                size: 18,
-                              ),
-                            ),
+                    Image.asset(post.image, height: 110, width: double.infinity, fit: BoxFit.cover),
+                    // Glass-morphic Delete Icon
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: GestureDetector(
+                        onTap: () => _confirmDelete(post),
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.9),
+                            shape: BoxShape.circle,
+                            boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 4)],
+                          ),
+                          child: const Icon(
+                            Icons.delete_outline_rounded,
+                            color: Colors.redAccent,
+                            size: 18,
                           ),
                         ),
-                      ],
-                    ),
-
-                    //  Card info
-                    Padding(
-                      padding: const EdgeInsets.all(10),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            trip['title'] ?? 'Untitled Trip',
-                            style: const TextStyle(
-                              fontFamily: 'Poppins',
-                              fontWeight: FontWeight.w700,
-                              fontSize: 13,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          Row(
-                            children: [
-                              const Icon(Icons.location_on,
-                                  size: 10, color: Color(0xFF4675B8)),
-                              const SizedBox(width: 4),
-                              Expanded(
-                                child: Text(
-                                  trip['destination'] ?? 'Unknown',
-                                  style: const TextStyle(
-                                      fontSize: 10, color: Color(0xFF9E9E9E)),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
-                          //  Time ago (newly added feature) 
-                          Text(
-                            trip['created_at'] != null
-                                ? _getTimeAgo(DateTime.parse(trip['created_at']!))
-                                : 'Recently',
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: Colors.grey.shade400,
-                              fontStyle: FontStyle.italic,
-                            ),
-                          ),
-                        ],
                       ),
                     ),
                   ],
                 ),
-              ),
-            ).animate().fadeIn(duration: 400.ms).scale(delay: 100.ms);
-          }).toList(),
-        ),
-      );
-    },
-  );
-}
+                Padding(
+                  padding:const EdgeInsets.all(10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(post.title, style: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis),
+                      Row(children: [const Icon(Icons.location_on, size: 10, color: Color(0xFF4675B8)), const SizedBox(width: 4), Expanded(child: Text(post.location, style: const TextStyle(fontSize: 10, color: Color(0xFF9E9E9E)), maxLines: 1, overflow: TextOverflow.ellipsis))]),
+                      Text(_getTimeAgo(post.timestamp), style: TextStyle(fontSize: 10, color: Colors.grey.shade400, fontStyle: FontStyle.italic)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ).animate().fadeIn(duration: 400.ms).scale(delay: 100.ms) // Entrance animation
+        ).toList(),
+      ),
+    );
+  }
 
   Widget _buildLikedGrid() {
     return Padding(
