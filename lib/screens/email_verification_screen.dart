@@ -96,13 +96,13 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
       if (success) {
         // Email verified! User is now authenticated
         authProvider.setAuthenticatedStatus();
-        
+
         _showSnack(
           'Email verified successfully!',
           isError: false,
           duration: const Duration(seconds: 2),
         );
-        
+
         // Navigate to MBTI screen (onboarding continues)
         Navigator.of(context).pushAndRemoveUntil(
           FadePageRoute(page: const MbtiScreen()),

@@ -271,12 +271,12 @@ class AuthService {
         '${ApiConfig.authPath}/verify-email-code',
         {'email': email, 'code': code},
       );
-      
+
       // Backend returns {message, email, access_token, user} on success
       if (response['access_token'] != null) {
         // Save the new token with email_verified: true
         await saveAuthToken(response['access_token'] as String);
-        
+
         // Update user data
         if (response['user'] != null) {
           final user = response['user'] as Map<String, dynamic>;
@@ -288,7 +288,7 @@ class AuthService {
         }
         return true;
       }
-      
+
       return response['email'] != null || response['message'] != null;
     } catch (e) {
       throw Exception('Email verification failed: ${e.toString()}');
