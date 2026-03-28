@@ -70,7 +70,7 @@ class TripService {
       }
 
       final response = await _apiService.post(
-        ApiConfig.tripsPath,
+        '${ApiConfig.tripsPath}/',
         tripData,
         token: token,
       );
