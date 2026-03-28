@@ -47,12 +47,16 @@ class UserService {
       Map<String, dynamic> updates) async {
     try {
       final token = await _authService.getAuthToken();
+      final userId = await _authService.getUserId();
       if (token == null) {
         throw Exception('Not authenticated');
       }
+      if (userId == null || userId.isEmpty) {
+        throw Exception('User ID not found');
+      }
 
       final response = await _apiService.put(
-        '${ApiConfig.usersPath}/me',
+        '${ApiConfig.usersPath}/$userId/profile',
         updates,
         token: token,
       );
@@ -67,12 +71,16 @@ class UserService {
   Future<Map<String, dynamic>> getSettings() async {
     try {
       final token = await _authService.getAuthToken();
+      final userId = await _authService.getUserId();
       if (token == null) {
         throw Exception('Not authenticated');
       }
+      if (userId == null || userId.isEmpty) {
+        throw Exception('User ID not found');
+      }
 
       final response = await _apiService.get(
-        '${ApiConfig.usersPath}/me/settings',
+        '${ApiConfig.usersPath}/$userId/settings',
         token: token,
       );
 
@@ -87,12 +95,16 @@ class UserService {
       Map<String, dynamic> settings) async {
     try {
       final token = await _authService.getAuthToken();
+      final userId = await _authService.getUserId();
       if (token == null) {
         throw Exception('Not authenticated');
       }
+      if (userId == null || userId.isEmpty) {
+        throw Exception('User ID not found');
+      }
 
       final response = await _apiService.put(
-        '${ApiConfig.usersPath}/me/settings',
+        '${ApiConfig.usersPath}/$userId/settings',
         settings,
         token: token,
       );

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/user_service.dart';
 
 class Settings extends StatefulWidget {
   const Settings({super.key});
@@ -8,7 +9,39 @@ class Settings extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<Settings> {
+  final _userService = UserService();
   bool _notificationsOn = true;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    try {
+      final settings = await _userService.getSettings();
+      if (!mounted) return;
+      setState(() {
+        _notificationsOn = settings['notifications_enabled'] == true;
+      });
+    } catch (_) {
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _updateNotifications(bool value) async {
+    setState(() => _notificationsOn = value);
+    try {
+      await _userService.updateSettings({
+        'notifications_enabled': value,
+      });
+    } catch (_) {}
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -22,9 +55,15 @@ class _SettingsScreenState extends State<Settings> {
             children: [
               GestureDetector(
                 onTap: () => Navigator.pop(context),
-                child: const Icon(Icons.arrow_back, size: 24, color: Color(0xFF1E1E1E)),
+                child: const Icon(Icons.arrow_back,
+                    size: 24, color: Color(0xFF1E1E1E)),
               ),
               const SizedBox(height: 16),
+              if (_isLoading)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: LinearProgressIndicator(minHeight: 2),
+                ),
               _buildSectionTitle('Account'),
               _buildArrowItem(Icons.info_outline, 'security'),
               _buildToggleItem(Icons.notifications_outlined, 'Notifications'),
@@ -48,9 +87,15 @@ class _SettingsScreenState extends State<Settings> {
   Widget _buildSectionTitle(String title) {
     return Container(
       padding: const EdgeInsets.only(bottom: 8),
-      decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Color(0xFFE5E5E5)))),
+      decoration: const BoxDecoration(
+          border: Border(bottom: BorderSide(color: Color(0xFFE5E5E5)))),
       margin: const EdgeInsets.only(bottom: 4),
-      child: Text(title, style: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 18, color: Colors.black)),
+      child: Text(title,
+          style: const TextStyle(
+              fontFamily: 'Poppins',
+              fontWeight: FontWeight.w700,
+              fontSize: 18,
+              color: Colors.black)),
     );
   }
 
@@ -61,7 +106,13 @@ class _SettingsScreenState extends State<Settings> {
         children: [
           Icon(icon, size: 20, color: const Color(0xFF1E1E1E)),
           const SizedBox(width: 16),
-          Expanded(child: Text(label, style: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w500, fontSize: 15, color: Colors.black))),
+          Expanded(
+              child: Text(label,
+                  style: const TextStyle(
+                      fontFamily: 'Poppins',
+                      fontWeight: FontWeight.w500,
+                      fontSize: 15,
+                      color: Colors.black))),
           const Icon(Icons.chevron_right, size: 16, color: Color(0xFF999999)),
         ],
       ),
@@ -75,10 +126,16 @@ class _SettingsScreenState extends State<Settings> {
         children: [
           Icon(icon, size: 20, color: const Color(0xFF1E1E1E)),
           const SizedBox(width: 16),
-          Expanded(child: Text(label, style: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w500, fontSize: 15, color: Colors.black))),
+          Expanded(
+              child: Text(label,
+                  style: const TextStyle(
+                      fontFamily: 'Poppins',
+                      fontWeight: FontWeight.w500,
+                      fontSize: 15,
+                      color: Colors.black))),
           Switch(
             value: _notificationsOn,
-            onChanged: (v) => setState(() => _notificationsOn = v),
+            onChanged: _updateNotifications,
             activeColor: const Color(0xFF4675B8),
           ),
         ],

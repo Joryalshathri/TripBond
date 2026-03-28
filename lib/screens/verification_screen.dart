@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'new_password_screen.dart';
 import 'widgets/custom_loading_spinner.dart';
 import '../core/animations/page_transitions.dart';
+import '../services/auth_service.dart';
 
 class VerificationScreen extends StatefulWidget {
   final String email;
@@ -16,6 +17,7 @@ class VerificationScreen extends StatefulWidget {
 }
 
 class _VerificationScreenState extends State<VerificationScreen> {
+  final _authService = AuthService();
   final List<TextEditingController> _controllers =
       List.generate(6, (_) => TextEditingController());
   final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
@@ -72,19 +74,26 @@ class _VerificationScreenState extends State<VerificationScreen> {
 
     setState(() => _isLoading = true);
 
-    // TODO: Verify code with backend
-    await Future.delayed(const Duration(seconds: 1));
+    final isValid = await _authService.verifyResetCode(widget.email, code);
 
     if (!mounted) return;
     setState(() => _isLoading = false);
 
+    if (!isValid) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Invalid or expired code.')),
+      );
+      return;
+    }
+
     Navigator.push(
       context,
-      SharedAxisPageRoute(page: const NewPasswordScreen()),
+      SharedAxisPageRoute(
+          page: NewPasswordScreen(email: widget.email, code: code)),
     );
   }
 
-  void _resendCode() {
+  Future<void> _resendCode() async {
     if (_remainingSeconds > 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -98,13 +107,22 @@ class _VerificationScreenState extends State<VerificationScreen> {
       return;
     }
 
-    // TODO: Implement actual resend verification code API call
+    try {
+      await _authService.sendPasswordResetCode(widget.email);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
+      );
+      return;
+    }
+
     _startCountdown();
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          'Verification code has been resent to ${widget.email}',
+          'Reset code has been resent to ${widget.email}',
           style: GoogleFonts.mulish(),
         ),
         backgroundColor: Colors.green,

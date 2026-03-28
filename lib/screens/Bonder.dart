@@ -8,11 +8,31 @@ import '../core/animations/animation_constants.dart';
 
 // Global "Bonders" list
 List<Map<String, String>> globalBonders = [
-  {'name': 'Leen', 'image': 'assets/images/people/person4.png', 'lastMsg': 'Hey! How are you?'},
-  {'name': 'Khalid', 'image': 'assets/images/people/person5.png', 'lastMsg': 'The trip was amazing!'},
-  {'name': 'Huda', 'image': 'assets/images/people/person6.png', 'lastMsg': 'Check this out.'},
-  {'name': 'Ziyad', 'image': 'assets/images/people/person7.png', 'lastMsg': 'Let\'s go!'},
-  {'name': 'Friends', 'image': 'assets/images/people/friends.png', 'lastMsg': 'Group chat active'},
+  {
+    'name': 'Leen',
+    'image': 'assets/images/people/pesron4.png',
+    'lastMsg': 'Hey! How are you?'
+  },
+  {
+    'name': 'Khalid',
+    'image': 'assets/images/people/person5.png',
+    'lastMsg': 'The trip was amazing!'
+  },
+  {
+    'name': 'Huda',
+    'image': 'assets/images/people/person6.png',
+    'lastMsg': 'Check this out.'
+  },
+  {
+    'name': 'Ziyad',
+    'image': 'assets/images/people/person7.png',
+    'lastMsg': 'Let\'s go!'
+  },
+  {
+    'name': 'Friends',
+    'image': 'assets/images/people/friends.png',
+    'lastMsg': 'Group chat active'
+  },
 ];
 
 class Bonders extends StatefulWidget {
@@ -48,16 +68,24 @@ class _BondersState extends State<Bonders> {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text("Delete Conversation", style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.bold)),
-        content: Text("Are you sure you want to delete your conversation with $name? This action can't be undone."),
+        title: const Text("Delete Conversation",
+            style:
+                TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.bold)),
+        content: Text(
+            "Are you sure you want to delete your conversation with $name? This action can't be undone."),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text("Cancel", style: TextStyle(color: Colors.grey, fontFamily: 'Poppins')),
+            child: const Text("Cancel",
+                style: TextStyle(color: Colors.grey, fontFamily: 'Poppins')),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text("Delete", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontFamily: 'Poppins')),
+            child: const Text("Delete",
+                style: TextStyle(
+                    color: Colors.red,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Poppins')),
           ),
         ],
       ),
@@ -77,15 +105,20 @@ class _BondersState extends State<Bonders> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text("Filter Conversations", 
-                style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.bold, fontSize: 18)),
+              const Text("Filter Conversations",
+                  style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18)),
               const Divider(),
               ListTile(
                 leading: const Icon(Icons.sort_by_alpha),
                 title: const Text("Sort A-Z"),
                 onTap: () {
                   setState(() {
-                    _filteredBonders.sort((a, b) => a['name']!.toLowerCase().compareTo(b['name']!.toLowerCase()));
+                    _filteredBonders.sort((a, b) => a['name']!
+                        .toLowerCase()
+                        .compareTo(b['name']!.toLowerCase()));
                   });
                   Navigator.pop(context);
                 },
@@ -133,18 +166,25 @@ class _BondersState extends State<Bonders> {
                                       decoration: const InputDecoration(
                                         hintText: 'Search bonders...',
                                         border: InputBorder.none,
-                                        hintStyle: TextStyle(fontFamily: 'Poppins', fontSize: 18),
+                                        hintStyle: TextStyle(
+                                            fontFamily: 'Poppins',
+                                            fontSize: 18),
                                       ),
-                                      style: const TextStyle(fontFamily: 'Poppins', fontSize: 18),
+                                      style: const TextStyle(
+                                          fontFamily: 'Poppins', fontSize: 18),
                                     )
                                   : const Text(
                                       'Bonders',
-                                      style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 24),
+                                      style: TextStyle(
+                                          fontFamily: 'Poppins',
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 24),
                                     ),
                             ),
                             GestureDetector(
                               onTap: _showFilterSheet,
-                              child: const Icon(Icons.tune, size: 24, color: Color(0xFF1E1E1E)),
+                              child: const Icon(Icons.tune,
+                                  size: 24, color: Color(0xFF1E1E1E)),
                             ),
                             const SizedBox(width: 15),
                             GestureDetector(
@@ -158,110 +198,125 @@ class _BondersState extends State<Bonders> {
                                 });
                               },
                               child: Icon(
-                                _isSearching ? Icons.close : Icons.group_outlined, 
-                                size: 24, 
-                                color: const Color(0xFF1E1E1E)
-                              ),
+                                  _isSearching
+                                      ? Icons.close
+                                      : Icons.group_outlined,
+                                  size: 24,
+                                  color: const Color(0xFF1E1E1E)),
                             ),
                           ],
                         ).animate().fadeIn().slideY(begin: -0.1, end: 0),
-                        
                         const SizedBox(height: 24),
-
                         ..._filteredBonders.asMap().entries.map((entry) {
                           final index = entry.key;
                           final b = entry.value;
-                          
+
                           // --- WRAPPED IN DISMISSIBLE FOR SWIPE-TO-DELETE ---
                           return Dismissible(
-                            key: Key(b['name']!),
-                            direction: DismissDirection.endToStart, // Swipe left
-                            confirmDismiss: (direction) => _confirmDelete(b['name']!),
-                            onDismissed: (direction) {
-                              setState(() {
-                                globalBonders.removeWhere((element) => element['name'] == b['name']);
-                                _filteredBonders.removeAt(index);
-                              });
-                            },
-                            background: Container(
-                              alignment: Alignment.centerRight,
-                              padding: const EdgeInsets.symmetric(horizontal: 20),
-                              margin: const EdgeInsets.only(bottom: 16),
-                              decoration: BoxDecoration(
-                                color: Colors.red.shade400,
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: const Icon(Icons.delete, color: Colors.white),
-                            ),
-                            child: GestureDetector(
-                              onTap: () async {
-                                await Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => ChatPage(
-                                      name: b['name']!, 
-                                      imagePath: b['image']!
-                                    ),
-                                  ),
-                                );
+                              key: Key(b['name']!),
+                              direction:
+                                  DismissDirection.endToStart, // Swipe left
+                              confirmDismiss: (direction) =>
+                                  _confirmDelete(b['name']!),
+                              onDismissed: (direction) {
                                 setState(() {
-                                  _filteredBonders = List.from(globalBonders);
+                                  globalBonders.removeWhere((element) =>
+                                      element['name'] == b['name']);
+                                  _filteredBonders.removeAt(index);
                                 });
                               },
-                              child: Container(
+                              background: Container(
+                                alignment: Alignment.centerRight,
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 20),
                                 margin: const EdgeInsets.only(bottom: 16),
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                                 decoration: BoxDecoration(
-                                  color: Colors.white,
+                                  color: Colors.red.shade400,
                                   borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(color: Colors.grey.shade200),
                                 ),
-                                child: Row(
-                                  children: [
-                                    CircleAvatar(
-                                      radius: 28,
-                                      backgroundImage: AssetImage(b['image']!),
-                                    ),
-                                    const SizedBox(width: 16),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            b['name']!,
-                                            style: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 18),
-                                          ),
-                                          Text(
-                                            b['lastMsg'] ?? 'No messages yet',
-                                            style: TextStyle(fontFamily: 'Poppins', color: Colors.grey.shade600, fontSize: 13),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ],
+                                child: const Icon(Icons.delete,
+                                    color: Colors.white),
+                              ),
+                              child: GestureDetector(
+                                  onTap: () async {
+                                    await Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => ChatPage(
+                                            name: b['name']!,
+                                            imagePath: b['image']!),
                                       ),
+                                    );
+                                    setState(() {
+                                      _filteredBonders =
+                                          List.from(globalBonders);
+                                    });
+                                  },
+                                  child: Container(
+                                    margin: const EdgeInsets.only(bottom: 16),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 16, vertical: 12),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(
+                                          color: Colors.grey.shade200),
                                     ),
-                                  ],
-                                ),
-                              )
-                                  .animate()
-                                  .fadeIn(
-                                    delay: Duration(
-                                        milliseconds: 150 + (index * 80)),
-                                    duration: Duration(
-                                        milliseconds:
-                                            AnimationConstants.normal),
-                                    curve: AnimationConstants.cubicEaseOut,
+                                    child: Row(
+                                      children: [
+                                        CircleAvatar(
+                                          radius: 28,
+                                          backgroundImage:
+                                              AssetImage(b['image']!),
+                                        ),
+                                        const SizedBox(width: 16),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                b['name']!,
+                                                style: const TextStyle(
+                                                    fontFamily: 'Poppins',
+                                                    fontWeight: FontWeight.w700,
+                                                    fontSize: 18),
+                                              ),
+                                              Text(
+                                                b['lastMsg'] ??
+                                                    'No messages yet',
+                                                style: TextStyle(
+                                                    fontFamily: 'Poppins',
+                                                    color: Colors.grey.shade600,
+                                                    fontSize: 13),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   )
-                                  .slideX(
-                                    delay: Duration(
-                                        milliseconds: 150 + (index * 80)),
-                                    begin: 0.2,
-                                    end: 0,
-                                    duration: Duration(
-                                        milliseconds:
-                                            AnimationConstants.normal),
-                                    curve: AnimationConstants.cubicEaseOut,
-                                  )));
+                                      .animate()
+                                      .fadeIn(
+                                        delay: Duration(
+                                            milliseconds: 150 + (index * 80)),
+                                        duration: Duration(
+                                            milliseconds:
+                                                AnimationConstants.normal),
+                                        curve: AnimationConstants.cubicEaseOut,
+                                      )
+                                      .slideX(
+                                        delay: Duration(
+                                            milliseconds: 150 + (index * 80)),
+                                        begin: 0.2,
+                                        end: 0,
+                                        duration: Duration(
+                                            milliseconds:
+                                                AnimationConstants.normal),
+                                        curve: AnimationConstants.cubicEaseOut,
+                                      )));
                         }),
                       ],
                     ),
@@ -278,22 +333,37 @@ class _BondersState extends State<Bonders> {
 
   Widget _buildBottomNav(BuildContext context) {
     return Positioned(
-      bottom: 0, left: 0, right: 0,
+      bottom: 0,
+      left: 0,
+      right: 0,
       child: Container(
         height: 70,
         decoration: const BoxDecoration(
           color: Color(0xFF4675B8),
-          borderRadius: BorderRadius.only(topLeft: Radius.circular(25), topRight: Radius.circular(25)),
+          borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(25), topRight: Radius.circular(25)),
         ),
         padding: const EdgeInsets.symmetric(horizontal: 32),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            _navIcon(Icons.search, onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const DestinationLandingPage()))),
-            _navIcon(Icons.location_on_outlined, onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const CloseSpots()))),
-            _navIcon(Icons.airplanemode_active, onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const GroupSuggestedItinerary()))),
+            _navIcon(Icons.search,
+                onTap: () => Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const DestinationLandingPage()))),
+            _navIcon(Icons.location_on_outlined,
+                onTap: () => Navigator.pushReplacement(context,
+                    MaterialPageRoute(builder: (_) => const CloseSpots()))),
+            _navIcon(Icons.airplanemode_active,
+                onTap: () => Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const GroupSuggestedItinerary()))),
             _navIcon(Icons.group_outlined, active: true),
-            _navIcon(Icons.person_outline, onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const Profile()))),
+            _navIcon(Icons.person_outline,
+                onTap: () => Navigator.pushReplacement(context,
+                    MaterialPageRoute(builder: (_) => const Profile()))),
           ],
         ),
       ),
@@ -309,13 +379,19 @@ class _BondersState extends State<Bonders> {
           Icon(icon, size: 24, color: Colors.white),
           if (active) ...[
             const SizedBox(height: 4),
-            Container(width: 20, height: 2, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(1))),
+            Container(
+                width: 20,
+                height: 2,
+                decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(1))),
           ],
         ],
       ),
     );
   }
 }
+
 class ChatPage extends StatefulWidget {
   final String name;
   final String imagePath;
@@ -334,9 +410,11 @@ class _ChatPageState extends State<ChatPage> {
     if (text.isNotEmpty) {
       setState(() {
         _messages.add(text);
-        int existingIndex = globalBonders.indexWhere((b) => b['name'] == widget.name);
+        int existingIndex =
+            globalBonders.indexWhere((b) => b['name'] == widget.name);
         if (existingIndex != -1) {
-          Map<String, String> updatedBonder = globalBonders.removeAt(existingIndex);
+          Map<String, String> updatedBonder =
+              globalBonders.removeAt(existingIndex);
           updatedBonder['lastMsg'] = text;
           globalBonders.insert(0, updatedBonder);
         }
@@ -350,9 +428,16 @@ class _ChatPageState extends State<ChatPage> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        elevation: 0, backgroundColor: Colors.white,
-        leading: IconButton(icon: const Icon(Icons.arrow_back, color: Colors.black), onPressed: () => Navigator.pop(context)),
-        title: Text(widget.name, style: const TextStyle(fontFamily: 'Poppins', color: Colors.black, fontWeight: FontWeight.w600)),
+        elevation: 0,
+        backgroundColor: Colors.white,
+        leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.black),
+            onPressed: () => Navigator.pop(context)),
+        title: Text(widget.name,
+            style: const TextStyle(
+                fontFamily: 'Poppins',
+                color: Colors.black,
+                fontWeight: FontWeight.w600)),
         centerTitle: true,
       ),
       body: Column(
@@ -366,12 +451,15 @@ class _ChatPageState extends State<ChatPage> {
                   alignment: Alignment.centerRight,
                   child: Container(
                     margin: const EdgeInsets.only(bottom: 10),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 10),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF4675B8), 
-                      borderRadius: BorderRadius.circular(20).copyWith(bottomRight: Radius.zero)
-                    ),
-                    child: Text(_messages[index], style: const TextStyle(color: Colors.white, fontFamily: 'Poppins')),
+                        color: const Color(0xFF4675B8),
+                        borderRadius: BorderRadius.circular(20)
+                            .copyWith(bottomRight: Radius.zero)),
+                    child: Text(_messages[index],
+                        style: const TextStyle(
+                            color: Colors.white, fontFamily: 'Poppins')),
                   ),
                 );
               },
@@ -379,17 +467,27 @@ class _ChatPageState extends State<ChatPage> {
           ),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(color: Colors.white, boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.2), blurRadius: 10, offset: const Offset(0, -2))]),
+            decoration: BoxDecoration(color: Colors.white, boxShadow: [
+              BoxShadow(
+                  color: Colors.grey.withOpacity(0.2),
+                  blurRadius: 10,
+                  offset: const Offset(0, -2))
+            ]),
             child: SafeArea(
               child: Row(
                 children: [
                   Expanded(
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
-                      decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(25)),
+                      decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(25)),
                       child: TextField(
                         controller: _messageController,
-                        decoration: const InputDecoration(hintText: "Type a message...", border: InputBorder.none, hintStyle: TextStyle(fontFamily: 'Poppins')),
+                        decoration: const InputDecoration(
+                            hintText: "Type a message...",
+                            border: InputBorder.none,
+                            hintStyle: TextStyle(fontFamily: 'Poppins')),
                         style: const TextStyle(fontFamily: 'Poppins'),
                       ),
                     ),
@@ -397,7 +495,9 @@ class _ChatPageState extends State<ChatPage> {
                   const SizedBox(width: 10),
                   GestureDetector(
                     onTap: _sendMessage,
-                    child: const CircleAvatar(backgroundColor: Color(0xFF4675B8), child: Icon(Icons.send, color: Colors.white, size: 20)),
+                    child: const CircleAvatar(
+                        backgroundColor: Color(0xFF4675B8),
+                        child: Icon(Icons.send, color: Colors.white, size: 20)),
                   ),
                 ],
               ),

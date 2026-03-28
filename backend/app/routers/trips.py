@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, status, Query, Depends
 from fastapi.concurrency import run_in_threadpool
 from typing import List
-from datetime import datetime
+from datetime import datetime, timedelta
 from ..database import SupabaseDB, get_supabase_client_for_user
 from ..services.trip_access import check_trip_access
 from ..services import trip_service
@@ -205,7 +205,7 @@ async def get_public_trip_itinerary(trip_id: str):
         total_cost = 0.0
         
         for item in items:
-            day_idx = item["day_index"]
+            day_idx = int(item.get("day_index") or 1)
             if day_idx not in days_dict:
                 days_dict[day_idx] = {"day": day_idx, "activities": []}
             
@@ -774,7 +774,7 @@ async def generate_trip_itinerary(
         itinerary_row = await run_in_threadpool(
             lambda: create_itinerary(
                 trip_id=trip_id,
-                generated_by=strategy,
+                generated_by=user_id,
                 status="active",
                 optimization_score=itinerary_data.get("fitness_score", 0.0),
                 version=1
@@ -829,7 +829,7 @@ async def get_itinerary(
     user_id, token = user_context
     
     try:
-        await check_trip_access(trip_id, user_id, token=token, required_role="view")
+        trip = await check_trip_access(trip_id, user_id, token=token, required_role="view")
         
         # Fetch latest itinerary
         itinerary = await run_in_threadpool(
@@ -850,19 +850,40 @@ async def get_itinerary(
         # Group by day_index → days[]
         days_dict = {}
         total_cost = 0.0
+
+        start_date_raw = trip.get("start_date") if isinstance(trip, dict) else None
+        start_date_obj = None
+        if start_date_raw:
+            try:
+                start_date_obj = datetime.fromisoformat(str(start_date_raw)).date()
+            except ValueError:
+                start_date_obj = None
         
         for item in items:
             day_idx = item["day_index"]
             if day_idx not in days_dict:
-                days_dict[day_idx] = {"day": day_idx, "activities": []}
+                day_date = (
+                    (start_date_obj + timedelta(days=max(day_idx - 1, 0))).isoformat()
+                    if start_date_obj
+                    else f"Day {day_idx}"
+                )
+                days_dict[day_idx] = {
+                    "day": day_idx,
+                    "date": day_date,
+                    "activities": [],
+                    "total_cost": 0.0,
+                    "total_duration_minutes": 0,
+                }
             
             activity = {
                 "id": item["id"],
                 "name": item["title"],
+                "type": "activity",
+                "location": "Unknown",
                 "start_time": item["start_time"],
                 "end_time": item["end_time"],
-                "notes": item["notes"],
-                "score": item["score"]
+                "description": item["notes"],
+                "priority": 1,
             }
             days_dict[day_idx]["activities"].append(activity)
         
@@ -1086,13 +1107,21 @@ async def get_trip_recommendations(
         
         group_prefs = group_prefs_response.data[0] if group_prefs_response.data else None
         
-        pois_response = await run_in_threadpool(
-            lambda: db.client.table("pois").select("*")
-            .ilike("location", f"%{destination}%")
-            .order("rating", desc=True)
-            .limit(100)
-            .execute()
-        )
+        try:
+            pois_response = await run_in_threadpool(
+                lambda: db.client.table("pois").select("*")
+                .ilike("location", f"%{destination}%")
+                .order("rating", desc=True)
+                .limit(100)
+                .execute()
+            )
+        except Exception:
+            pois_response = await run_in_threadpool(
+                lambda: db.client.table("pois").select("*")
+                .order("rating", desc=True)
+                .limit(100)
+                .execute()
+            )
         
         if not pois_response.data:
             return []
@@ -1110,7 +1139,7 @@ async def get_trip_recommendations(
                     id=poi["id"],
                     name=poi.get("name", ""),
                     type=poi.get("poi_type", ""),
-                    location=poi.get("location", ""),
+                    location=poi.get("location") or poi.get("formatted_address") or poi.get("city") or destination,
                     description=poi.get("description"),
                     rating=poi.get("rating"),
                     price_level=poi.get("price_level"),

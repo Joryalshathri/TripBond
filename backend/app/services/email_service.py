@@ -150,3 +150,105 @@ def send_verification_code_email(to_email: str, code: str, name: str = "") -> bo
         print(f"    Code : {code}")
         print(f"{'='*50}\n")
         return False
+
+
+def send_password_reset_code_email(to_email: str, code: str, name: str = "") -> bool:
+    """
+    Send a 6-digit password reset code.
+
+    Returns True on success (or when falling back to console print).
+    Returns False only when SMTP is configured but the send actually fails.
+    """
+    config = get_settings()
+
+    if not config.smtp_host or not config.smtp_user or not config.smtp_password:
+        print(f"\n{'='*50}")
+        print(f"📧  PASSWORD RESET CODE for {to_email}")
+        print(f"    Code : {code}")
+        print(f"{'='*50}\n")
+        return True
+
+    greeting = f"Hi {name}," if name else "Hi,"
+
+    text_body = (
+        f"{greeting}\n\n"
+        f"Your TripBond password reset code is:\n\n"
+        f"    {code}\n\n"
+        f"This code expires in 10 minutes.\n\n"
+        f"If you did not request a password reset, please ignore this email.\n\n"
+        f"Best,\nThe TripBond Team"
+    )
+
+    html_body = f"""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TripBond Password Reset</title>
+</head>
+<body style="margin:0;padding:0;background:#f5f7fa;font-family:'Segoe UI',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+    <tr>
+      <td align="center" style="padding:40px 20px;">
+        <table width="600" cellpadding="0" cellspacing="0" border="0" style="background:#ffffff;border-radius:20px;box-shadow:0 4px 20px rgba(0,0,0,0.08);overflow:hidden;max-width:100%;">
+          <tr>
+            <td style="background:linear-gradient(135deg, #4675B8 0%, #5A8CD9 100%);padding:40px 30px;text-align:center;">
+              <h1 style="margin:0;color:#ffffff;font-size:30px;font-weight:700;">TripBond</h1>
+              <p style="color:#ffffff;font-size:15px;margin:12px 0 0;font-weight:300;">Password Reset Request</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:40px 35px 30px;">
+              <p style="color:#5a5a5a;font-size:16px;line-height:1.7;margin:0 0 24px;text-align:center;">
+                {greeting}<br>
+                Use this code to reset your password.
+              </p>
+              <div style="background:linear-gradient(135deg, #f0f5ff 0%, #e6f2ff 100%);border-radius:16px;padding:28px 22px;margin:0 0 24px;text-align:center;border:2px solid #d0e4ff;">
+                <p style="margin:0 0 10px;color:#7a8a99;font-size:13px;letter-spacing:2px;text-transform:uppercase;font-weight:600;">
+                  Reset Code
+                </p>
+                <div style="font-size:38px;font-weight:bold;letter-spacing:12px;color:#4675B8;font-family:'Courier New',monospace;">
+                  {code}
+                </div>
+                <p style="color:#7a8a99;font-size:13px;margin:16px 0 0;line-height:1.6;">
+                  ⏱️ Expires in <strong style="color:#4675B8;">10 minutes</strong>
+                </p>
+              </div>
+              <p style="color:#8a8a8a;font-size:14px;line-height:1.7;margin:0;text-align:center;">
+                If you didn't request this, you can safely ignore this email.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+""".strip()
+
+    try:
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = "TripBond – Password Reset Code"
+        msg["From"] = config.smtp_from_email or config.smtp_user
+        msg["To"] = to_email
+        msg.attach(MIMEText(text_body, "plain"))
+        msg.attach(MIMEText(html_body, "html"))
+
+        with smtplib.SMTP(config.smtp_host, config.smtp_port, timeout=15) as server:
+            server.ehlo()
+            server.starttls()
+            server.login(config.smtp_user, config.smtp_password)
+            server.sendmail(config.smtp_from_email or config.smtp_user, to_email, msg.as_string())
+
+        logger.info(f"Password reset email sent to {to_email}")
+        return True
+
+    except Exception as exc:
+        logger.exception(f"Failed to send password reset email to {to_email}: {exc}")
+        print(f"\n{'='*50}")
+        print(f"📧  PASSWORD RESET CODE for {to_email}  (email send failed)")
+        print(f"    Code : {code}")
+        print(f"{'='*50}\n")
+        return False

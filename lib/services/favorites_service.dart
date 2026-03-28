@@ -13,14 +13,13 @@ class FavoritesService {
   // Get user's favorites
   Future<List<Map<String, dynamic>>> getMyFavorites() async {
     try {
-      final token = await _authService.getAuthToken();
-      if (token == null) {
-        throw Exception('Not authenticated');
+      final userId = await _authService.getUserId();
+      if (userId == null || userId.isEmpty) {
+        throw Exception('User ID not found');
       }
 
       final response = await _apiService.get(
-        '${ApiConfig.favoritesPath}/me',
-        token: token,
+        '${ApiConfig.favoritesPath}/$userId',
       );
 
       if (response is List) {
@@ -44,18 +43,17 @@ class FavoritesService {
     required String entityId,
   }) async {
     try {
-      final token = await _authService.getAuthToken();
-      if (token == null) {
-        throw Exception('Not authenticated');
+      final userId = await _authService.getUserId();
+      if (userId == null || userId.isEmpty) {
+        throw Exception('User ID not found');
       }
 
       final response = await _apiService.post(
-        ApiConfig.favoritesPath,
+        '${ApiConfig.favoritesPath}/$userId',
         {
           'entity_type': entityType,
           'entity_id': entityId,
         },
-        token: token,
       );
 
       return response;
@@ -67,14 +65,13 @@ class FavoritesService {
   // Remove from favorites
   Future<void> removeFavorite(String favoriteId) async {
     try {
-      final token = await _authService.getAuthToken();
-      if (token == null) {
-        throw Exception('Not authenticated');
+      final userId = await _authService.getUserId();
+      if (userId == null || userId.isEmpty) {
+        throw Exception('User ID not found');
       }
 
       await _apiService.delete(
-        '${ApiConfig.favoritesPath}/$favoriteId',
-        token: token,
+        '${ApiConfig.favoritesPath}/$userId/$favoriteId',
       );
     } catch (e) {
       throw Exception('Failed to remove favorite: ${e.toString()}');
@@ -87,21 +84,12 @@ class FavoritesService {
     required String entityId,
   }) async {
     try {
-      final token = await _authService.getAuthToken();
-      if (token == null) {
-        return false;
-      }
-
-      final response = await _apiService.get(
-        '${ApiConfig.favoritesPath}/check',
-        queryParams: {
-          'entity_type': entityType,
-          'entity_id': entityId,
-        },
-        token: token,
+      final favorites = await getMyFavorites();
+      return favorites.any(
+        (favorite) =>
+            favorite['entity_type'] == entityType &&
+            favorite['entity_id'] == entityId,
       );
-
-      return response['is_favorited'] == true;
     } catch (e) {
       return false;
     }

@@ -3,15 +3,24 @@ import 'package:google_fonts/google_fonts.dart';
 import 'login_screen.dart';
 import 'widgets/custom_loading_spinner.dart';
 import '../core/animations/page_transitions.dart';
+import '../services/auth_service.dart';
 
 class NewPasswordScreen extends StatefulWidget {
-  const NewPasswordScreen({super.key});
+  final String email;
+  final String code;
+
+  const NewPasswordScreen({
+    super.key,
+    required this.email,
+    required this.code,
+  });
 
   @override
   State<NewPasswordScreen> createState() => _NewPasswordScreenState();
 }
 
 class _NewPasswordScreenState extends State<NewPasswordScreen> {
+  final _authService = AuthService();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   bool _isPasswordVisible = false;
@@ -45,8 +54,16 @@ class _NewPasswordScreenState extends State<NewPasswordScreen> {
 
     setState(() => _isLoading = true);
 
-    // TODO: Update password in backend
-    await Future.delayed(const Duration(seconds: 1));
+    try {
+      await _authService.resetPassword(widget.email, widget.code, password);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
+      );
+      return;
+    }
 
     if (!mounted) return;
     setState(() => _isLoading = false);

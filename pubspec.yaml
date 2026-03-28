@@ -51,6 +51,8 @@ dependencies:
   http: ^1.1.0
   top_snackbar_flutter: ^3.3.0
   share_plus: ^12.0.1
+  flutter_map: ^8.1.1
+  latlong2: ^0.9.1
 
 
 dev_dependencies:
@@ -81,6 +83,7 @@ flutter:
     - assets/images/icons/
     - assets/images/people/
     - assets/images/cities/
+    - assets/images/places/
     - assets/animations/
     - assets/figmaAssets/ 
     

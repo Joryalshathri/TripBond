@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'verification_screen.dart';
 import 'widgets/custom_loading_spinner.dart';
 import '../core/animations/page_transitions.dart';
+import '../services/auth_service.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -14,6 +15,7 @@ class ForgotPasswordScreen extends StatefulWidget {
 class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _emailController = TextEditingController();
   final _confirmEmailController = TextEditingController();
+  final _authService = AuthService();
   bool _isLoading = false;
 
   @override
@@ -43,11 +45,26 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
     setState(() => _isLoading = true);
 
-    // TODO: Send verification code to email
-    await Future.delayed(const Duration(seconds: 1));
+    try {
+      await _authService.sendPasswordResetCode(email);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
+      );
+      return;
+    }
 
     if (!mounted) return;
     setState(() => _isLoading = false);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content:
+            Text('If the email exists, a 6-digit reset code has been sent.'),
+      ),
+    );
 
     Navigator.push(
       context,

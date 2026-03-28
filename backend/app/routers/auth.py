@@ -7,14 +7,17 @@ from ..schemas.auth import (
     SignInRequest,
     AuthResponse,
     PasswordResetRequest,
+    VerifyResetCodeRequest,
     UpdatePasswordRequest,
+    UpdatePasswordWithCodeRequest,
     VerifyEmailRequest,
     ResendVerificationRequest,
     SendVerificationCodeRequest,
     VerifyEmailCodeRequest,
 )
 from ..services import verification_store
-from ..services.email_service import send_verification_code_email
+from ..services import password_reset_store
+from ..services.email_service import send_verification_code_email, send_password_reset_code_email
 import logging
 import bcrypt
 import jwt
@@ -223,18 +226,28 @@ async def sign_out(token: str = Depends(get_current_user_token)):
 @router.post("/reset-password")
 async def reset_password(request: PasswordResetRequest):
     """
-    Send password reset email to user
+    Send password reset code email to user (custom auth flow).
     """
     try:
-        db = SupabaseDB()
-        config = get_settings()
-        
-        db.client.auth.reset_password_for_email(
-            request.email,
-            options={
-                "redirect_to": f"{config.frontend_url}/reset-password"
-            }
+        admin_client = get_supabase_admin_client()
+
+        user_result = await run_in_threadpool(
+            lambda: admin_client.table("profiles")
+            .select("id, email_address, full_name")
+            .eq("email_address", request.email.lower())
+            .limit(1)
+            .execute()
         )
+
+        if user_result.data:
+            user = user_result.data[0]
+            code = password_reset_store.generate_code()
+            password_reset_store.store_code(request.email, code, user["id"])
+            send_password_reset_code_email(
+                to_email=request.email,
+                code=code,
+                name=user.get("full_name") or "",
+            )
         
         return {
             "message": f"If an account exists with {request.email}, you will receive a password reset email."
@@ -245,6 +258,58 @@ async def reset_password(request: PasswordResetRequest):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Password reset request failed. Please try again."
+        )
+
+
+@router.post("/verify-reset-code")
+async def verify_reset_code(request: VerifyResetCodeRequest):
+    """
+    Verify a 6-digit password reset code for an email.
+    """
+    try:
+        is_valid = password_reset_store.verify(request.email, request.code)
+        return {"valid": is_valid}
+    except Exception:
+        logger.exception("Password reset code verification failed")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to verify reset code. Please try again.",
+        )
+
+
+@router.post("/update-password-with-code")
+async def update_password_with_code(request: UpdatePasswordWithCodeRequest):
+    """
+    Update password using email + 6-digit reset code (custom auth flow).
+    """
+    try:
+        user_id = password_reset_store.verify_and_consume(request.email, request.code)
+        if not user_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid or expired reset code. Please request a new one.",
+            )
+
+        admin_client = get_supabase_admin_client()
+        password_hash = bcrypt.hashpw(request.new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+        await run_in_threadpool(
+            lambda: admin_client.table("profiles")
+            .update({"password_hash": password_hash})
+            .eq("id", user_id)
+            .execute()
+        )
+
+        return {
+            "message": "Password updated successfully! You can now sign in with your new password."
+        }
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Password update with code failed")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Password update failed. Please try again.",
         )
 
 

@@ -5,37 +5,79 @@ import 'profile.dart';
 import 'DestinationLandingPage.dart';
 import 'AI_Plan.dart';
 import 'plans_list.dart';
+import '../services/trip_service.dart';
 
-final List<DateTime> tripDays = [
+final List<DateTime> _fallbackTripDays = [
   DateTime(2026, 4, 9),
   DateTime(2026, 4, 10),
   DateTime(2026, 4, 11),
 ];
 
 DateTime _norm(DateTime d) => DateTime(d.year, d.month, d.day);
-final Map<DateTime, List<Place>> _calendarItinerary = {
-  DateTime(2026, 4, 9):  itinerary[0]['places'] as List<Place>,
-  DateTime(2026, 4, 10): itinerary[1]['places'] as List<Place>,
-  DateTime(2026, 4, 11): itinerary[2]['places'] as List<Place>,
+final Map<DateTime, List<Place>> _fallbackCalendarItinerary = {
+  DateTime(2026, 4, 9): const [
+    Place(
+        name: 'Ithra',
+        image: 'assets/images/places/Ithra.png',
+        rating: 4.8,
+        location: 'Dhahran'),
+    Place(
+        name: 'City Walk',
+        image: 'assets/images/places/CityWalk.png',
+        rating: 4.8,
+        location: 'Olaya'),
+  ],
+  DateTime(2026, 4, 10): const [
+    Place(
+        name: 'Ajdan Walk',
+        image: 'assets/images/cities/Khobar2.png',
+        rating: 4.3,
+        location: 'Alkurnaish'),
+    Place(
+        name: 'AMC Cinema',
+        image: 'assets/images/places/Cinema.png',
+        rating: 4.3,
+        location: 'Alkurnaish'),
+  ],
+  DateTime(2026, 4, 11): const [
+    Place(
+        name: 'Parkers',
+        image: 'assets/images/places/Parkers.png',
+        rating: 4.4,
+        location: 'Dhahran'),
+    Place(
+        name: 'AlKhobar Beach',
+        image: 'assets/images/places/Beach.png',
+        rating: 4.2,
+        location: 'Khobar'),
+  ],
 };
-
 
 ItineraryItem _placeToItem(Place place, int index) {
   const starts = ['09:00', '11:30', '14:00'];
-  const ends   = ['10:30', '13:00', '15:30'];
+  const ends = ['10:30', '13:00', '15:30'];
   return ItineraryItem(
     startTime: starts[index % 3],
-    endTime:   ends[index % 3],
-    title:    place.name,
+    endTime: ends[index % 3],
+    title: place.name,
     subtitle: place.location,
     location: place.location,
-    person:   'You',
-    color:    Colors.white,
+    person: 'You',
+    color: Colors.white,
   );
 }
 
 class GroupSuggestedItinerary extends StatefulWidget {
-  const GroupSuggestedItinerary({super.key});
+  final String? tripId;
+  final String? tripTitle;
+  final String? destination;
+
+  const GroupSuggestedItinerary({
+    super.key,
+    this.tripId,
+    this.tripTitle,
+    this.destination,
+  });
 
   @override
   State<GroupSuggestedItinerary> createState() =>
@@ -43,12 +85,16 @@ class GroupSuggestedItinerary extends StatefulWidget {
 }
 
 class _GroupSuggestedItineraryState extends State<GroupSuggestedItinerary> {
-  DateTime _selectedDay = DateTime(2026, 4, 9);
-  DateTime _focusedDay = DateTime(2026, 4, 9);
+  final _tripService = TripService();
+
+  late DateTime _selectedDay;
+  List<DateTime> _tripDays = List<DateTime>.from(_fallbackTripDays);
+  Map<DateTime, List<Place>> _calendarItinerary =
+      Map<DateTime, List<Place>>.from(_fallbackCalendarItinerary);
+
   bool isEditMode = false;
   bool hasNotification = false;
   Set<String> deletedPlaceNames = {};
-
 
   List<Map<String, dynamic>> suggestions = [
     {
@@ -72,13 +118,85 @@ class _GroupSuggestedItineraryState extends State<GroupSuggestedItinerary> {
   ];
 
   List<Place> _placesForDay(DateTime day) {
-    return _calendarItinerary[_norm(day)] ?? [];
+    return _calendarItinerary[_norm(day)] ?? const [];
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedDay = _tripDays.first;
+    _loadTripItinerary();
+  }
+
+  Future<void> _loadTripItinerary() async {
+    if (widget.tripId == null || widget.tripId!.isEmpty) return;
+
+    try {
+      final itineraryData =
+          await _tripService.getLatestItinerary(widget.tripId!);
+      final days = itineraryData['days'];
+      if (days is! List || days.isEmpty) return;
+
+      final mappedDays = <DateTime>[];
+      final mappedCalendar = <DateTime, List<Place>>{};
+
+      for (final dayData in days) {
+        if (dayData is! Map<String, dynamic>) continue;
+        final dayNumber = dayData['day'] is int
+            ? dayData['day'] as int
+            : int.tryParse(dayData['day']?.toString() ?? '') ?? 1;
+        final dayDate = DateTime(2026, 1, 1).add(Duration(days: dayNumber - 1));
+
+        final activities = dayData['activities'];
+        final places = <Place>[];
+        if (activities is List) {
+          for (final item in activities) {
+            if (item is! Map<String, dynamic>) continue;
+            places.add(
+              Place(
+                name: (item['name'] ?? 'Activity').toString(),
+                image: 'assets/images/places/Ithra.png',
+                rating: (item['score'] is num)
+                    ? (item['score'] as num).toDouble()
+                    : 4.0,
+                location: (item['location'] ??
+                        item['notes'] ??
+                        widget.destination ??
+                        'Trip')
+                    .toString(),
+              ),
+            );
+          }
+        }
+
+        mappedDays.add(dayDate);
+        mappedCalendar[_norm(dayDate)] = places;
+      }
+
+      if (!mounted || mappedDays.isEmpty) return;
+      setState(() {
+        _tripDays = mappedDays;
+        _calendarItinerary = mappedCalendar;
+        _selectedDay = _tripDays.first;
+      });
+    } catch (_) {}
   }
 
   String _dayLabel(DateTime day) {
     const months = [
-      '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      '',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
     ];
     return '${months[day.month]} ${day.year}';
   }
@@ -87,7 +205,6 @@ class _GroupSuggestedItineraryState extends State<GroupSuggestedItinerary> {
     const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     return days[day.weekday - 1];
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -121,21 +238,33 @@ class _GroupSuggestedItineraryState extends State<GroupSuggestedItinerary> {
                               children: [
                                 Text(
                                   '${_selectedDay.day}',
-                                  style: const TextStyle(fontSize: 48, fontWeight: FontWeight.w600),
+                                  style: const TextStyle(
+                                      fontSize: 48,
+                                      fontWeight: FontWeight.w600),
                                 ),
-                                Text(_weekdayLabel(_selectedDay), style: const TextStyle(fontSize: 14, color: Color(0xFF9E9E9E))),
-                                Text(_dayLabel(_selectedDay), style: const TextStyle(fontSize: 14, color: Color(0xFF9E9E9E))),
+                                Text(_weekdayLabel(_selectedDay),
+                                    style: const TextStyle(
+                                        fontSize: 14,
+                                        color: Color(0xFF9E9E9E))),
+                                Text(_dayLabel(_selectedDay),
+                                    style: const TextStyle(
+                                        fontSize: 14,
+                                        color: Color(0xFF9E9E9E))),
                               ],
                             ),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 6),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFFFF4E0),
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: const Text(
                                 'Trip Days',
-                                style: TextStyle(color: Color(0xFFC8A858), fontSize: 12, fontWeight: FontWeight.w500),
+                                style: TextStyle(
+                                    color: Color(0xFFC8A858),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500),
                               ),
                             ),
                           ],
@@ -145,27 +274,40 @@ class _GroupSuggestedItineraryState extends State<GroupSuggestedItinerary> {
                           padding: const EdgeInsets.symmetric(vertical: 4),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                            children: tripDays.map((day) {
-                              final bool isSelected = _norm(_selectedDay) == _norm(day);
-                              const weekdays = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+                            children: _tripDays.map((day) {
+                              final bool isSelected =
+                                  _norm(_selectedDay) == _norm(day);
+                              const weekdays = [
+                                'Mon',
+                                'Tue',
+                                'Wed',
+                                'Thu',
+                                'Fri',
+                                'Sat',
+                                'Sun'
+                              ];
                               final String wd = weekdays[day.weekday - 1];
                               return GestureDetector(
                                 onTap: () => setState(() {
                                   _selectedDay = day;
-                                  _focusedDay  = day;
                                 }),
                                 child: AnimatedContainer(
                                   duration: const Duration(milliseconds: 200),
                                   width: 72,
-                                  padding: const EdgeInsets.symmetric(vertical: 10),
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 10),
                                   decoration: BoxDecoration(
                                     color: isSelected
                                         ? const Color(0xFFC8A858)
                                         : const Color(0xFFFFF4E0),
                                     borderRadius: BorderRadius.circular(12),
                                     border: isSelected
-                                        ? Border.all(color: const Color(0xFFC8A858), width: 2)
-                                        : Border.all(color: const Color(0xFFEDD98A), width: 1),
+                                        ? Border.all(
+                                            color: const Color(0xFFC8A858),
+                                            width: 2)
+                                        : Border.all(
+                                            color: const Color(0xFFEDD98A),
+                                            width: 1),
                                   ),
                                   child: Column(
                                     mainAxisAlignment: MainAxisAlignment.center,
@@ -175,7 +317,9 @@ class _GroupSuggestedItineraryState extends State<GroupSuggestedItinerary> {
                                         style: TextStyle(
                                           fontSize: 11,
                                           fontWeight: FontWeight.w500,
-                                          color: isSelected ? Colors.white : const Color(0xFFC8A858),
+                                          color: isSelected
+                                              ? Colors.white
+                                              : const Color(0xFFC8A858),
                                         ),
                                       ),
                                       const SizedBox(height: 4),
@@ -184,7 +328,9 @@ class _GroupSuggestedItineraryState extends State<GroupSuggestedItinerary> {
                                         style: TextStyle(
                                           fontSize: 20,
                                           fontWeight: FontWeight.w700,
-                                          color: isSelected ? Colors.white : const Color(0xFFC8A858),
+                                          color: isSelected
+                                              ? Colors.white
+                                              : const Color(0xFFC8A858),
                                         ),
                                       ),
                                     ],
@@ -200,7 +346,8 @@ class _GroupSuggestedItineraryState extends State<GroupSuggestedItinerary> {
                               ? const Center(
                                   child: Text(
                                     'No places planned for this day.',
-                                    style: TextStyle(color: Color(0xFF9E9E9E), fontSize: 14),
+                                    style: TextStyle(
+                                        color: Color(0xFF9E9E9E), fontSize: 14),
                                   ),
                                 )
                               : ListView.builder(
@@ -209,28 +356,33 @@ class _GroupSuggestedItineraryState extends State<GroupSuggestedItinerary> {
                                   padding: const EdgeInsets.only(bottom: 20),
                                   itemBuilder: (context, index) {
                                     final place = places[index];
-                                    final bool isDeleted = deletedPlaceNames.contains(place.name);
+                                    final bool isDeleted =
+                                        deletedPlaceNames.contains(place.name);
                                     final item = _placeToItem(place, index);
 
                                     return Padding(
-                                      padding: const EdgeInsets.only(bottom: 16),
+                                      padding:
+                                          const EdgeInsets.only(bottom: 16),
                                       child: Opacity(
                                         opacity: isDeleted ? 0.4 : 1.0,
                                         child: AbsorbPointer(
                                           absorbing: isDeleted,
                                           child: _CalendarItineraryCard(
                                             item: item,
-                                            showDelete: isEditMode && !isDeleted,
+                                            showDelete:
+                                                isEditMode && !isDeleted,
                                             onDelete: () {
                                               setState(() {
                                                 hasNotification = true;
-                                                deletedPlaceNames.add(place.name);
+                                                deletedPlaceNames
+                                                    .add(place.name);
                                                 suggestions.insert(0, {
                                                   'name': place.name,
                                                   'type': 'Removed from Plan',
                                                   'location': place.location,
                                                   'person': 'You',
-                                                  'personColor': const Color(0xFF4675B8),
+                                                  'personColor':
+                                                      const Color(0xFF4675B8),
                                                   'highlight': false,
                                                   'action': 'delete',
                                                 });
@@ -247,7 +399,7 @@ class _GroupSuggestedItineraryState extends State<GroupSuggestedItinerary> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 80), 
+                const SizedBox(height: 80),
               ],
             ),
           ),
@@ -268,7 +420,8 @@ class _GroupSuggestedItineraryState extends State<GroupSuggestedItinerary> {
               context,
               MaterialPageRoute(builder: (_) => const PlansList()),
             ),
-            child: const Icon(Icons.arrow_back, size: 24, color: Color(0xFF1E1E1E)),
+            child: const Icon(Icons.arrow_back,
+                size: 24, color: Color(0xFF1E1E1E)),
           ),
           const Text(
             'Generated Plan',
@@ -338,7 +491,13 @@ class _GroupSuggestedItineraryState extends State<GroupSuggestedItinerary> {
             child: GestureDetector(
               onTap: () => Navigator.pushReplacement(
                 context,
-                MaterialPageRoute(builder: (_) => const AI_Plan()),
+                MaterialPageRoute(
+                  builder: (_) => AI_Plan(
+                    tripId: widget.tripId,
+                    tripTitle: widget.tripTitle,
+                    destination: widget.destination,
+                  ),
+                ),
               ),
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 10),
@@ -423,12 +582,17 @@ class _GroupSuggestedItineraryState extends State<GroupSuggestedItinerary> {
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
                 child: Row(
                   children: const [
-                    Text('Action', style: TextStyle(color: Color(0xFF9E9E9E), fontSize: 14)),
+                    Text('Action',
+                        style:
+                            TextStyle(color: Color(0xFF9E9E9E), fontSize: 14)),
                     SizedBox(width: 40),
-                    Text('Course', style: TextStyle(color: Color(0xFF9E9E9E), fontSize: 14)),
+                    Text('Course',
+                        style:
+                            TextStyle(color: Color(0xFF9E9E9E), fontSize: 14)),
                     Spacer(),
                     Icon(Icons.filter_list, color: Color(0xFF9E9E9E), size: 20),
                   ],
@@ -603,7 +767,6 @@ class _GroupSuggestedItineraryState extends State<GroupSuggestedItinerary> {
     );
   }
 
-
   Widget _buildBottomNav(BuildContext context) {
     return Positioned(
       bottom: 0,
@@ -618,18 +781,39 @@ class _GroupSuggestedItineraryState extends State<GroupSuggestedItinerary> {
             topRight: Radius.circular(25),
           ),
           boxShadow: [
-            BoxShadow(color: Color(0x1A000000), blurRadius: 20, offset: Offset(0, -4)),
+            BoxShadow(
+                color: Color(0x1A000000),
+                blurRadius: 20,
+                offset: Offset(0, -4)),
           ],
         ),
         padding: const EdgeInsets.symmetric(horizontal: 32),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            _navIcon(Icons.search, onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const DestinationLandingPage()))),
-            _navIcon(Icons.location_on_outlined, onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const CloseSpots()))),
+            _navIcon(Icons.search,
+                onTap: () => Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const DestinationLandingPage()))),
+            _navIcon(
+              Icons.location_on_outlined,
+              onTap: () => Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => CloseSpots(
+                    tripId: widget.tripId,
+                  ),
+                ),
+              ),
+            ),
             _navIcon(Icons.airplanemode_active),
-            _navIcon(Icons.group_outlined, onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const Bonders()))),
-            _navIcon(Icons.person_outline, onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const Profile()))),
+            _navIcon(Icons.group_outlined,
+                onTap: () => Navigator.pushReplacement(context,
+                    MaterialPageRoute(builder: (_) => const Bonders()))),
+            _navIcon(Icons.person_outline,
+                onTap: () => Navigator.pushReplacement(context,
+                    MaterialPageRoute(builder: (_) => const Profile()))),
           ],
         ),
       ),
@@ -643,7 +827,6 @@ class _GroupSuggestedItineraryState extends State<GroupSuggestedItinerary> {
     );
   }
 }
-
 
 class _CalendarItineraryCard extends StatelessWidget {
   final ItineraryItem item;
@@ -811,6 +994,7 @@ class _CalendarItineraryCard extends StatelessWidget {
     );
   }
 }
+
 class ItineraryItem {
   final String startTime, endTime, title, subtitle, location, person;
   final Color color;

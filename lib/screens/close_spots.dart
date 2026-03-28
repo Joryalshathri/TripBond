@@ -1,28 +1,192 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'DestinationLandingPage.dart';
 import 'Bonder.dart';
 import 'profile.dart';
 import 'AI_Plan.dart';
 import '../core/animations/animation_constants.dart';
+import '../services/trip_service.dart';
 
 class NearActivity {
   final String name;
   final String arrival;
   final int minutes;
+  final String location;
+  final double latitude;
+  final double longitude;
 
-  const NearActivity(
-      {required this.name, required this.arrival, required this.minutes});
+  const NearActivity({
+    required this.name,
+    required this.arrival,
+    required this.minutes,
+    this.location = '',
+    required this.latitude,
+    required this.longitude,
+  });
 }
 
-const List<NearActivity> _activities = [
-  NearActivity(name: 'Ithra', arrival: '10:30', minutes: 6),
-  NearActivity(name: 'Ajdan Walk', arrival: '10:35', minutes: 12),
-  NearActivity(name: 'Norman ATM', arrival: '10:35', minutes: 14),
+const List<NearActivity> _defaultActivities = [
+  NearActivity(
+    name: 'Ithra',
+    arrival: '10:30',
+    minutes: 6,
+    location: 'Dhahran',
+    latitude: 26.3277,
+    longitude: 50.1304,
+  ),
+  NearActivity(
+    name: 'Ajdan Walk',
+    arrival: '10:35',
+    minutes: 12,
+    location: 'Khobar',
+    latitude: 26.2797,
+    longitude: 50.2083,
+  ),
+  NearActivity(
+    name: 'Norman ATM',
+    arrival: '10:35',
+    minutes: 14,
+    location: 'Khobar',
+    latitude: 26.2172,
+    longitude: 50.1971,
+  ),
 ];
 
 class CloseSpots extends StatelessWidget {
-  const CloseSpots({super.key});
+  final String? tripId;
+
+  const CloseSpots({super.key, this.tripId});
+
+  @override
+  Widget build(BuildContext context) {
+    return _CloseSpotsView(tripId: tripId);
+  }
+}
+
+class _CloseSpotsView extends StatefulWidget {
+  final String? tripId;
+  const _CloseSpotsView({required this.tripId});
+
+  @override
+  State<_CloseSpotsView> createState() => _CloseSpotsViewState();
+}
+
+class _CloseSpotsViewState extends State<_CloseSpotsView> {
+  final _tripService = TripService();
+  final _mapController = MapController();
+  List<NearActivity> _activities = List<NearActivity>.from(_defaultActivities);
+  bool _isLoading = false;
+  int? _selectedActivityIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadNearbyFromApi();
+  }
+
+  Future<void> _loadNearbyFromApi() async {
+    if (widget.tripId == null || widget.tripId!.isEmpty) return;
+
+    setState(() => _isLoading = true);
+    try {
+      final recommendations =
+          await _tripService.getRecommendations(widget.tripId!);
+      if (!mounted || recommendations.isEmpty) return;
+
+      final mapped =
+          recommendations.take(8).toList().asMap().entries.map((entry) {
+        final index = entry.key;
+        final recommendation = entry.value;
+        final poi = recommendation['poi'] as Map<String, dynamic>? ??
+            <String, dynamic>{};
+        final coordinates = (poi['coordinates'] is Map<String, dynamic>)
+            ? (poi['coordinates'] as Map<String, dynamic>)
+            : <String, dynamic>{};
+        final fallback = _inferCoordinatesFromLocation(
+          (poi['location'] ?? '').toString(),
+        );
+        return NearActivity(
+          name: (poi['name'] ?? 'Place').toString(),
+          arrival: '${10 + index}:30',
+          minutes: 5 + (index * 3),
+          location: (poi['location'] ?? '').toString(),
+          latitude: _extractCoordinate(
+            coordinates,
+            ['lat', 'latitude', 'y'],
+            fallback.latitude,
+          ),
+          longitude: _extractCoordinate(
+            coordinates,
+            ['lng', 'lon', 'longitude', 'x'],
+            fallback.longitude,
+          ),
+        );
+      }).toList();
+
+      setState(() {
+        _activities = mapped;
+      });
+    } catch (_) {
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  double _extractCoordinate(
+    Map<String, dynamic> coordinates,
+    List<String> keys,
+    double fallback,
+  ) {
+    for (final key in keys) {
+      final value = coordinates[key];
+      if (value is num) {
+        return value.toDouble();
+      }
+      if (value is String) {
+        final parsed = double.tryParse(value);
+        if (parsed != null) {
+          return parsed;
+        }
+      }
+    }
+    return fallback;
+  }
+
+  LatLng _inferCoordinatesFromLocation(String location) {
+    final normalized = location.toLowerCase();
+    if (normalized.contains('dhahran')) {
+      return const LatLng(26.3277, 50.1304);
+    }
+    if (normalized.contains('khobar') || normalized.contains('alkhobar')) {
+      return const LatLng(26.2172, 50.1971);
+    }
+    if (normalized.contains('dammam')) {
+      return const LatLng(26.4207, 50.0888);
+    }
+    return const LatLng(26.2172, 50.1971);
+  }
+
+  LatLng _mapCenter() {
+    if (_activities.isEmpty) {
+      return const LatLng(26.2172, 50.1971);
+    }
+    final latSum = _activities.fold<double>(0, (sum, a) => sum + a.latitude);
+    final lngSum = _activities.fold<double>(0, (sum, a) => sum + a.longitude);
+    return LatLng(latSum / _activities.length, lngSum / _activities.length);
+  }
+
+  void _focusActivityOnMap(int index) {
+    final target = _activities[index];
+    setState(() => _selectedActivityIndex = index);
+    _mapController.move(
+      LatLng(target.latitude, target.longitude),
+      13.5,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -97,36 +261,51 @@ class CloseSpots extends StatelessWidget {
   }
 
   Widget _buildMap() {
-    return Container(
+    final center = _mapCenter();
+    return SizedBox(
       height: 300,
-      color: const Color(0xFFE0E5EC),
-      child: Stack(
-        children: [
-          Center(
-            child: Icon(Icons.map, size: 80, color: Colors.grey.shade400),
+      child: FlutterMap(
+        mapController: _mapController,
+        options: MapOptions(
+          initialCenter: center,
+          initialZoom: 12,
+          interactionOptions: const InteractionOptions(
+            flags: InteractiveFlag.all,
           ),
-          _buildPin(80, 60),
-          _buildPin(190, 40),
-          _buildPin(230, 100),
-          _buildPin(270, 30),
-          _buildPin(140, 200),
+        ),
+        children: [
+          TileLayer(
+            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+            userAgentPackageName: 'com.tripbond.app',
+          ),
+          MarkerLayer(
+            markers: _activities.asMap().entries.map((entry) {
+              final index = entry.key;
+              final activity = entry.value;
+              final isSelected = _selectedActivityIndex == index;
+              return Marker(
+                point: LatLng(activity.latitude, activity.longitude),
+                width: isSelected ? 44 : 36,
+                height: isSelected ? 44 : 36,
+                child: Icon(
+                  Icons.location_on,
+                  color: const Color(0xFF4675B8),
+                  size: isSelected ? 42 : 34,
+                )
+                    .animate(
+                        onPlay: (controller) =>
+                            controller.repeat(reverse: true))
+                    .scale(
+                      begin: const Offset(1.0, 1.0),
+                      end: const Offset(1.12, 1.12),
+                      duration: 1200.ms,
+                      curve: Curves.easeInOut,
+                    ),
+              );
+            }).toList(),
+          ),
         ],
       ),
-    );
-  }
-
-  Widget _buildPin(double left, double top) {
-    return Positioned(
-      left: left,
-      top: top,
-      child: const Icon(Icons.location_on, size: 28, color: Color(0xFF4675B8))
-          .animate(onPlay: (controller) => controller.repeat(reverse: true))
-          .scale(
-            begin: const Offset(1.0, 1.0),
-            end: const Offset(1.2, 1.2),
-            duration: 1200.ms,
-            curve: Curves.easeInOut,
-          ),
     );
   }
 
@@ -146,13 +325,30 @@ class CloseSpots extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          ..._activities.map((a) => Container(
+          if (_isLoading)
+            const Center(
+                child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: CircularProgressIndicator(),
+            )),
+          ..._activities.asMap().entries.map((entry) {
+            final index = entry.key;
+            final a = entry.value;
+            final isSelected = _selectedActivityIndex == index;
+            return GestureDetector(
+              onTap: () => _focusActivityOnMap(index),
+              child: Container(
                 margin: const EdgeInsets.only(bottom: 12),
                 padding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  border: Border.all(color: Colors.grey.shade200),
+                  color: isSelected ? const Color(0xFFEFF4FC) : Colors.white,
+                  border: Border.all(
+                    color: isSelected
+                        ? const Color(0xFF4675B8)
+                        : Colors.grey.shade200,
+                    width: isSelected ? 1.5 : 1,
+                  ),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Row(
@@ -183,7 +379,9 @@ class CloseSpots extends StatelessWidget {
                             ),
                           ),
                           Text(
-                            'Arrival ${a.arrival}',
+                            a.location.isEmpty
+                                ? 'Arrival ${a.arrival}'
+                                : a.location,
                             style: TextStyle(
                               fontFamily: 'Poppins',
                               fontSize: 12,
@@ -204,7 +402,9 @@ class CloseSpots extends StatelessWidget {
                     ),
                   ],
                 ),
-              )),
+              ),
+            );
+          }),
         ],
       ),
     );
@@ -246,7 +446,7 @@ class CloseSpots extends StatelessWidget {
               Navigator.push(
                   context,
                   MaterialPageRoute(
-                      builder: (_) => const AI_Plan()));
+                      builder: (_) => AI_Plan(tripId: widget.tripId)));
             }),
             _navIcon(Icons.group_outlined, onTap: () {
               Navigator.push(

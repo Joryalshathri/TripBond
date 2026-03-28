@@ -211,7 +211,6 @@ def create_itinerary(
         "version": version,
         "status": status,
         "generated_by": generated_by,
-        "optimization_score": optimization_score,
     }
     response = db.client.table("itineraries").insert(record).execute()
     if not response.data:

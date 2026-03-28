@@ -185,12 +185,6 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  // Set authenticated status after email verification
-  void setAuthenticatedStatus() {
-    _status = AuthStatus.authenticated;
-    notifyListeners();
-  }
-
   // Clear error message
   void clearError() {
     _errorMessage = null;

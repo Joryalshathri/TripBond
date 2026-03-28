@@ -111,10 +111,10 @@ async def update_trip(trip_id: str, token: str, update_data: dict) -> dict:
 
 async def delete_trip(trip_id: str, token: str) -> None:
     """Delete trip (cascade will delete related data)."""
-    client = get_supabase_client_for_user(token)
+    db = SupabaseDB(admin=True)
     
     await run_in_threadpool(
-        lambda: client.table("trips").delete().eq("id", trip_id).execute()
+        lambda: db.client.table("trips").delete().eq("id", trip_id).execute()
     )
 
 

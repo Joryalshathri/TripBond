@@ -34,7 +34,18 @@ class PasswordResetRequest(BaseModel):
     email: EmailStr
 
 
+class VerifyResetCodeRequest(BaseModel):
+    email: EmailStr
+    code: str
+
+
 class UpdatePasswordRequest(BaseModel):
+    new_password: str
+
+
+class UpdatePasswordWithCodeRequest(BaseModel):
+    email: EmailStr
+    code: str
     new_password: str
 
 

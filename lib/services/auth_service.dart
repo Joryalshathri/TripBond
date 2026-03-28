@@ -187,7 +187,7 @@ class AuthService {
   Future<void> sendPasswordResetCode(String email) async {
     try {
       await _apiService.post(
-        '${ApiConfig.authPath}/password-reset',
+        '${ApiConfig.authPath}/reset-password',
         {'email': email},
       );
     } catch (e) {
@@ -216,7 +216,7 @@ class AuthService {
       String email, String code, String newPassword) async {
     try {
       await _apiService.post(
-        '${ApiConfig.authPath}/update-password',
+        '${ApiConfig.authPath}/update-password-with-code',
         {
           'email': email,
           'code': code,

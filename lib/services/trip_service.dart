@@ -214,8 +214,10 @@ class TripService {
       }
 
       final response = await _apiService.post(
-        '${ApiConfig.tripsPath}/$tripId/itinerary/generate',
-        preferences,
+        '${ApiConfig.tripsPath}/$tripId/generate-itinerary',
+        {
+          'preferences': preferences,
+        },
         token: token,
       );
 
@@ -234,7 +236,7 @@ class TripService {
       }
 
       final response = await _apiService.get(
-        '${ApiConfig.tripsPath}/$tripId/itinerary/latest',
+        '${ApiConfig.tripsPath}/$tripId/itinerary',
         token: token,
       );
 

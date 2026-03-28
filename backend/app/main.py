@@ -120,8 +120,10 @@ async def health_check():
     try:
         client = get_supabase_admin_client()
         start_time = time.perf_counter()
-        
-        await run_in_threadpool(lambda: client.rpc("pg_backend_pid").execute())
+
+        await run_in_threadpool(
+            lambda: client.table("profiles").select("id").limit(1).execute()
+        )
         
         db_time = (time.perf_counter() - start_time) * 1000
         

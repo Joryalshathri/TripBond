@@ -9,7 +9,6 @@ import 'close_spots.dart';
 import 'DestinationLandingPage.dart';
 import 'profile.dart';
 
-
 class PlanItem {
   final String name;
   final String image;
@@ -61,7 +60,6 @@ const List<PlanItem> pastPlans = [
   ),
 ];
 
-
 const List<Color> _avatarColors = [
   Color(0xFF4675B8),
   Color(0xFFC4A44A),
@@ -78,7 +76,7 @@ class PlansList extends StatefulWidget {
 class _PlansListState extends State<PlansList> {
   bool currentOpen = true;
   bool futureOpen = true;
-  bool pastOpen = true; 
+  bool pastOpen = true;
 
   @override
   void initState() {
@@ -111,21 +109,21 @@ class _PlansListState extends State<PlansList> {
       }
     }).toList();
   }
-  
+
   //the user must not be able to create a plan without setting the date (a safety net for edge cases like corrupted backend data.)
   String _formatDateRange(Map<String, dynamic> trip) {
-  if (trip['start_date'] != null && trip['end_date'] != null) {
-    try {
-      final start = DateTime.parse(trip['start_date']);
-      final end = DateTime.parse(trip['end_date']);
-      return '${start.day} - ${end.day} ${_getMonthName(end.month)} ${end.year}';
-    } catch (e) {
-      return 'Invalid date'; // fallback for corrupted data only
+    if (trip['start_date'] != null && trip['end_date'] != null) {
+      try {
+        final start = DateTime.parse(trip['start_date']);
+        final end = DateTime.parse(trip['end_date']);
+        return '${start.day} - ${end.day} ${_getMonthName(end.month)} ${end.year}';
+      } catch (e) {
+        return 'Invalid date'; // fallback for corrupted data only
+      }
     }
+    // This should never happen — backend must enforce date requirement
+    return 'Invalid date';
   }
-  // This should never happen — backend must enforce date requirement
-  return 'Invalid date';
-}
 
   @override
   Widget build(BuildContext context) {
@@ -155,17 +153,15 @@ class _PlansListState extends State<PlansList> {
                                   const SizedBox(height: 16),
                                   _buildSection('Current Plans', currentOpen,
                                       () {
-                                    setState(
-                                        () => currentOpen = !currentOpen);
+                                    setState(() => currentOpen = !currentOpen);
                                   }, currentTrips),
                                   const SizedBox(height: 16),
-                                  _buildSection('Future Plans', futureOpen,
-                                      () {
+                                  _buildSection('Future Plans', futureOpen, () {
                                     setState(() => futureOpen = !futureOpen);
                                   }, futureTrips),
-                                   const SizedBox(height: 16),
+                                  const SizedBox(height: 16),
                                   _buildSection('Past Plans', pastOpen, () {
-                                     setState(() => pastOpen = !pastOpen);
+                                    setState(() => pastOpen = !pastOpen);
                                   }, pastPlans),
                                 ],
                               ),
@@ -216,8 +212,8 @@ class _PlansListState extends State<PlansList> {
         );
   }
 
-  Widget _buildSection(String title, bool isOpen, VoidCallback onToggle,
-      List <dynamic> plans) {
+  Widget _buildSection(
+      String title, bool isOpen, VoidCallback onToggle, List<dynamic> plans) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -249,154 +245,197 @@ class _PlansListState extends State<PlansList> {
     );
   }
 
+  Widget _buildPlanCard(dynamic plan) {
+    // Handle both PlanItem and Map<String, dynamic>
+    final String name =
+        plan is PlanItem ? plan.name : (plan['title'] ?? 'Untitled');
+    final String image =
+        plan is PlanItem ? plan.image : (plan['image_url'] ?? '');
+    final String dateRange =
+        plan is PlanItem ? plan.dateRange : _formatDateRange(plan);
+    final List<String> avatarInitials =
+        plan is PlanItem ? plan.avatarInitials : [];
+    final String? tripId = plan is PlanItem ? null : (plan['id']?.toString());
+    final String destination =
+        plan is PlanItem ? plan.name : (plan['destination'] ?? name).toString();
 
-Widget _buildPlanCard(dynamic plan) {
-  // Handle both PlanItem and Map<String, dynamic>
-  final String name = plan is PlanItem ? plan.name : (plan['title'] ?? 'Untitled');
-  final String image = plan is PlanItem ? plan.image : (plan['image_url'] ?? '');
-  final String dateRange = plan is PlanItem ? plan.dateRange : _formatDateRange(plan);
-  final List<String> avatarInitials = plan is PlanItem ? plan.avatarInitials : [];
-
-  return GestureDetector(
-    onTap: () => Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const AI_Plan()),
-    ),
-    child: Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: Colors.grey.shade200),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: image.startsWith('http')
-                ? Image.network(
-                    image,
-                    width: 90, height: 90, fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => _defaultTripImage(),
-                  )
-                : image.isNotEmpty
-                    ? Image.asset(
-                        image,
-                        width: 90, height: 90, fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => _defaultTripImage(),
-                      )
-                    : _defaultTripImage(),
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => AI_Plan(
+            tripId: tripId,
+            tripTitle: name,
+            destination: destination,
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  style: const TextStyle(
-                    fontFamily: 'Poppins',
-                    fontWeight: FontWeight.w700,
-                    fontSize: 16,
-                    color: Colors.black,
+        ),
+      ),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border.all(color: Colors.grey.shade200),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: image.startsWith('http')
+                  ? Image.network(
+                      image,
+                      width: 90,
+                      height: 90,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => _defaultTripImage(),
+                    )
+                  : image.isNotEmpty
+                      ? Image.asset(
+                          image,
+                          width: 90,
+                          height: 90,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => _defaultTripImage(),
+                        )
+                      : _defaultTripImage(),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    style: const TextStyle(
+                      fontFamily: 'Poppins',
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                      color: Colors.black,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    const Icon(Icons.calendar_today,
-                        size: 14, color: Color(0xFF666666)),
-                    const SizedBox(width: 6),
-                    Text(
-                      dateRange,
-                      style: TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 13,
-                        color: Colors.grey.shade500,
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Icon(Icons.calendar_today,
+                          size: 14, color: Color(0xFF666666)),
+                      const SizedBox(width: 6),
+                      Text(
+                        dateRange,
+                        style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 13,
+                          color: Colors.grey.shade500,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (avatarInitials.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      height: 24,
+                      child: Stack(
+                        children: List.generate(avatarInitials.length, (i) {
+                          return Positioned(
+                            left: i * 18.0,
+                            child: Container(
+                              width: 24,
+                              height: 24,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: _avatarColors[i % _avatarColors.length],
+                                border:
+                                    Border.all(color: Colors.white, width: 2),
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(
+                                avatarInitials[i],
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          );
+                        }),
                       ),
                     ),
                   ],
-                ),
-                if (avatarInitials.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    height: 24,
-                    child: Stack(
-                      children: List.generate(avatarInitials.length, (i) {
-                        return Positioned(
-                          left: i * 18.0,
-                          child: Container(
-                            width: 24, height: 24,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: _avatarColors[i % _avatarColors.length],
-                              border: Border.all(color: Colors.white, width: 2),
-                            ),
-                            alignment: Alignment.center,
-                            child: Text(
-                              avatarInitials[i],
-                              style: const TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                        );
-                      }),
-                    ),
-                  ),
                 ],
-              ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   Widget _defaultTripImage() {
-  return Container(
-    width: 90,
-    height: 90,
-    color: const Color(0xFF4675B8).withOpacity(0.1),
-    child: const Icon(
-      Icons.travel_explore,
-      size: 40,
-      color: Color(0xFF4675B8),
-    ),
-  );
-}
+    return Container(
+      width: 90,
+      height: 90,
+      color: const Color(0xFF4675B8).withOpacity(0.1),
+      child: const Icon(
+        Icons.travel_explore,
+        size: 40,
+        color: Color(0xFF4675B8),
+      ),
+    );
+  }
 
-String _getMonthName(int month) {
-  const months = [
-    '',
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-  ];
-  return months[month];
-}
+  String _getMonthName(int month) {
+    const months = [
+      '',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
+    ];
+    return months[month];
+  }
 
-Widget _buildBottomNav(BuildContext context) {
+  Widget _buildBottomNav(BuildContext context) {
     return Positioned(
-      bottom: 0, left: 0, right: 0,
+      bottom: 0,
+      left: 0,
+      right: 0,
       child: Container(
         height: 70,
         decoration: const BoxDecoration(
           color: Color(0xFF4675B8),
-          borderRadius: BorderRadius.only(topLeft: Radius.circular(25), topRight: Radius.circular(25)),
+          borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(25), topRight: Radius.circular(25)),
         ),
         padding: const EdgeInsets.symmetric(horizontal: 32),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            _navIcon(Icons.search, onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const DestinationLandingPage()))),
-            _navIcon(Icons.location_on_outlined, onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const CloseSpots()))),
-            _navIcon(Icons.airplanemode_active, onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const AI_Plan()))),
-            _navIcon(Icons.group_outlined, onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const Bonders()))),
-            _navIcon(Icons.person_outline, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const Profile()))),
+            _navIcon(Icons.search,
+                onTap: () => Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const DestinationLandingPage()))),
+            _navIcon(Icons.location_on_outlined,
+                onTap: () => Navigator.pushReplacement(context,
+                    MaterialPageRoute(builder: (_) => const CloseSpots()))),
+            _navIcon(Icons.airplanemode_active,
+                onTap: () => Navigator.pushReplacement(context,
+                    MaterialPageRoute(builder: (_) => const AI_Plan()))),
+            _navIcon(Icons.group_outlined,
+                onTap: () => Navigator.pushReplacement(context,
+                    MaterialPageRoute(builder: (_) => const Bonders()))),
+            _navIcon(Icons.person_outline,
+                onTap: () => Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const Profile()))),
           ],
         ),
       ),
@@ -412,7 +451,12 @@ Widget _buildBottomNav(BuildContext context) {
           Icon(icon, size: 24, color: Colors.white),
           if (active) ...[
             const SizedBox(height: 4),
-            Container(width: 20, height: 2, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(1))),
+            Container(
+                width: 20,
+                height: 2,
+                decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(1))),
           ],
         ],
       ),

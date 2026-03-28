@@ -4,6 +4,7 @@ import 'profile.dart';
 import 'close_spots.dart';
 import 'group_suggested_itinerary.dart';
 import 'plans_list.dart';
+import '../services/trip_service.dart';
 
 class Place {
   final String name;
@@ -19,42 +20,93 @@ class Place {
   });
 }
 
-final List<Map<String, dynamic>> itinerary = [
+final List<Map<String, dynamic>> _fallbackItinerary = [
   {
     'day': 1,
     'places': [
-      const Place(name: 'Ithra', image: 'assets/images/places/Ithra.png', rating: 4.8, location: 'Dhahran'),
-      const Place(name: 'City Walk', image: 'assets/images/places/CityWalk.png', rating: 4.8, location: 'Olaya'),
-      const Place(name: 'Salt', image: 'assets/images/places/salt.jpg', rating: 4.6, location: 'Olaya'),
+      const Place(
+          name: 'Ithra',
+          image: 'assets/images/places/Ithra.png',
+          rating: 4.8,
+          location: 'Dhahran'),
+      const Place(
+          name: 'City Walk',
+          image: 'assets/images/places/CityWalk.png',
+          rating: 4.8,
+          location: 'Olaya'),
+      const Place(
+          name: 'Salt',
+          image: 'assets/images/places/salt.jpg',
+          rating: 4.6,
+          location: 'Olaya'),
     ],
   },
   {
     'day': 2,
     'places': [
-      const Place(name: 'Ajdan Walk', image: 'assets/images/cities/Khobar2.png', rating: 4.3, location: 'Alkurnaish'),
-      const Place(name: 'AMC Cinema', image: 'assets/images/places/Cinema.png', rating: 4.3, location: 'Alkurnaish'),
-      const Place(name: 'The Shed', image: 'assets/images/places/TheShed.png', rating: 4.5, location: 'Alkurnaish'),
+      const Place(
+          name: 'Ajdan Walk',
+          image: 'assets/images/cities/Khobar2.png',
+          rating: 4.3,
+          location: 'Alkurnaish'),
+      const Place(
+          name: 'AMC Cinema',
+          image: 'assets/images/places/Cinema.png',
+          rating: 4.3,
+          location: 'Alkurnaish'),
+      const Place(
+          name: 'The Shed',
+          image: 'assets/images/places/TheShed.png',
+          rating: 4.5,
+          location: 'Alkurnaish'),
     ],
   },
   {
     'day': 3,
     'places': [
-      const Place(name: 'Parkers', image: 'assets/images/places/Parkers.png', rating: 4.4, location: 'Dhahran'),
-      const Place(name: 'Escap The Room', image: 'assets/images/places/escapTheRoom.png', rating: 4.2, location: 'Khobar'),
-      const Place(name: 'AlKhobar Beach', image: 'assets/images/places/Beach.png', rating: 4.2, location: 'Khobar'),
+      const Place(
+          name: 'Parkers',
+          image: 'assets/images/places/Parkers.png',
+          rating: 4.4,
+          location: 'Dhahran'),
+      const Place(
+          name: 'Escape The Room',
+          image: 'assets/images/places/escapeTheRoom.png',
+          rating: 4.2,
+          location: 'Khobar'),
+      const Place(
+          name: 'AlKhobar Beach',
+          image: 'assets/images/places/Beach.png',
+          rating: 4.2,
+          location: 'Khobar'),
     ],
   },
 ];
 
 class AI_Plan extends StatefulWidget {
-  const AI_Plan({super.key});
+  final String? tripId;
+  final String? tripTitle;
+  final String? destination;
+
+  const AI_Plan({
+    super.key,
+    this.tripId,
+    this.tripTitle,
+    this.destination,
+  });
   @override
   State<AI_Plan> createState() => _AI_PlanState();
 }
 
 class _AI_PlanState extends State<AI_Plan> {
+  final _tripService = TripService();
   bool isEditMode = false;
   bool hasNotification = false;
+  bool _isLoadingData = false;
+
+  late List<Map<String, dynamic>> _itinerary;
+  late String _activeDestination;
+  late String _activeTitle;
 
   // Tracking the "deleted" places (shaded)
   Set<String> deletedPlaceNames = {};
@@ -82,6 +134,104 @@ class _AI_PlanState extends State<AI_Plan> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _itinerary = List<Map<String, dynamic>>.from(_fallbackItinerary);
+    _activeDestination = widget.destination ?? 'Khobar';
+    _activeTitle = widget.tripTitle ??
+        'Wonderful ${_activeDestination.isEmpty ? 'Trip' : _activeDestination}';
+    _loadTripData();
+  }
+
+  Future<void> _loadTripData() async {
+    if (widget.tripId == null || widget.tripId!.isEmpty) return;
+
+    setState(() => _isLoadingData = true);
+    try {
+      final itineraryData =
+          await _tripService.getLatestItinerary(widget.tripId!);
+      final mapped = _mapItineraryFromApi(itineraryData);
+
+      final recommendations =
+          await _tripService.getRecommendations(widget.tripId!);
+      final mappedSuggestions =
+          _mapSuggestionsFromRecommendations(recommendations);
+
+      if (!mounted) return;
+      setState(() {
+        if (mapped.isNotEmpty) {
+          _itinerary = mapped;
+        }
+        if (mappedSuggestions.isNotEmpty) {
+          suggestions = mappedSuggestions;
+          hasNotification = true;
+        }
+      });
+    } catch (_) {
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingData = false);
+      }
+    }
+  }
+
+  List<Map<String, dynamic>> _mapItineraryFromApi(
+      Map<String, dynamic> itineraryData) {
+    final days = itineraryData['days'];
+    if (days is! List) return [];
+
+    final mapped = <Map<String, dynamic>>[];
+    for (final dayData in days) {
+      if (dayData is! Map<String, dynamic>) continue;
+      final dayNumber = dayData['day'] is int
+          ? dayData['day'] as int
+          : int.tryParse(dayData['day']?.toString() ?? '') ?? 1;
+      final activities = dayData['activities'];
+      final places = <Place>[];
+      if (activities is List) {
+        for (final item in activities) {
+          if (item is! Map<String, dynamic>) continue;
+          places.add(
+            Place(
+              name: (item['name'] ?? 'Activity').toString(),
+              image: 'assets/images/places/Ithra.png',
+              rating: (item['score'] is num)
+                  ? (item['score'] as num).toDouble()
+                  : 4.0,
+              location:
+                  (item['location'] ?? item['notes'] ?? _activeDestination)
+                      .toString(),
+            ),
+          );
+        }
+      }
+
+      mapped.add({'day': dayNumber, 'places': places});
+    }
+
+    return mapped;
+  }
+
+  List<Map<String, dynamic>> _mapSuggestionsFromRecommendations(
+      List<Map<String, dynamic>> recommendations) {
+    return recommendations.take(8).map((entry) {
+      final poi = (entry['poi'] is Map<String, dynamic>)
+          ? entry['poi'] as Map<String, dynamic>
+          : <String, dynamic>{};
+
+      return {
+        'name': (poi['name'] ?? 'Suggested Place').toString(),
+        'type': (poi['type'] ?? 'Recommendation').toString(),
+        'location': (poi['location'] ?? _activeDestination).toString(),
+        'person': 'TripBond AI',
+        'personColor': const Color(0xFF4675B8),
+        'highlight': false,
+        'action': 'add',
+      };
+    }).toList();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
@@ -100,7 +250,13 @@ class _AI_PlanState extends State<AI_Plan> {
                     children: [
                       _buildHeader(),
                       const SizedBox(height: 16),
-                      ...itinerary.map((day) => _buildDaySection(day)),
+                      if (_isLoadingData)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 24),
+                          child: Center(child: CircularProgressIndicator()),
+                        )
+                      else
+                        ..._itinerary.map((day) => _buildDaySection(day)),
                     ],
                   ),
                 ),
@@ -168,7 +324,8 @@ class _AI_PlanState extends State<AI_Plan> {
               IconButton(
                 visualDensity: VisualDensity.compact,
                 padding: EdgeInsets.zero,
-                icon: Icon(isEditMode ? Icons.check : Icons.edit_outlined, size: 22),
+                icon: Icon(isEditMode ? Icons.check : Icons.edit_outlined,
+                    size: 22),
                 onPressed: () => setState(() => isEditMode = !isEditMode),
               ),
             ],
@@ -197,19 +354,34 @@ class _AI_PlanState extends State<AI_Plan> {
               child: const Text(
                 'Your Plan',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
+                style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600),
               ),
             ),
           ),
           Expanded(
             child: GestureDetector(
-              onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const GroupSuggestedItinerary())),
+              onTap: () => Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => GroupSuggestedItinerary(
+                    tripId: widget.tripId,
+                    tripTitle: widget.tripTitle,
+                    destination: widget.destination,
+                  ),
+                ),
+              ),
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 10),
                 child: const Text(
                   'Calendar View',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Color(0xFF757575), fontSize: 14, fontWeight: FontWeight.w500),
+                  style: TextStyle(
+                      color: Color(0xFF757575),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500),
                 ),
               ),
             ),
@@ -226,10 +398,12 @@ class _AI_PlanState extends State<AI_Plan> {
       backgroundColor: Colors.transparent,
       builder: (context) {
         return Container(
-          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.75),
+          constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.75),
           decoration: const BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.only(topLeft: Radius.circular(28), topRight: Radius.circular(28)),
+            borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(28), topRight: Radius.circular(28)),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -237,11 +411,14 @@ class _AI_PlanState extends State<AI_Plan> {
               Center(
                 child: Container(
                   margin: const EdgeInsets.only(top: 12, bottom: 4),
-                  width: 40, height: 4,
-                  decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2)),
                 ),
               ),
-                const Padding(
+              const Padding(
                 padding: EdgeInsets.fromLTRB(24, 8, 24, 12),
                 child: Align(
                   alignment: Alignment.center,
@@ -256,12 +433,17 @@ class _AI_PlanState extends State<AI_Plan> {
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
                 child: Row(
                   children: const [
-                    Text('Action', style: TextStyle(color: Color(0xFF9E9E9E), fontSize: 14)),
+                    Text('Action',
+                        style:
+                            TextStyle(color: Color(0xFF9E9E9E), fontSize: 14)),
                     SizedBox(width: 40),
-                    Text('Course', style: TextStyle(color: Color(0xFF9E9E9E), fontSize: 14)),
+                    Text('Course',
+                        style:
+                            TextStyle(color: Color(0xFF9E9E9E), fontSize: 14)),
                     Spacer(),
                     Icon(Icons.filter_list, color: Color(0xFF9E9E9E), size: 20),
                   ],
@@ -286,8 +468,17 @@ class _AI_PlanState extends State<AI_Plan> {
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Text(isAdd ? 'Add' : 'Delete', style: TextStyle(fontFamily: 'Poppins', fontSize: 12, color: Colors.grey.shade500)),
-                                Icon(isAdd ? Icons.add_circle_outline : Icons.delete_outline, size: 24, color: Colors.grey.shade600),
+                                Text(isAdd ? 'Add' : 'Delete',
+                                    style: TextStyle(
+                                        fontFamily: 'Poppins',
+                                        fontSize: 12,
+                                        color: Colors.grey.shade500)),
+                                Icon(
+                                    isAdd
+                                        ? Icons.add_circle_outline
+                                        : Icons.delete_outline,
+                                    size: 24,
+                                    color: Colors.grey.shade600),
                               ],
                             ),
                           ),
@@ -295,42 +486,93 @@ class _AI_PlanState extends State<AI_Plan> {
                             child: Container(
                               padding: const EdgeInsets.all(16),
                               decoration: BoxDecoration(
-                                color: isHighlight ? const Color(0xFFE8D5A0) : Colors.white,
-                                border: Border.all(color: isHighlight ? const Color(0xFFD4BC7A) : Colors.grey.shade200),
+                                color: isHighlight
+                                    ? const Color(0xFFE8D5A0)
+                                    : Colors.white,
+                                border: Border.all(
+                                    color: isHighlight
+                                        ? const Color(0xFFD4BC7A)
+                                        : Colors.grey.shade200),
                                 borderRadius: BorderRadius.circular(16),
                               ),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
                                     children: [
-                                      Text(s['name'] as String, style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 16, color: isHighlight ? Colors.white : Colors.black)),
+                                      Text(s['name'] as String,
+                                          style: TextStyle(
+                                              fontFamily: 'Poppins',
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: 16,
+                                              color: isHighlight
+                                                  ? Colors.white
+                                                  : Colors.black)),
                                       Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          Icon(Icons.favorite_border, size: 18, color: isHighlight ? Colors.white : const Color(0xFFC4A44A)),
+                                          Icon(Icons.favorite_border,
+                                              size: 18,
+                                              color: isHighlight
+                                                  ? Colors.white
+                                                  : const Color(0xFFC4A44A)),
                                           const SizedBox(width: 12),
-                                          Icon(Icons.close, size: 18, color: isHighlight ? Colors.white : const Color(0xFF1E1E1E)),
+                                          Icon(Icons.close,
+                                              size: 18,
+                                              color: isHighlight
+                                                  ? Colors.white
+                                                  : const Color(0xFF1E1E1E)),
                                         ],
                                       ),
                                     ],
                                   ),
-                                  Text(s['type'] as String, style: TextStyle(fontFamily: 'Poppins', fontSize: 13, color: isHighlight ? Colors.white70 : Colors.grey.shade500)),
+                                  Text(s['type'] as String,
+                                      style: TextStyle(
+                                          fontFamily: 'Poppins',
+                                          fontSize: 13,
+                                          color: isHighlight
+                                              ? Colors.white70
+                                              : Colors.grey.shade500)),
                                   const SizedBox(height: 8),
                                   Row(
                                     children: [
-                                      Icon(Icons.location_on, size: 12, color: isHighlight ? Colors.white : const Color(0xFF4675B8)),
+                                      Icon(Icons.location_on,
+                                          size: 12,
+                                          color: isHighlight
+                                              ? Colors.white
+                                              : const Color(0xFF4675B8)),
                                       const SizedBox(width: 4),
-                                      Text(s['location'] as String, style: TextStyle(fontFamily: 'Poppins', fontSize: 12, color: isHighlight ? Colors.white70 : Colors.grey.shade500)),
+                                      Text(s['location'] as String,
+                                          style: TextStyle(
+                                              fontFamily: 'Poppins',
+                                              fontSize: 12,
+                                              color: isHighlight
+                                                  ? Colors.white70
+                                                  : Colors.grey.shade500)),
                                     ],
                                   ),
                                   const SizedBox(height: 4),
                                   Row(
                                     children: [
-                                      CircleAvatar(radius: 8, backgroundColor: s['personColor'] as Color, child: Text((s['person'] as String)[0], style: const TextStyle(fontSize: 8, color: Colors.white))),
+                                      CircleAvatar(
+                                          radius: 8,
+                                          backgroundColor:
+                                              s['personColor'] as Color,
+                                          child: Text(
+                                              (s['person'] as String)[0],
+                                              style: const TextStyle(
+                                                  fontSize: 8,
+                                                  color: Colors.white))),
                                       const SizedBox(width: 4),
-                                      Text(s['person'] as String, style: TextStyle(fontFamily: 'Poppins', fontSize: 12, color: isHighlight ? Colors.white70 : Colors.grey.shade500)),
+                                      Text(s['person'] as String,
+                                          style: TextStyle(
+                                              fontFamily: 'Poppins',
+                                              fontSize: 12,
+                                              color: isHighlight
+                                                  ? Colors.white70
+                                                  : Colors.grey.shade500)),
                                     ],
                                   ),
                                 ],
@@ -355,10 +597,28 @@ class _AI_PlanState extends State<AI_Plan> {
       padding: const EdgeInsets.symmetric(horizontal: 27),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: const [
-          SizedBox(height: 8),
-          Text('Wonderful Khobar,', style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 22)),
-          Text("Let's Bond Together", style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w500, fontSize: 16, fontStyle: FontStyle.italic, color: Color(0xFF4675B8))),
+        children: [
+          const SizedBox(height: 8),
+          Text(
+            _activeTitle.isNotEmpty
+                ? _activeTitle
+                : 'Wonderful $_activeDestination,',
+            style: const TextStyle(
+              fontFamily: 'Poppins',
+              fontWeight: FontWeight.w700,
+              fontSize: 22,
+            ),
+          ),
+          Text(
+            "Let's Bond Together",
+            style: const TextStyle(
+              fontFamily: 'Poppins',
+              fontWeight: FontWeight.w500,
+              fontSize: 16,
+              fontStyle: FontStyle.italic,
+              color: Color(0xFF4675B8),
+            ),
+          ),
         ],
       ),
     );
@@ -378,8 +638,13 @@ class _AI_PlanState extends State<AI_Plan> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Day $dayNum:', style: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 18)),
-                const Icon(Icons.arrow_forward, size: 20, color: Color(0xFF1E1E1E)),
+                Text('Day $dayNum:',
+                    style: const TextStyle(
+                        fontFamily: 'Poppins',
+                        fontWeight: FontWeight.w700,
+                        fontSize: 18)),
+                const Icon(Icons.arrow_forward,
+                    size: 20, color: Color(0xFF1E1E1E)),
               ],
             ),
           ),
@@ -429,22 +694,53 @@ class _AI_PlanState extends State<AI_Plan> {
 
   Widget _buildBottomNav(BuildContext context) {
     return Positioned(
-      bottom: 0, left: 0, right: 0,
+      bottom: 0,
+      left: 0,
+      right: 0,
       child: Container(
         height: 70,
         decoration: const BoxDecoration(
           color: Color(0xFF4675B8),
-          borderRadius: BorderRadius.only(topLeft: Radius.circular(25), topRight: Radius.circular(25)),
+          borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(25), topRight: Radius.circular(25)),
         ),
         padding: const EdgeInsets.symmetric(horizontal: 32),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            _navIcon(Icons.search, onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const DestinationLandingPage()))),
-            _navIcon(Icons.location_on_outlined, onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const CloseSpots()))),
-            _navIcon(Icons.airplanemode_active, onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const AI_Plan()))),
+            _navIcon(Icons.search,
+                onTap: () => Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const DestinationLandingPage()))),
+            _navIcon(
+              Icons.location_on_outlined,
+              onTap: () => Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => CloseSpots(
+                    tripId: widget.tripId,
+                  ),
+                ),
+              ),
+            ),
+            _navIcon(
+              Icons.airplanemode_active,
+              onTap: () => Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => AI_Plan(
+                    tripId: widget.tripId,
+                    tripTitle: widget.tripTitle,
+                    destination: widget.destination,
+                  ),
+                ),
+              ),
+            ),
             _navIcon(Icons.group_outlined, active: true),
-            _navIcon(Icons.person_outline, onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const Profile()))),
+            _navIcon(Icons.person_outline,
+                onTap: () => Navigator.pushReplacement(context,
+                    MaterialPageRoute(builder: (_) => const Profile()))),
           ],
         ),
       ),
@@ -470,14 +766,11 @@ class _AI_PlanState extends State<AI_Plan> {
 
 class _PlaceCard extends StatelessWidget {
   final Place place;
-  final bool showDelete; 
-  final VoidCallback onDelete; 
+  final bool showDelete;
+  final VoidCallback onDelete;
 
-  const _PlaceCard({
-    required this.place, 
-    required this.showDelete, 
-    required this.onDelete
-  });
+  const _PlaceCard(
+      {required this.place, required this.showDelete, required this.onDelete});
   @override
   Widget build(BuildContext context) {
     return Stack(
@@ -514,7 +807,8 @@ class _PlaceCard extends StatelessWidget {
                       width: 155,
                       height: 110,
                       color: const Color(0xFF4675B8),
-                      child: const Icon(Icons.place, size: 50, color: Colors.white),
+                      child: const Icon(Icons.place,
+                          size: 50, color: Colors.white),
                     );
                   },
                 ),
@@ -539,7 +833,8 @@ class _PlaceCard extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 4),
-                        const Icon(Icons.star, size: 12, color: Color(0xFFFACC15)),
+                        const Icon(Icons.star,
+                            size: 12, color: Color(0xFFFACC15)),
                         const SizedBox(width: 2),
                         Text(
                           '${place.rating}',
@@ -575,11 +870,11 @@ class _PlaceCard extends StatelessWidget {
         ),
         if (showDelete)
           Positioned(
-            top: 4, 
+            top: 4,
             right: 4,
             child: GestureDetector(
               onTap: onDelete,
-                child: const Icon(
+              child: const Icon(
                 Icons.close,
                 color: Color.fromARGB(255, 0, 0, 0),
                 size: 20,

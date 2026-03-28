@@ -6,7 +6,7 @@ Handles authorization and access verification for trip operations.
 from fastapi import HTTPException, status
 from fastapi.concurrency import run_in_threadpool
 from typing import Optional
-from ..database import SupabaseDB, get_supabase_client_for_user
+from ..database import SupabaseDB
 import logging
 
 logger = logging.getLogger(__name__)
@@ -61,12 +61,9 @@ async def check_trip_access(
             detail="Authentication token required for this operation"
         )
     
-    # Use user client if token provided for RLS-based queries
-    client = get_supabase_client_for_user(token) if token else db.client
-    
     # Check if user is an accepted member
     participant_response = await run_in_threadpool(
-        lambda: client.table("trip_participants")
+        lambda: db.client.table("trip_participants")
         .select("user_id, status")
         .eq("trip_id", trip_id)
         .eq("user_id", user_id)

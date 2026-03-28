@@ -49,7 +49,7 @@ class PlacesService {
   Future<Map<String, dynamic>> getPlaceDetails(String placeId) async {
     try {
       final response = await _apiService.get(
-        '${ApiConfig.placesPath}/$placeId',
+        '${ApiConfig.placesPath}/details/$placeId',
       );
 
       return response;
@@ -113,8 +113,8 @@ class PlacesService {
   }) async {
     try {
       final queryParams = {
-        'latitude': latitude.toString(),
-        'longitude': longitude.toString(),
+        'lat': latitude.toString(),
+        'lng': longitude.toString(),
         'radius': radius.toString(),
       };
 
