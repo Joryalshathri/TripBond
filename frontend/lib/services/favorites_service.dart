@@ -13,13 +13,18 @@ class FavoritesService {
   // Get user's favorites
   Future<List<Map<String, dynamic>>> getMyFavorites() async {
     try {
+      final token = await _authService.getAuthToken();
       final userId = await _authService.getUserId();
+      if (token == null || token.isEmpty) {
+        throw Exception('Not authenticated');
+      }
       if (userId == null || userId.isEmpty) {
         throw Exception('User ID not found');
       }
 
       final response = await _apiService.get(
         '${ApiConfig.favoritesPath}/$userId',
+        token: token,
       );
 
       if (response is List) {
@@ -39,21 +44,38 @@ class FavoritesService {
 
   // Add to favorites
   Future<Map<String, dynamic>> addFavorite({
-    required String entityType,
-    required String entityId,
+    String? tripId,
+    String? destinationName,
+    String? destinationType,
+    String? poiId,
   }) async {
     try {
+      final token = await _authService.getAuthToken();
       final userId = await _authService.getUserId();
+      if (token == null || token.isEmpty) {
+        throw Exception('Not authenticated');
+      }
       if (userId == null || userId.isEmpty) {
         throw Exception('User ID not found');
+      }
+
+      if ((tripId == null || tripId.isEmpty) &&
+          (destinationName == null || destinationName.isEmpty) &&
+          (poiId == null || poiId.isEmpty)) {
+        throw Exception('Provide a trip ID, destination name, or POI ID');
       }
 
       final response = await _apiService.post(
         '${ApiConfig.favoritesPath}/$userId',
         {
-          'entity_type': entityType,
-          'entity_id': entityId,
+          if (tripId != null && tripId.isNotEmpty) 'trip_id': tripId,
+          if (destinationName != null && destinationName.isNotEmpty)
+            'destination_name': destinationName,
+          if (destinationType != null && destinationType.isNotEmpty)
+            'destination_type': destinationType,
+          if (poiId != null && poiId.isNotEmpty) 'poi_id': poiId,
         },
+        token: token,
       );
 
       return response;
@@ -65,13 +87,18 @@ class FavoritesService {
   // Remove from favorites
   Future<void> removeFavorite(String favoriteId) async {
     try {
+      final token = await _authService.getAuthToken();
       final userId = await _authService.getUserId();
+      if (token == null || token.isEmpty) {
+        throw Exception('Not authenticated');
+      }
       if (userId == null || userId.isEmpty) {
         throw Exception('User ID not found');
       }
 
       await _apiService.delete(
         '${ApiConfig.favoritesPath}/$userId/$favoriteId',
+        token: token,
       );
     } catch (e) {
       throw Exception('Failed to remove favorite: ${e.toString()}');
@@ -80,16 +107,24 @@ class FavoritesService {
 
   // Check if entity is favorited
   Future<bool> isFavorited({
-    required String entityType,
-    required String entityId,
+    String? tripId,
+    String? destinationName,
+    String? poiId,
   }) async {
     try {
       final favorites = await getMyFavorites();
-      return favorites.any(
-        (favorite) =>
-            favorite['entity_type'] == entityType &&
-            favorite['entity_id'] == entityId,
-      );
+      return favorites.any((favorite) {
+        if (tripId != null && tripId.isNotEmpty) {
+          return favorite['trip_id']?.toString() == tripId;
+        }
+        if (poiId != null && poiId.isNotEmpty) {
+          return favorite['poi_id']?.toString() == poiId;
+        }
+        if (destinationName != null && destinationName.isNotEmpty) {
+          return favorite['destination_name']?.toString() == destinationName;
+        }
+        return false;
+      });
     } catch (e) {
       return false;
     }

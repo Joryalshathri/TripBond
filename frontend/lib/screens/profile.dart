@@ -9,6 +9,7 @@ import 'AI_Plan.dart';
 import 'package:top_snackbar_flutter/top_snack_bar.dart';
 import 'package:top_snackbar_flutter/custom_snack_bar.dart';
 import '../services/profileService.dart';
+import '../services/favorites_service.dart';
 import '../models/profile_model.dart';
 import '../models.dart';
 
@@ -28,11 +29,16 @@ class _ProfileState extends State<Profile> {
   UserProfile? _userProfile;
   bool _isLoading = true;
   String? _error;
+  final FavoritesService _favoritesService = FavoritesService();
+  List<Map<String, dynamic>> _likedTrips = [];
+  bool _isLoadingLikedTrips = true;
+  String? _likedTripsError;
 
   @override
   void initState() {
     super.initState();
     _loadProfile();
+    _loadLikedTrips();
   }
 
   Future<void> _loadProfile() async {
@@ -46,6 +52,24 @@ class _ProfileState extends State<Profile> {
       setState(() {
         _error = e.toString();
         _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _loadLikedTrips() async {
+    try {
+      final favorites = await _favoritesService.getMyFavorites();
+      if (!mounted) return;
+      setState(() {
+        _likedTrips = favorites;
+        _isLoadingLikedTrips = false;
+        _likedTripsError = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _likedTripsError = e.toString().replaceFirst('Exception: ', '');
+        _isLoadingLikedTrips = false;
       });
     }
   }
@@ -436,13 +460,40 @@ class _ProfileState extends State<Profile> {
   }
 
   Widget _buildLikedGrid() {
+    if (_isLoadingLikedTrips) {
+      return const Padding(
+        padding: EdgeInsets.all(24),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_likedTripsError != null) {
+      return Padding(
+        padding: const EdgeInsets.all(24),
+        child: Center(child: Text('Error: $_likedTripsError')),
+      );
+    }
+
+    if (_likedTrips.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(24),
+        child: Center(
+          child: Text(
+            'No liked trips yet',
+            style: TextStyle(color: Colors.grey.shade600),
+          ),
+        ),
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Wrap(
         spacing: 12,
         runSpacing: 12,
-        children: likedPosts.asMap().entries.map((entry) {
-          var trip = entry.value;
+        children: _likedTrips.asMap().entries.map((entry) {
+          final trip = entry.value;
+          final favoriteId = (trip['id'] ?? '').toString();
           return SizedBox(
             width: (MediaQuery.of(context).size.width - 44) / 2,
             child: Container(
@@ -455,23 +506,55 @@ class _ProfileState extends State<Profile> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Stack(children: [
-                    Image.asset(trip['image'] ?? '',
-                        height: 100, width: double.infinity, fit: BoxFit.cover),
+                    Container(
+                      height: 100,
+                      width: double.infinity,
+                      color: const Color(0xFFE9EEF7),
+                      child: Center(
+                        child: Icon(
+                          Icons.favorite,
+                          color: const Color(0xFF4675B8).withOpacity(0.7),
+                          size: 28,
+                        ),
+                      ),
+                    ),
                     Positioned(
                         top: 8,
                         right: 8,
                         child: GestureDetector(
-                            onTap: () =>
-                                setState(() => likedPosts.removeAt(entry.key)),
+                            onTap: favoriteId.isEmpty
+                                ? null
+                                : () async {
+                                    try {
+                                      await _favoritesService
+                                          .removeFavorite(favoriteId);
+                                      if (!mounted) return;
+                                      setState(() {
+                                        _likedTrips.removeAt(entry.key);
+                                      });
+                                    } catch (e) {
+                                      if (!mounted) return;
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        SnackBar(
+                                          content: Text(e
+                                              .toString()
+                                              .replaceFirst('Exception: ', '')),
+                                        ),
+                                      );
+                                    }
+                                  },
                             child: const Icon(Icons.favorite,
-                                size: 18, color: Color(0xFFEF4444)))),
+                                size: 18, color: Color(0xFFEF4444))))
                   ]),
                   Padding(
                     padding: const EdgeInsets.all(12),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(trip['name'] ?? '',
+                        Text(
+                            (trip['destination_name'] ?? 'Liked trip')
+                                .toString(),
                             style: const TextStyle(
                                 fontFamily: 'Poppins',
                                 fontWeight: FontWeight.w700,
@@ -481,13 +564,15 @@ class _ProfileState extends State<Profile> {
                               size: 10, color: Color(0xFF4675B8)),
                           const SizedBox(width: 4),
                           Expanded(
-                              child: Text(trip['location'] ?? 'Location',
+                              child: Text(
+                                  (trip['destination_type'] ?? 'Trip')
+                                      .toString(),
                                   style: const TextStyle(
                                       fontSize: 10, color: Color(0xFF9E9E9E)),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis))
                         ]),
-                        Text(trip['time'] ?? 'Recently',
+                        Text((trip['created_at'] ?? 'Recently').toString(),
                             style: TextStyle(
                                 fontSize: 8, color: Colors.grey.shade400)),
                       ],
