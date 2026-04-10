@@ -11,7 +11,10 @@ class Settings extends StatefulWidget {
 class _SettingsScreenState extends State<Settings> {
   final _userService = UserService();
   bool _notificationsOn = true;
+  bool _securityEnabled = true;
+  String _privacyMode = 'public';
   bool _isLoading = true;
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -24,9 +27,15 @@ class _SettingsScreenState extends State<Settings> {
       final settings = await _userService.getSettings();
       if (!mounted) return;
       setState(() {
-        _notificationsOn = settings['notifications_enabled'] == true;
+        _notificationsOn = settings['notifications_enabled'] ?? true;
+        _securityEnabled = settings['security_enabled'] ?? true;
+        _privacyMode = settings['privacy_mode'] ?? 'public';
+        _errorMessage = null;
       });
-    } catch (_) {
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Failed to load settings: ${e.toString().replaceFirst('Exception: ', '')}';
+      });
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -40,7 +49,41 @@ class _SettingsScreenState extends State<Settings> {
       await _userService.updateSettings({
         'notifications_enabled': value,
       });
-    } catch (_) {}
+      setState(() => _errorMessage = null);
+    } catch (e) {
+      setState(() {
+        _notificationsOn = !value;
+        _errorMessage = 'Failed to update notifications: ${e.toString().replaceFirst('Exception: ', '')}';
+      });
+    }
+  }
+  Future<void> _updateSecurity(bool value) async {
+    setState(() => _securityEnabled = value);
+    try {
+      await _userService.updateSettings({
+        'security_enabled': value,
+      });
+      setState(() => _errorMessage = null);
+    } catch (e) {
+      setState(() {
+        _securityEnabled = !value;
+        _errorMessage = 'Failed to update security settings: ${e.toString().replaceFirst('Exception: ', '')}';
+      });
+    }
+  }
+
+  Future<void> _updatePrivacyMode(String mode) async {
+    setState(() => _privacyMode = mode);
+    try {
+      await _userService.updateSettings({
+        'privacy_mode': mode,
+      });
+      setState(() => _errorMessage = null);
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Failed to update privacy settings: ${e.toString().replaceFirst('Exception: ', '')}';
+      });
+    }
   }
 
   @override
@@ -59,15 +102,50 @@ class _SettingsScreenState extends State<Settings> {
                     size: 24, color: Color(0xFF1E1E1E)),
               ),
               const SizedBox(height: 16),
+              if (_errorMessage != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFEBEE),
+                      border: Border.all(color: const Color(0xFFEF5350)),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.error_outline,
+                            color: Color(0xFFEF5350), size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _errorMessage!,
+                            style: const TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 13,
+                              color: Color(0xFFEF5350),
+                            ),
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: () => setState(() => _errorMessage = null),
+                          child: const Icon(Icons.close,
+                              color: Color(0xFFEF5350), size: 18),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               if (_isLoading)
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 12),
                   child: LinearProgressIndicator(minHeight: 2),
                 ),
               _buildSectionTitle('Account'),
-              _buildArrowItem(Icons.info_outline, 'security'),
+              _buildToggleItem(Icons.lock_outline, 'Security', _securityEnabled,
+                  _updateSecurity),
               _buildToggleItem(Icons.notifications_outlined, 'Notifications'),
-              _buildArrowItem(Icons.lock_outline, 'Privacy'),
+              _buildPrivacyModeItem(),
               const SizedBox(height: 24),
               _buildSectionTitle('Support & About'),
               _buildArrowItem(Icons.inventory_2_outlined, 'My Subscribtion'),
@@ -119,7 +197,11 @@ class _SettingsScreenState extends State<Settings> {
     );
   }
 
-  Widget _buildToggleItem(IconData icon, String label) {
+  Widget _buildToggleItem(IconData icon, String label,
+      [bool? value, Function(bool)? onChanged]) {
+    value ??= _notificationsOn;
+    onChanged ??= _updateNotifications;
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 14),
       child: Row(
@@ -134,9 +216,58 @@ class _SettingsScreenState extends State<Settings> {
                       fontSize: 15,
                       color: Colors.black))),
           Switch(
-            value: _notificationsOn,
-            onChanged: _updateNotifications,
-            activeColor: const Color(0xFF4675B8),
+            value: value,
+            onChanged: onChanged,
+            activeThumbColor: const Color(0xFF4675B8),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPrivacyModeItem() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      child: Row(
+        children: [
+          const Icon(Icons.privacy_tip_outlined,
+              size: 20, color: Color(0xFF1E1E1E)),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Privacy',
+                    style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontWeight: FontWeight.w500,
+                        fontSize: 15,
+                        color: Colors.black)),
+                Text(_privacyMode,
+                    style: const TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 12,
+                        color: Color(0xFF999999))),
+              ],
+            ),
+          ),
+          PopupMenuButton<String>(
+            onSelected: _updatePrivacyMode,
+            itemBuilder: (BuildContext context) => [
+              const PopupMenuItem(
+                value: 'public',
+                child: Text('Public'),
+              ),
+              const PopupMenuItem(
+                value: 'friends',
+                child: Text('Friends Only'),
+              ),
+              const PopupMenuItem(
+                value: 'private',
+                child: Text('Private'),
+              ),
+            ],
+            child: const Icon(Icons.more_vert, size: 20),
           ),
         ],
       ),

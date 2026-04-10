@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'api_config.dart';
@@ -35,6 +36,8 @@ class ApiService {
       return _handleResponse(response);
     } on SocketException {
       throw ApiException('No internet connection');
+    } on TimeoutException {
+      throw ApiException('Request timed out. Please check backend connection.');
     } on http.ClientException {
       throw ApiException('Failed to connect to server');
     } catch (e) {
@@ -68,6 +71,8 @@ class ApiService {
     } on SocketException {
       print('SocketException: No internet connection'); // Debug
       throw ApiException('No internet connection');
+    } on TimeoutException {
+      throw ApiException('Request timed out. Please check backend connection.');
     } on http.ClientException catch (e) {
       print('ClientException: $e'); // Debug
       throw ApiException('Failed to connect to server');
@@ -96,6 +101,8 @@ class ApiService {
       return _handleResponse(response);
     } on SocketException {
       throw ApiException('No internet connection');
+    } on TimeoutException {
+      throw ApiException('Request timed out. Please check backend connection.');
     } on http.ClientException {
       throw ApiException('Failed to connect to server');
     } catch (e) {
@@ -120,6 +127,8 @@ class ApiService {
       return _handleResponse(response);
     } on SocketException {
       throw ApiException('No internet connection');
+    } on TimeoutException {
+      throw ApiException('Request timed out. Please check backend connection.');
     } on http.ClientException {
       throw ApiException('Failed to connect to server');
     } catch (e) {

@@ -5,7 +5,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../core/animations/page_transitions.dart';
-import 'login_screen.dart';
 import 'mbti_screen.dart';
 import 'widgets/custom_loading_spinner.dart';
 
@@ -45,8 +44,12 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
   @override
   void dispose() {
     _countdownTimer?.cancel();
-    for (final c in _controllers) c.dispose();
-    for (final n in _focusNodes) n.dispose();
+    for (final c in _controllers) {
+      c.dispose();
+    }
+    for (final n in _focusNodes) {
+      n.dispose();
+    }
     super.dispose();
   }
 
@@ -115,7 +118,9 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
           isError: true,
         );
         // Clear the fields so user can re-enter
-        for (final c in _controllers) c.clear();
+        for (final c in _controllers) {
+          c.clear();
+        }
         _focusNodes[0].requestFocus();
         authProvider.clearError();
       }
