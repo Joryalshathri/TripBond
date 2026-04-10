@@ -50,6 +50,30 @@ class PersonalityService {
     }
   }
 
+  // Submit quiz answers in the backend schema format.
+  Future<Map<String, dynamic>> submitQuizSubmission({
+    required String userId,
+    required List<Map<String, dynamic>> answers,
+  }) async {
+    try {
+      final response = await _apiService.post(
+        '${ApiConfig.personalityPath}/submit',
+        {
+          'user_id': userId,
+          'answers': answers,
+        },
+      );
+
+      if (response is Map<String, dynamic>) {
+        return response;
+      }
+
+      return Map<String, dynamic>.from(response as Map);
+    } catch (e) {
+      throw Exception('Failed to submit quiz: ${e.toString()}');
+    }
+  }
+
   // Get personality scores
   Future<Map<String, dynamic>> getPersonalityScores(String userId) async {
     try {
