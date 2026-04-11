@@ -704,8 +704,8 @@ class _ProfileState extends State<Profile> {
                             context,
                             MaterialPageRoute(
                                 builder: (_) => ChatPage(
-                                    name: user['name']!,
-                                    imagePath: user['image'] ?? '')));
+                              bonderId: user['name']!,
+                              name: user['name']!)));
                       } else if (value == 'remove') {
                         setState(() {
                           users.removeAt(index);

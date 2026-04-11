@@ -5,9 +5,47 @@ from ..auth import get_current_user_context
 from ..schemas.profile import ProfileResponse, UpdateProfileRequest
 from ..schemas.settings import UserSettingsResponse, UpdateSettingsRequest
 import logging
+from typing import List
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+@router.get("/bonders", response_model=List[dict])
+async def list_bonders(
+    limit: int = 50,
+    user_context: tuple[str, str] = Depends(get_current_user_context),
+):
+    """List discoverable users for the Bonders screen (excluding current user)."""
+    user_id, _token = user_context
+    safe_limit = max(1, min(limit, 200))
+
+    try:
+        db = SupabaseDB(admin=True)
+        response = await run_in_threadpool(
+            lambda: db.client.table("profiles")
+            .select("id,full_name,username,avatar_url,is_public")
+            .neq("id", user_id)
+            .eq("is_public", True)
+            .limit(safe_limit)
+            .execute()
+        )
+
+        items = response.data or []
+        return [
+            {
+                "id": p["id"],
+                "name": p.get("full_name") or p.get("username") or "TripBond User",
+                "avatar_url": p.get("avatar_url"),
+            }
+            for p in items
+        ]
+    except Exception:
+        logger.exception("Failed to list bonders")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve bonders",
+        )
 
 
 # ==================== Profile ====================
