@@ -42,6 +42,8 @@ build/
 **/android/gradlew.bat
 **/android/local.properties
 **/android/**/GeneratedPluginRegistrant.java
+android/app/build/
+local.properties
 
 # iOS/Xcode
 **/ios/**/*.mode1v3
@@ -71,6 +73,9 @@ build/
 **/ios/Flutter/flutter_export_environment.sh
 **/ios/ServiceDefinitions.json
 **/ios/Runner/GeneratedPluginRegistrant.*
+ios/Flutter/flutter_export_environment.sh
+ios/Pods/
+ios/.symlinks/
 
 # Generated platform registrants
 **/windows/flutter/generated_plugin_registrant.cc
@@ -104,3 +109,12 @@ app.*.map.json
 
 # Duplicate/backup folders
 TripBond-Frontend/
+
+# Python AI Backend
+tripbond_ai_backend/__pycache__/
+tripbond_ai_backend/**/__pycache__/
+tripbond_ai_backend/cache/
+tripbond_ai_backend/.env
+
+# Machine Learning Models (optional - uncomment if models are large)
+# tripbond_ai_backend/models/*.pkl
