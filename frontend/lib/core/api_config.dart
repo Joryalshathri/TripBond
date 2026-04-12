@@ -1,4 +1,5 @@
-import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
+import 'package:flutter/foundation.dart'
+    show kIsWeb, defaultTargetPlatform, TargetPlatform;
 
 class ApiConfig {
   // Backend API base URL
@@ -38,6 +39,7 @@ class ApiConfig {
   static const String poisPath = '/api/pois';
   static const String placesPath = '/api/places';
   static const String chatPath = '/api/chat';
+  static const String aiPath = '/api/ai';
 
   // Request timeout
   static const Duration requestTimeout = Duration(seconds: 30);

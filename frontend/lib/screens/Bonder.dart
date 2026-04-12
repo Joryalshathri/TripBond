@@ -61,20 +61,18 @@ class _BondersState extends State<Bonders> {
           p.partnerId: _BonderMeta(unreadCount: p.unreadCount),
       };
 
-      final merged = bonders
-          .map((b) {
-            final p = previewByPartnerId[b.id];
-            if (p == null) {
-              return b;
-            }
-            return b.copyWith(
-              avatarUrl: p.partnerAvatarUrl,
-              lastMsg: (p.lastMessage != null && p.lastMessage!.isNotEmpty)
-                  ? p.lastMessage
-                  : b.lastMsg,
-            );
-          })
-          .toList()
+      final merged = bonders.map((b) {
+        final p = previewByPartnerId[b.id];
+        if (p == null) {
+          return b;
+        }
+        return b.copyWith(
+          avatarUrl: p.partnerAvatarUrl,
+          lastMsg: (p.lastMessage != null && p.lastMessage!.isNotEmpty)
+              ? p.lastMessage
+              : b.lastMsg,
+        );
+      }).toList()
         ..sort((a, b) {
           final aHasPreview = previewByPartnerId.containsKey(a.id);
           final bHasPreview = previewByPartnerId.containsKey(b.id);
@@ -105,7 +103,8 @@ class _BondersState extends State<Bonders> {
   void _filterList(String query) {
     setState(() {
       _filteredBonders = _allBonders
-          .where((bonder) => bonder.name.toLowerCase().contains(query.toLowerCase()))
+          .where((bonder) =>
+              bonder.name.toLowerCase().contains(query.toLowerCase()))
           .toList();
     });
   }
@@ -196,7 +195,8 @@ class _BondersState extends State<Bonders> {
                 onTap: () {
                   setState(() {
                     _filteredBonders.sort(
-                      (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+                      (a, b) =>
+                          a.name.toLowerCase().compareTo(b.name.toLowerCase()),
                     );
                   });
                   Navigator.pop(context);
@@ -312,12 +312,15 @@ class _BondersState extends State<Bonders> {
                               ],
                             ),
                           ),
-                        if (!_isLoading && _error == null && _filteredBonders.isEmpty)
+                        if (!_isLoading &&
+                            _error == null &&
+                            _filteredBonders.isEmpty)
                           const Padding(
                             padding: EdgeInsets.symmetric(vertical: 40),
                             child: Text(
                               'No bonders found',
-                              style: TextStyle(fontFamily: 'Poppins', color: Colors.grey),
+                              style: TextStyle(
+                                  fontFamily: 'Poppins', color: Colors.grey),
                             ),
                           ),
                         ..._filteredBonders.asMap().entries.map((entry) {
@@ -333,7 +336,8 @@ class _BondersState extends State<Bonders> {
                                   _confirmDelete(b.name),
                               onDismissed: (direction) {
                                 setState(() {
-                                  _allBonders.removeWhere((element) => element.id == b.id);
+                                  _allBonders.removeWhere(
+                                      (element) => element.id == b.id);
                                   _filteredBonders.removeAt(index);
                                 });
                               },
@@ -405,13 +409,16 @@ class _BondersState extends State<Bonders> {
                                             ],
                                           ),
                                         ),
-                                        if ((_bonderMeta[b.id]?.unreadCount ?? 0) > 0)
+                                        if ((_bonderMeta[b.id]?.unreadCount ??
+                                                0) >
+                                            0)
                                           Container(
                                             padding: const EdgeInsets.symmetric(
                                                 horizontal: 8, vertical: 4),
                                             decoration: BoxDecoration(
                                               color: const Color(0xFF4675B8),
-                                              borderRadius: BorderRadius.circular(999),
+                                              borderRadius:
+                                                  BorderRadius.circular(999),
                                             ),
                                             child: Text(
                                               '${_bonderMeta[b.id]!.unreadCount}',
@@ -654,10 +661,12 @@ class _ChatPageState extends State<ChatPage> {
               Text(
                 _error!,
                 textAlign: TextAlign.center,
-                style: TextStyle(fontFamily: 'Poppins', color: Colors.red.shade400),
+                style: TextStyle(
+                    fontFamily: 'Poppins', color: Colors.red.shade400),
               ),
               const SizedBox(height: 12),
-              ElevatedButton(onPressed: _loadMessages, child: const Text('Retry')),
+              ElevatedButton(
+                  onPressed: _loadMessages, child: const Text('Retry')),
             ],
           ),
         ),
@@ -678,7 +687,8 @@ class _ChatPageState extends State<ChatPage> {
       itemCount: _messages.length,
       itemBuilder: (context, index) {
         final message = _messages[index];
-        final isMine = _currentUserId != null && message.senderId == _currentUserId;
+        final isMine =
+            _currentUserId != null && message.senderId == _currentUserId;
 
         return Align(
           alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
@@ -758,7 +768,7 @@ class _ChatPageState extends State<ChatPage> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(color: Colors.white, boxShadow: [
               BoxShadow(
-                  color: Colors.grey.withOpacity(0.2),
+                  color: Colors.grey.withValues(alpha: 0.2),
                   blurRadius: 10,
                   offset: const Offset(0, -2))
             ]),
@@ -793,10 +803,12 @@ class _ChatPageState extends State<ChatPage> {
                               width: 16,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                valueColor:
+                                    AlwaysStoppedAnimation<Color>(Colors.white),
                               ),
                             )
-                          : const Icon(Icons.send, color: Colors.white, size: 20),
+                          : const Icon(Icons.send,
+                              color: Colors.white, size: 20),
                     ),
                   ),
                 ],

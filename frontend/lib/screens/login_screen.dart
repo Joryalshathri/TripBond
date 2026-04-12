@@ -305,8 +305,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               elevation: 0,
-                              disabledBackgroundColor:
-                                  const Color(0xFF4675B8).withOpacity(0.6),
+                              disabledBackgroundColor: const Color(0xFF4675B8)
+                                  .withValues(alpha: 0.6),
                             ),
                             child: isLoading
                                 ? const CustomLoadingSpinner(

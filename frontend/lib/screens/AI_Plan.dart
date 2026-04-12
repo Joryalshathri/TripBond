@@ -8,15 +8,25 @@ import '../services/trip_service.dart';
 
 class Place {
   final String name;
-  final String image;
+  final String image; // Can be asset path or network URL
   final double rating;
   final String location;
+  final double? latitude;
+  final double? longitude;
+  final String? externalPlaceId;
+  final String? fsqId; // Foursquare ID for detail lookups
+  final String? photoUrl; // Direct photo URL from Foursquare
 
   const Place({
     required this.name,
     required this.image,
     required this.rating,
     required this.location,
+    this.latitude,
+    this.longitude,
+    this.externalPlaceId,
+    this.fsqId,
+    this.photoUrl,
   });
 }
 
@@ -191,16 +201,28 @@ class _AI_PlanState extends State<AI_Plan> {
       if (activities is List) {
         for (final item in activities) {
           if (item is! Map<String, dynamic>) continue;
+
+          // Use Foursquare photo_url if available, fallback to asset
+          final photoUrl = item['photo_url'];
+          final imageToUse =
+              (photoUrl != null && photoUrl.toString().isNotEmpty)
+                  ? photoUrl.toString()
+                  : 'assets/images/places/Ithra.png';
+
           places.add(
             Place(
               name: (item['name'] ?? 'Activity').toString(),
-              image: 'assets/images/places/Ithra.png',
-              rating: (item['score'] is num)
-                  ? (item['score'] as num).toDouble()
-                  : 4.0,
+              image: imageToUse,
+              rating: (item['rating'] is num)
+                  ? (item['rating'] as num).toDouble()
+                  : (item['score'] is num)
+                      ? (item['score'] as num).toDouble()
+                      : 4.0,
               location:
                   (item['location'] ?? item['notes'] ?? _activeDestination)
                       .toString(),
+              photoUrl: photoUrl != null ? photoUrl.toString() : null,
+              fsqId: item['fsq_id']?.toString(),
             ),
           );
         }
@@ -624,6 +646,77 @@ class _AI_PlanState extends State<AI_Plan> {
     );
   }
 
+  void _showPlaceModal(BuildContext context, Place place) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  place.name,
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Icon(Icons.location_on, size: 16, color: Colors.grey[600]),
+                const SizedBox(width: 6),
+                Text(place.location, style: const TextStyle(fontSize: 14)),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(Icons.star, size: 16, color: const Color(0xFFC8A858)),
+                const SizedBox(width: 6),
+                Text(
+                  '${place.rating.toStringAsFixed(1)} rating',
+                  style: const TextStyle(fontSize: 14),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Added ${place.name} to favorites'),
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF4675B8),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                child: const Text('Save Place'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildDaySection(Map<String, dynamic> day) {
     final int dayNum = day['day'];
     final List<Place> places = day['places'];
@@ -650,10 +743,10 @@ class _AI_PlanState extends State<AI_Plan> {
           ),
           const SizedBox(height: 12),
           SizedBox(
-            height: 180,
+            height: 190,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 27),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
               itemCount: places.length,
               separatorBuilder: (_, __) => const SizedBox(width: 12),
               itemBuilder: (context, index) {
@@ -663,24 +756,27 @@ class _AI_PlanState extends State<AI_Plan> {
                   opacity: isDeleted ? 0.4 : 1.0,
                   child: AbsorbPointer(
                     absorbing: isDeleted,
-                    child: _PlaceCard(
-                      place: place,
-                      showDelete: isEditMode && !isDeleted,
-                      onDelete: () {
-                        setState(() {
-                          hasNotification = true;
-                          deletedPlaceNames.add(place.name);
-                          suggestions.insert(0, {
-                            'name': place.name,
-                            'type': 'Removed from Plan',
-                            'location': place.location,
-                            'person': 'You',
-                            'personColor': const Color(0xFF4675B8),
-                            'highlight': false,
-                            'action': 'delete',
+                    child: GestureDetector(
+                      onTap: () => _showPlaceModal(context, place),
+                      child: _PlaceCard(
+                        place: place,
+                        showDelete: isEditMode && !isDeleted,
+                        onDelete: () {
+                          setState(() {
+                            hasNotification = true;
+                            deletedPlaceNames.add(place.name);
+                            suggestions.insert(0, {
+                              'name': place.name,
+                              'type': 'Removed from Plan',
+                              'location': place.location,
+                              'person': 'You',
+                              'personColor': const Color(0xFF4675B8),
+                              'highlight': false,
+                              'action': 'delete',
+                            });
                           });
-                        });
-                      },
+                        },
+                      ),
                     ),
                   ),
                 );
@@ -776,7 +872,7 @@ class _PlaceCard extends StatelessWidget {
     return Stack(
       children: [
         Container(
-          width: 155,
+          width: 165,
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
@@ -797,21 +893,7 @@ class _PlaceCard extends StatelessWidget {
                   topLeft: Radius.circular(16),
                   topRight: Radius.circular(16),
                 ),
-                child: Image.asset(
-                  place.image,
-                  width: 155,
-                  height: 110,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      width: 155,
-                      height: 110,
-                      color: const Color(0xFF4675B8),
-                      child: const Icon(Icons.place,
-                          size: 50, color: Colors.white),
-                    );
-                  },
-                ),
+                child: _buildPlaceImage(place),
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
@@ -882,6 +964,59 @@ class _PlaceCard extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+
+  Widget _buildPlaceImage(Place place) {
+    // Use Foursquare photo if available and it's a network URL
+    final isNetworkUrl =
+        place.photoUrl != null && place.photoUrl!.startsWith('http');
+
+    if (isNetworkUrl) {
+      return Image.network(
+        place.photoUrl!,
+        width: 165,
+        height: 115,
+        fit: BoxFit.cover,
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return Container(
+            width: 165,
+            height: 115,
+            color: Colors.grey.shade200,
+            child: const Center(
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
+          );
+        },
+        errorBuilder: (context, error, stackTrace) {
+          return _buildPlaceholderImage();
+        },
+      );
+    } else {
+      // Fallback to local asset
+      return Image.asset(
+        place.image,
+        width: 165,
+        height: 115,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return _buildPlaceholderImage();
+        },
+      );
+    }
+  }
+
+  Widget _buildPlaceholderImage() {
+    return Container(
+      width: 165,
+      height: 115,
+      color: const Color(0xFF4675B8),
+      child: const Icon(Icons.place, size: 50, color: Colors.white),
     );
   }
 }

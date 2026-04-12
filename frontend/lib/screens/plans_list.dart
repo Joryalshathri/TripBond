@@ -375,7 +375,7 @@ class _PlansListState extends State<PlansList> {
     return Container(
       width: 90,
       height: 90,
-      color: const Color(0xFF4675B8).withOpacity(0.1),
+      color: const Color(0xFF4675B8).withValues(alpha: 0.1),
       child: const Icon(
         Icons.travel_explore,
         size: 40,

@@ -4,8 +4,12 @@ import 'DatesPage.dart';
 import 'Bonder.dart';
 import 'profile.dart';
 import 'close_spots.dart';
+import 'places_search_screen.dart';
+import 'nearby_places_screen.dart';
 import 'AI_Plan.dart';
 import 'plans_list.dart';
+import 'chat_screen.dart';
+import 'poi_explorer_screen.dart';
 import '../services/favorites_service.dart';
 
 String selectedCityForTrip = "";
@@ -120,7 +124,9 @@ class _DestinationLandingPageState extends State<DestinationLandingPage> {
 
   Future<void> _loadFavorites() async {
     try {
+      print('[DestinationLandingPage] Starting _loadFavorites');
       final favorites = await _favoritesService.getMyFavorites();
+      print('[DestinationLandingPage] Loaded ${favorites.length} favorites');
       if (!mounted) return;
       setState(() {
         _favoriteByTitle
@@ -132,7 +138,9 @@ class _DestinationLandingPageState extends State<DestinationLandingPage> {
           }).where((entry) => entry.key.isNotEmpty));
         _isLoadingFavorites = false;
       });
-    } catch (_) {
+      print('[DestinationLandingPage] _loadFavorites completed successfully');
+    } catch (e) {
+      print('[DestinationLandingPage] Error loading favorites: $e');
       if (!mounted) return;
       setState(() {
         _isLoadingFavorites = false;
@@ -318,13 +326,13 @@ class _DestinationLandingPageState extends State<DestinationLandingPage> {
                           height: 180,
                           width: double.infinity,
                           decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.1),
+                              color: Colors.black.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(15)),
                         ),
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.9),
+                              color: Colors.white.withValues(alpha: 0.9),
                               shape: BoxShape.circle),
                           child: const Icon(Icons.add_a_photo,
                               color: Color(0xFF4675B8), size: 28),
@@ -546,7 +554,7 @@ class _DestinationLandingPageState extends State<DestinationLandingPage> {
           borderRadius: BorderRadius.circular(14),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.05),
+                color: Colors.black.withValues(alpha: 0.05),
                 blurRadius: 10,
                 offset: const Offset(0, 2))
           ]),
@@ -729,7 +737,7 @@ class _DestinationCardState extends State<_DestinationCard>
                                   begin: Alignment.bottomCenter,
                                   end: Alignment.center,
                                   colors: [
-                            Colors.black.withOpacity(0.6),
+                            Colors.black.withValues(alpha: 0.6),
                             Colors.transparent
                           ]))),
                       Positioned(

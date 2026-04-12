@@ -115,6 +115,27 @@ class UserService {
     }
   }
 
+  // Delete account
+  Future<void> deleteAccount() async {
+    try {
+      final token = await _authService.getAuthToken();
+      final userId = await _authService.getUserId();
+      if (token == null) {
+        throw Exception('Not authenticated');
+      }
+      if (userId == null || userId.isEmpty) {
+        throw Exception('User ID not found');
+      }
+
+      await _apiService.delete(
+        '${ApiConfig.usersPath}/$userId',
+        token: token,
+      );
+    } catch (e) {
+      throw Exception('Failed to delete account: ${e.toString()}');
+    }
+  }
+
   // Upload profile picture
   Future<Map<String, dynamic>> uploadProfilePicture(
       String userId, String filePath) async {

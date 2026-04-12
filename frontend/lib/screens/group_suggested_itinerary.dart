@@ -129,13 +129,23 @@ class _GroupSuggestedItineraryState extends State<GroupSuggestedItinerary> {
   }
 
   Future<void> _loadTripItinerary() async {
-    if (widget.tripId == null || widget.tripId!.isEmpty) return;
+    print('DEBUG: Loading itinerary for tripId=${widget.tripId}');
+    if (widget.tripId == null || widget.tripId!.isEmpty) {
+      print('DEBUG: No tripId provided, using fallback data');
+      return;
+    }
 
     try {
+      print('DEBUG: Fetching itinerary from API...');
       final itineraryData =
           await _tripService.getLatestItinerary(widget.tripId!);
+      print('DEBUG: API Response: $itineraryData');
+
       final days = itineraryData['days'];
-      if (days is! List || days.isEmpty) return;
+      if (days is! List || days.isEmpty) {
+        print('DEBUG: No days in response, using fallback data');
+        return;
+      }
 
       final mappedDays = <DateTime>[];
       final mappedCalendar = <DateTime, List<Place>>{};
@@ -174,12 +184,15 @@ class _GroupSuggestedItineraryState extends State<GroupSuggestedItinerary> {
       }
 
       if (!mounted || mappedDays.isEmpty) return;
+      print('DEBUG: Successfully loaded ${mappedDays.length} days from API');
       setState(() {
         _tripDays = mappedDays;
         _calendarItinerary = mappedCalendar;
         _selectedDay = _tripDays.first;
       });
-    } catch (_) {}
+    } catch (e) {
+      print('DEBUG: Error loading itinerary: $e');
+    }
   }
 
   String _dayLabel(DateTime day) {
@@ -204,6 +217,82 @@ class _GroupSuggestedItineraryState extends State<GroupSuggestedItinerary> {
   String _weekdayLabel(DateTime day) {
     const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     return days[day.weekday - 1];
+  }
+
+  void _showPlaceDetail(BuildContext context, Place place, ItineraryItem item) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  place.name,
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Icon(Icons.location_on, size: 16, color: Colors.grey[600]),
+                const SizedBox(width: 6),
+                Text(place.location, style: const TextStyle(fontSize: 14)),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(Icons.star, size: 16, color: const Color(0xFFC8A858)),
+                const SizedBox(width: 6),
+                Text(
+                  '${place.rating.toStringAsFixed(1)} rating',
+                  style: const TextStyle(fontSize: 14),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '${item.startTime} - ${item.endTime}',
+              style: const TextStyle(fontSize: 14, color: Colors.grey),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Added ${place.name} to favorites'),
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF4675B8),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                child: const Text('Save Place'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -367,27 +456,33 @@ class _GroupSuggestedItineraryState extends State<GroupSuggestedItinerary> {
                                         opacity: isDeleted ? 0.4 : 1.0,
                                         child: AbsorbPointer(
                                           absorbing: isDeleted,
-                                          child: _CalendarItineraryCard(
-                                            item: item,
-                                            showDelete:
-                                                isEditMode && !isDeleted,
-                                            onDelete: () {
-                                              setState(() {
-                                                hasNotification = true;
-                                                deletedPlaceNames
-                                                    .add(place.name);
-                                                suggestions.insert(0, {
-                                                  'name': place.name,
-                                                  'type': 'Removed from Plan',
-                                                  'location': place.location,
-                                                  'person': 'You',
-                                                  'personColor':
-                                                      const Color(0xFF4675B8),
-                                                  'highlight': false,
-                                                  'action': 'delete',
+                                          child: GestureDetector(
+                                            onTap: () => _showPlaceDetail(
+                                                context,
+                                                place,
+                                                _placeToItem(place, index)),
+                                            child: _CalendarItineraryCard(
+                                              item: item,
+                                              showDelete:
+                                                  isEditMode && !isDeleted,
+                                              onDelete: () {
+                                                setState(() {
+                                                  hasNotification = true;
+                                                  deletedPlaceNames
+                                                      .add(place.name);
+                                                  suggestions.insert(0, {
+                                                    'name': place.name,
+                                                    'type': 'Removed from Plan',
+                                                    'location': place.location,
+                                                    'person': 'You',
+                                                    'personColor':
+                                                        const Color(0xFF4675B8),
+                                                    'highlight': false,
+                                                    'action': 'delete',
+                                                  });
                                                 });
-                                              });
-                                            },
+                                              },
+                                            ),
                                           ),
                                         ),
                                       ),

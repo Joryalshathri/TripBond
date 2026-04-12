@@ -24,9 +24,9 @@ warnings.filterwarnings('ignore')
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Import existing classes
-from group_recommendations import TripBondGroupRecommender
-from build_itinerary import GreedyItineraryBuilder
-from build_itinerary_ga import GeneticItineraryOptimizer
+from api.group_recommendations import TripBondGroupRecommender
+from api.build_itinerary import GreedyItineraryBuilder
+from api.build_itinerary_ga import GeneticItineraryOptimizer
 
 
 # Initialize Flask app

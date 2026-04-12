@@ -36,11 +36,11 @@ class AppColors {
 
   // Transparent/Overlay Colors
   static Color primaryWithOpacity(double opacity) =>
-      primary.withOpacity(opacity);
+      primary.withValues(alpha: opacity);
   static Color blackWithOpacity(double opacity) =>
-      Colors.black.withOpacity(opacity);
+      Colors.black.withValues(alpha: opacity);
   static Color whiteWithOpacity(double opacity) =>
-      Colors.white.withOpacity(opacity);
+      Colors.white.withValues(alpha: opacity);
 
   // Surface Colors
   static const Color surface = Colors.white;

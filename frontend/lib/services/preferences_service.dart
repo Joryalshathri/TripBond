@@ -121,4 +121,17 @@ class PreferencesService {
       throw Exception('Failed to update general preferences: ${e.toString()}');
     }
   }
+
+  // Get user general preferences
+  Future<Map<String, dynamic>> getUserGeneralPreferences(String userId) async {
+    try {
+      final response = await _apiService.get(
+        '${ApiConfig.preferencesPath}/user/general/$userId',
+      );
+
+      return response;
+    } catch (e) {
+      throw Exception('Failed to get general preferences: ${e.toString()}');
+    }
+  }
 }

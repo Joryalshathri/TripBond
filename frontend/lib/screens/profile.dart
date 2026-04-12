@@ -6,6 +6,9 @@ import 'DestinationLandingPage.dart';
 import 'Bonder.dart';
 import 'close_spots.dart';
 import 'AI_Plan.dart';
+import 'chat_screen.dart';
+import 'personality_quiz_screen.dart';
+import 'feedback_screen.dart';
 import 'package:top_snackbar_flutter/top_snack_bar.dart';
 import 'package:top_snackbar_flutter/custom_snack_bar.dart';
 import '../services/profileService.dart';
@@ -239,11 +242,77 @@ class _ProfileState extends State<Profile> {
                   MaterialPageRoute(builder: (_) => const editprofile())),
               child: const Icon(Icons.edit_outlined,
                   size: 20, color: Color(0xFF1E1E1E))),
-          GestureDetector(
-              onTap: () => Navigator.push(
-                  context, MaterialPageRoute(builder: (_) => const Settings())),
-              child: const Icon(Icons.more_vert,
-                  size: 20, color: Color(0xFF1E1E1E))),
+          PopupMenuButton<String>(
+            child:
+                const Icon(Icons.more_vert, size: 20, color: Color(0xFF1E1E1E)),
+            onSelected: (value) {
+              switch (value) {
+                case 'chat':
+                  Navigator.push(context,
+                      MaterialPageRoute(builder: (_) => const ChatScreen()));
+                  break;
+                case 'quiz':
+                  Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const PersonalityQuizScreen()));
+                  break;
+                case 'feedback':
+                  Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const FeedbackScreen()));
+                  break;
+                case 'settings':
+                  Navigator.push(context,
+                      MaterialPageRoute(builder: (_) => const Settings()));
+                  break;
+              }
+            },
+            itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+              const PopupMenuItem<String>(
+                value: 'chat',
+                child: Row(
+                  children: [
+                    Icon(Icons.chat_outlined, size: 18),
+                    SizedBox(width: 12),
+                    Text('Messages'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem<String>(
+                value: 'quiz',
+                child: Row(
+                  children: [
+                    Icon(Icons.quiz_outlined, size: 18),
+                    SizedBox(width: 12),
+                    Text('Personality Quiz'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem<String>(
+                value: 'feedback',
+                child: Row(
+                  children: [
+                    Icon(Icons.rate_review_outlined, size: 18),
+                    SizedBox(width: 12),
+                    Text('Give Feedback'),
+                  ],
+                ),
+              ),
+              const PopupMenuDivider(),
+              const PopupMenuItem<String>(
+                value: 'settings',
+                child: Row(
+                  children: [
+                    Icon(Icons.settings_outlined, size: 18),
+                    SizedBox(width: 12),
+                    Text('Settings'),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -396,7 +465,8 @@ class _ProfileState extends State<Profile> {
                                     child: Container(
                                       padding: const EdgeInsets.all(6),
                                       decoration: BoxDecoration(
-                                        color: Colors.white.withOpacity(0.9),
+                                        color:
+                                            Colors.white.withValues(alpha: 0.9),
                                         shape: BoxShape.circle,
                                         boxShadow: [
                                           BoxShadow(
@@ -513,7 +583,7 @@ class _ProfileState extends State<Profile> {
                       child: Center(
                         child: Icon(
                           Icons.favorite,
-                          color: const Color(0xFF4675B8).withOpacity(0.7),
+                          color: const Color(0xFF4675B8).withValues(alpha: 0.7),
                           size: 28,
                         ),
                       ),
@@ -704,8 +774,8 @@ class _ProfileState extends State<Profile> {
                             context,
                             MaterialPageRoute(
                                 builder: (_) => ChatPage(
-                              bonderId: user['name']!,
-                              name: user['name']!)));
+                                    bonderId: user['name']!,
+                                    name: user['name']!)));
                       } else if (value == 'remove') {
                         setState(() {
                           users.removeAt(index);

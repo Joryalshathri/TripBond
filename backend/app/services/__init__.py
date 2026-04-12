@@ -17,6 +17,10 @@ from . import (
     trip_access,
     itinerary_service,
     recommendation_service,
+    verification_store,
+    password_reset_store,
+    geoapify_service,
+    email_service,
 )
 
 __all__ = [
@@ -30,4 +34,8 @@ __all__ = [
     "trip_access",
     "itinerary_service",
     "recommendation_service",
+    "verification_store",
+    "password_reset_store",
+    "geoapify_service",
+    "email_service",
 ]

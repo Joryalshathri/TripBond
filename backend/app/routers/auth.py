@@ -509,6 +509,7 @@ async def verify_email_code(request: VerifyEmailCodeRequest):
         user = user_result.data[0]
 
         # Generate access token with email_verified = true
+        config = get_settings()
         token_payload = {
             "sub": user["id"],
             "email": user["email_address"],

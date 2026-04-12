@@ -1,5 +1,6 @@
 import '../core/api_service.dart';
 import '../core/api_config.dart';
+import '../models/place_model.dart';
 
 class PlacesService {
   static final PlacesService _instance = PlacesService._internal();
@@ -8,53 +9,75 @@ class PlacesService {
 
   final _apiService = ApiService();
 
-  // Search places by location and query
-  Future<List<Map<String, dynamic>>> searchPlaces({
-    String? query,
-    double? latitude,
-    double? longitude,
-    int? radius,
-    String? type,
+  // Search places by text query
+  Future<PlacesSearchResponse> searchPlaces({
+    required String query,
+    String language = 'en',
+    String? nextPageToken,
   }) async {
     try {
-      final queryParams = <String, String>{};
+      final queryParams = {
+        'query': query,
+        'language': language,
+      };
 
-      if (query != null) queryParams['query'] = query;
-      if (latitude != null) queryParams['latitude'] = latitude.toString();
-      if (longitude != null) queryParams['longitude'] = longitude.toString();
-      if (radius != null) queryParams['radius'] = radius.toString();
-      if (type != null) queryParams['type'] = type;
+      if (nextPageToken != null) {
+        queryParams['next_page_token'] = nextPageToken;
+      }
 
       final response = await _apiService.get(
         '${ApiConfig.placesPath}/search',
         queryParams: queryParams,
       );
 
-      if (response is List) {
-        return response.cast<Map<String, dynamic>>();
-      } else if (response is Map && response.containsKey('places')) {
-        final places = response['places'];
-        if (places is List) {
-          return places.cast<Map<String, dynamic>>();
-        }
-      }
-
-      return [];
+      return PlacesSearchResponse.fromJson(response);
     } catch (e) {
       throw Exception('Failed to search places: ${e.toString()}');
     }
   }
 
   // Get place details
-  Future<Map<String, dynamic>> getPlaceDetails(String placeId) async {
+  Future<PlaceDetailsResponse> getPlaceDetails(String placeId) async {
     try {
       final response = await _apiService.get(
         '${ApiConfig.placesPath}/details/$placeId',
       );
 
-      return response;
+      return PlaceDetailsResponse.fromJson(response);
     } catch (e) {
       throw Exception('Failed to get place details: ${e.toString()}');
+    }
+  }
+
+  // Get place details with intelligent fallback
+  // Supports lat/lng/country context to find the correct location
+  // This prevents "Ithra" from returning "Ithra Tower" in wrong country
+  Future<PlaceDetailsResponse> getPlaceDetailsWithFallback({
+    required String placeId,
+    double? latitude,
+    double? longitude,
+    String? fallbackName,
+    String? country,
+  }) async {
+    try {
+      final queryParams = {
+        'language': 'en',
+      };
+
+      if (latitude != null) queryParams['latitude'] = latitude.toString();
+      if (longitude != null) queryParams['longitude'] = longitude.toString();
+      if (fallbackName != null) queryParams['fallback_name'] = fallbackName;
+      if (country != null) queryParams['country'] = country;
+
+      final response = await _apiService.get(
+        '${ApiConfig.placesPath}/details/$placeId',
+        queryParams: queryParams,
+      );
+
+      return PlaceDetailsResponse.fromJson(response);
+    } catch (e) {
+      throw Exception(
+          'Failed to get place details with fallback: ${e.toString()}');
     }
   }
 
@@ -105,17 +128,19 @@ class PlacesService {
   }
 
   // Get nearby places
-  Future<List<Map<String, dynamic>>> getNearbyPlaces({
+  Future<PlacesSearchResponse> getNearbyPlaces({
     required double latitude,
     required double longitude,
     int radius = 5000,
     String? type,
+    String language = 'en',
   }) async {
     try {
       final queryParams = {
         'lat': latitude.toString(),
         'lng': longitude.toString(),
         'radius': radius.toString(),
+        'language': language,
       };
 
       if (type != null) queryParams['type'] = type;
@@ -125,16 +150,7 @@ class PlacesService {
         queryParams: queryParams,
       );
 
-      if (response is List) {
-        return response.cast<Map<String, dynamic>>();
-      } else if (response is Map && response.containsKey('places')) {
-        final places = response['places'];
-        if (places is List) {
-          return places.cast<Map<String, dynamic>>();
-        }
-      }
-
-      return [];
+      return PlacesSearchResponse.fromJson(response);
     } catch (e) {
       throw Exception('Failed to get nearby places: ${e.toString()}');
     }

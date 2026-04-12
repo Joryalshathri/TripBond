@@ -111,7 +111,7 @@ class ShimmerAnimation extends StatelessWidget {
   Widget build(BuildContext context) {
     return child.animate(onPlay: (controller) => controller.repeat()).shimmer(
           duration: const Duration(milliseconds: 1500),
-          color: Colors.white.withOpacity(0.3),
+          color: Colors.white.withValues(alpha: 0.3),
         );
   }
 }

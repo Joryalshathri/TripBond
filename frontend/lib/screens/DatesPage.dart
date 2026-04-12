@@ -166,7 +166,7 @@ class _DatesPageState extends State<DatesPage> {
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
+                      color: Colors.black.withValues(alpha: 0.05),
                       blurRadius: 4,
                       offset: const Offset(0, 2))
                 ],
@@ -255,8 +255,9 @@ class _DatesPageState extends State<DatesPage> {
                   (i) => DropdownMenuItem(value: i, child: Text(_months[i]))),
               onChanged: (val) {
                 if (val != null) {
-                  if (_currentYear == _today.year && val < _today.month - 1)
+                  if (_currentYear == _today.year && val < _today.month - 1) {
                     return;
+                  }
                   setState(() {
                     _currentMonth = val;
                     _startDate = null;
