@@ -46,18 +46,8 @@ def _get_places_for_destination(destination: str) -> List[dict]:
         
         if places:
             logger.info(f"Loaded {len(places)} POIs from AI backend for {destination}")
-            # Convert to our internal format
-            formatted = []
-            for place in places:
-                formatted.append({
-                    "name": place.get("name", "Activity"),
-                    "location": place.get("location", destination),
-                    "type": place.get("type", "attraction"),
-                    "rating": place.get("rating", 4.0),
-                    "description": place.get("description", ""),
-                    "id": place.get("id"),
-                })
-            return formatted
+            # Keep all place data for activities
+            return places
         else:
             logger.info(f"No POIs found for {destination}, using fallback")
             return _get_sample_places(destination)
@@ -205,7 +195,15 @@ def generate_itinerary_with_ga(
                 "cost": slot.get("cost_est", 40.0),
                 "description": f"Popular {slot['type']} in {destination}",
                 "rating": place.get("rating", 4.0),
-                "priority": 4 if slot.get("type") == "attraction" else 3
+                "priority": 4 if slot.get("type") == "attraction" else 3,
+                # Preserve place identifiers
+                "place_id": place.get("id"),
+                "external_place_id": place.get("external_place_id") or place.get("id"),
+                "fsq_id": place.get("fsq_id"),
+                "latitude": place.get("latitude"),
+                "longitude": place.get("longitude"),
+                "photo_url": place.get("photo_url"),
+                "address": place.get("address"),
             }
             day_activities.append(activity)
         
@@ -348,41 +346,9 @@ def insert_items(itinerary_id: str, items: _List[dict]) -> None:
                 "score": item.get("score", 0.0),
             }
             
-            # Store location information
-            if "location" in item:
-                item_record["location"] = item["location"]
-            if "address" in item:
-                item_record["address"] = item["address"]
-            
-            # Store activity type
-            if "type" in item:
-                item_record["type"] = item["type"]
-            
-            # Preserve place information if available
-            if "external_place_id" in item:
-                item_record["external_place_id"] = item["external_place_id"]
-            if "place_id" in item:
-                item_record["place_id"] = item["place_id"]
-            if "latitude" in item:
-                item_record["latitude"] = item["latitude"]
-            if "longitude" in item:
-                item_record["longitude"] = item["longitude"]
-            if "rating" in item:
-                item_record["rating"] = item["rating"]
-            if "cost" in item:
-                item_record["cost"] = item["cost"]
-            if "priority" in item:
-                item_record["priority"] = item["priority"]
-            if "user_ratings_total" in item:
-                item_record["user_ratings_total"] = item["user_ratings_total"]
-            if "place_types" in item:
-                item_record["place_types"] = item["place_types"]
-            if "photo_url" in item:
-                item_record["photo_url"] = item["photo_url"]
-            if "fsq_id" in item:
-                item_record["fsq_id"] = item["fsq_id"]
-            if "name" in item and "title" not in item:
-                item_record["name"] = item["name"]
+            # NOTE: The database schema for itinerary_items is limited.
+            # Only core fields above are guaranteed to exist.
+            # Do not add additional fields without migrations.
             
             to_insert.append(item_record)
     if to_insert:

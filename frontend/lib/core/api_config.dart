@@ -27,6 +27,9 @@ class ApiConfig {
     return 'http://localhost:8000';
   }
 
+  // Google API Key for Maps/Places/Geocoding
+  static const String googleApiKey = 'AIzaSyAAID68aVlsYvCbhKMa5YKGvigSL9_xYIc';
+
   // API endpoints
   static const String authPath = '/api/auth';
   static const String usersPath = '/api/users';

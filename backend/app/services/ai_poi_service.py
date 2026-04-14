@@ -1,9 +1,9 @@
 """
-AI POI Service - Integration with TripBond AI Backend Dataset + Foursquare Enrichment
+AI POI Service - Integration with TripBond AI Backend Dataset + Google Places Photo Enrichment
 
 Combines:
 1. Primary: Pre-trained AI recommendations from CSV datasets
-2. Enrichment: Foursquare API for photos, reviews, fsq_id for detail lookups
+2. Enrichment: Google Places API for photos and nearby place matching
 """
 
 import pandas as pd
@@ -23,8 +23,8 @@ DATA_DIR = AI_BACKEND_ROOT / "data"
 _pois_cache = None
 _group_recs_cache = None
 
-# Foursquare enrichment cache (fsq_id lookup by name+city)
-_foursquare_cache = {}
+# Initialize PLACES_BASE_URL for photo URL construction
+PLACES_BASE_URL = "https://maps.googleapis.com/maps/api/place"
 
 
 def _load_poi_dataset() -> Optional[pd.DataFrame]:
@@ -67,79 +67,65 @@ def _load_group_recommendations() -> Optional[pd.DataFrame]:
         return None
 
 
-def _enrich_with_foursquare(poi: Dict, lat: Optional[float], lng: Optional[float]) -> Dict:
+def _enrich_with_photos(poi: Dict, lat: Optional[float], lng: Optional[float]) -> Dict:
     """
-    Enrich a POI with Foursquare data (photos, detailed reviews, fsq_id).
+    Enrich a POI with photos from Google Places API (Foursquare backup).
     
     Args:
         poi: POI dictionary from CSV
-        lat: Latitude for Foursquare lookup
-        lng: Longitude for Foursquare lookup
+        lat: Latitude for photo lookup
+        lng: Longitude for photo lookup
     
     Returns:
-        Enhanced POI dictionary with Foursquare data
+        Enhanced POI dictionary with photo data
     """
     settings = get_settings()
+    poi_name = poi.get('name', 'Unknown')
     
-    if not settings.foursquare_api_key or not lat or not lng:
-        # No Foursquare enrichment available
+    # Only skip if coordinates are NONE/NaN, not if they're 0
+    if lat is None or lng is None:
+        logger.debug(f"Skipping enrichment for {poi_name}: lat={lat}, lng={lng}")
         return poi
     
-    try:
-        # Check cache first
-        cache_key = f"{poi['name']}:{poi['location']}"
-        if cache_key in _foursquare_cache:
-            foursquare_data = _foursquare_cache[cache_key]
-            poi.update(foursquare_data)
-            return poi
-        
-        # Search Foursquare for this place
-        fsq_headers = {
-            "Authorization": settings.foursquare_api_key,
-            "Accept": "application/json"
-        }
-        
-        query = f"{poi['name']} {poi['location']}"
-        fsq_params = {
-            "query": query,
-            "ll": f"{lat},{lng}",
-            "radius": 2000,  # 2km radius
-            "limit": 1  # Get best match
-        }
-        
-        response = requests.get(
-            "https://api.foursquare.com/v3/places/search",
-            headers=fsq_headers,
-            params=fsq_params,
-            timeout=3
-        )
-        
-        if response.status_code == 200:
-            results = response.json().get("results", [])
-            if results:
-                fsq_place = results[0]
+    # Try to Google Photos API using nearby search
+    if settings.google_maps_api_key:
+        try:
+            from .google_places_service import nearby_search_places
+            
+            # Search for nearby places matching our POI
+            results = nearby_search_places(
+                lat=lat,
+                lng=lng,
+                radius=500,  # 500m radius for nearby match
+                keyword=poi_name,
+                language='en'
+            )
+            
+            if results and results.results:
+                google_place = results.results[0]
                 
-                foursquare_data = {
-                    "fsq_id": fsq_place.get("fsq_id"),
+                photo_data = {
                     "photo_url": None,
                 }
                 
-                # Get photos if available
-                if fsq_place.get("photos"):
-                    photo = fsq_place["photos"][0]
-                    foursquare_data["photo_url"] = f"{photo['prefix']}original{photo['suffix']}"
+                # Get photos from Google Places
+                if google_place.photos:
+                    first_photo = google_place.photos[0]
+                    # Build Google photo URL with correct parameter name
+                    photo_data["photo_url"] = f"{PLACES_BASE_URL}/photo?maxwidth=800&photo_reference={first_photo.photo_reference}&key={settings.google_maps_api_key}"
+                    logger.info(f"✅ Enriched {poi_name} with Google Places photo")
+                else:
+                    logger.debug(f"Google Places found {poi_name} but no photos")
                 
-                # Cache it
-                _foursquare_cache[cache_key] = foursquare_data
-                poi.update(foursquare_data)
-                logger.debug(f"Enriched {poi['name']} with Foursquare data (fsq_id: {foursquare_data.get('fsq_id')})")
-        
-    except requests.Timeout:
-        logger.debug(f"Foursquare lookup timeout for {poi['name']}")
-    except Exception as e:
-        logger.debug(f"Foursquare enrichment failed for {poi['name']}: {e}")
+                poi.update(photo_data)
+                return poi
+            else:
+                logger.debug(f"No Google Places results near {poi_name}: ({lat}, {lng})")
+                
+        except Exception as e:
+            logger.debug(f"Google Places enrichment failed for {poi_name}: {e}")
     
-    # Always return the POI, enriched or not
+    # No enrichment available
     return poi
 
 
@@ -192,8 +178,8 @@ def get_pois_for_destination(destination: str, limit: int = 15) -> List[Dict]:
             "province": str(row.get('province', '')),
         }
         
-        # Enrich with Foursquare data (photos, fsq_id, etc.)
-        poi = _enrich_with_foursquare(poi, poi["latitude"], poi["longitude"])
+        # Enrich with photos (Google Places API)
+        poi = _enrich_with_photos(poi, poi["latitude"], poi["longitude"])
         
         result.append(poi)
     

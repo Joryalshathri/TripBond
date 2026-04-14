@@ -794,14 +794,16 @@ async def generate_trip_itinerary(
         items_to_insert = []
         for day in itinerary_data.get("days", []):
             for activity in day.get("activities", []):
-                items_to_insert.append({
+                item = {
                     "day_index": day.get("day"),
                     "start_time": activity.get("start_time"),
                     "end_time": activity.get("end_time"),
                     "title": activity.get("name"),
                     "notes": activity.get("description"),
-                    "score": activity.get("score", 0.0)
-                })
+                    "score": activity.get("score", 0.0),
+                }
+                    
+                items_to_insert.append(item)
         
         await run_in_threadpool(
             lambda: insert_items(itinerary_id, items_to_insert)
@@ -884,7 +886,8 @@ async def get_itinerary(
             
             activity = {
                 "id": item["id"],
-                "name": item["title"],
+                "name": item.get("name") or item.get("title", "Activity"),
+                "title": item["title"],
                 "type": item.get("type", "activity"),
                 "location": item.get("location") or item.get("notes") or trip.get("destination", "Unknown"),
                 "start_time": item["start_time"],
@@ -893,6 +896,13 @@ async def get_itinerary(
                 "priority": item.get("priority", 1),
                 "rating": item.get("rating", 4.0),
                 "cost": item.get("cost", 0),
+                # Include place data fields where they may exist
+                "external_place_id": item.get("external_place_id"),
+                "place_id": item.get("place_id"),
+                "fsq_id": item.get("fsq_id"),
+                "latitude": item.get("latitude"),
+                "longitude": item.get("longitude"),
+                "photo_url": item.get("photo_url"),
             }
             days_dict[day_idx]["activities"].append(activity)
         
