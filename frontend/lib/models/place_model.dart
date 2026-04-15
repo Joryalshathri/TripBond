@@ -72,6 +72,7 @@ class PlaceResult {
   final List<String> types;
   final PlaceOpeningHours? openingHours;
   final List<PlacePhoto> photos;
+  final String? imageUrl;
   final String? icon;
   final String? businessStatus;
 
@@ -87,6 +88,7 @@ class PlaceResult {
     this.types = const [],
     this.openingHours,
     this.photos = const [],
+    this.imageUrl,
     this.icon,
     this.businessStatus,
   });
@@ -112,6 +114,7 @@ class PlaceResult {
               ?.map((p) => PlacePhoto.fromJson(p as Map<String, dynamic>))
               .toList() ??
           [],
+      imageUrl: json['image_url'],
       icon: json['icon'],
       businessStatus: json['business_status'],
     );
@@ -129,6 +132,7 @@ class PlaceResult {
         'types': types,
         'opening_hours': openingHours?.toJson(),
         'photos': photos.map((p) => p.toJson()).toList(),
+        'image_url': imageUrl,
         'icon': icon,
         'business_status': businessStatus,
       };
@@ -177,6 +181,7 @@ class PlaceDetailsResult {
   final List<String> types;
   final dynamic openingHours;
   final List<PlacePhoto> photos;
+  final String? imageUrl;
   final String? url;
   final String? editorialSummary;
 
@@ -194,6 +199,7 @@ class PlaceDetailsResult {
     this.types = const [],
     this.openingHours,
     this.photos = const [],
+    this.imageUrl,
     this.url,
     this.editorialSummary,
   });
@@ -219,6 +225,7 @@ class PlaceDetailsResult {
               ?.map((p) => PlacePhoto.fromJson(p as Map<String, dynamic>))
               .toList() ??
           [],
+      imageUrl: json['image_url'],
       url: json['url'],
       editorialSummary: json['editorial_summary'],
     );
@@ -238,6 +245,7 @@ class PlaceDetailsResult {
         'types': types,
         'opening_hours': openingHours,
         'photos': photos.map((p) => p.toJson()).toList(),
+        'image_url': imageUrl,
         'url': url,
         'editorial_summary': editorialSummary,
       };

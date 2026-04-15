@@ -23,9 +23,6 @@ DATA_DIR = AI_BACKEND_ROOT / "data"
 _pois_cache = None
 _group_recs_cache = None
 
-# Initialize PLACES_BASE_URL for photo URL construction
-PLACES_BASE_URL = "https://maps.googleapis.com/maps/api/place"
-
 
 def _load_poi_dataset() -> Optional[pd.DataFrame]:
     """Load integrated POI dataset."""
@@ -69,64 +66,61 @@ def _load_group_recommendations() -> Optional[pd.DataFrame]:
 
 def _enrich_with_photos(poi: Dict, lat: Optional[float], lng: Optional[float]) -> Dict:
     """
-    Enrich a POI with photos from Google Places API (Foursquare backup).
+    Enrich a POI with an image URL from Google Places API.
+    
+    Complete flow:
+    1. Search for the POI by name
+    2. Get the place_id from search results
+    3. Call Place Details API for that place_id
+    4. Extract the first photo_reference
+    5. Build the photo URL
     
     Args:
         poi: POI dictionary from CSV
-        lat: Latitude for photo lookup
-        lng: Longitude for photo lookup
+        lat: Latitude for nearby search bias
+        lng: Longitude for nearby search bias
     
     Returns:
-        Enhanced POI dictionary with photo data
+        Enhanced POI dictionary with image_url field
     """
     settings = get_settings()
     poi_name = poi.get('name', 'Unknown')
     
-    # Only skip if coordinates are NONE/NaN, not if they're 0
+    # Only proceed if coordinates are provided
     if lat is None or lng is None:
-        logger.debug(f"Skipping enrichment for {poi_name}: lat={lat}, lng={lng}")
+        logger.debug(f"Skipping enrichment for {poi_name}: missing coordinates (lat={lat}, lng={lng})")
+        poi["image_url"] = None
         return poi
     
-    # Try to Google Photos API using nearby search
-    if settings.google_maps_api_key:
-        try:
-            from .google_places_service import nearby_search_places
-            
-            # Search for nearby places matching our POI
-            results = nearby_search_places(
-                lat=lat,
-                lng=lng,
-                radius=500,  # 500m radius for nearby match
-                keyword=poi_name,
-                language='en'
-            )
-            
-            if results and results.results:
-                google_place = results.results[0]
-                
-                photo_data = {
-                    "photo_url": None,
-                }
-                
-                # Get photos from Google Places
-                if google_place.photos:
-                    first_photo = google_place.photos[0]
-                    # Build Google photo URL with correct parameter name
-                    photo_data["photo_url"] = f"{PLACES_BASE_URL}/photo?maxwidth=800&photo_reference={first_photo.photo_reference}&key={settings.google_maps_api_key}"
-                    logger.info(f"✅ Enriched {poi_name} with Google Places photo")
-                else:
-                    logger.debug(f"Google Places found {poi_name} but no photos")
-                
-                poi.update(photo_data)
-                return poi
-            else:
-                logger.debug(f"No Google Places results near {poi_name}: ({lat}, {lng})")
-                
-        except Exception as e:
-            logger.debug(f"Google Places enrichment failed for {poi_name}: {e}")
+    # Only proceed if Google Maps API key is configured
+    if not settings.google_maps_api_key:
+        logger.debug(f"Skipping enrichment for {poi_name}: Google Maps API key not configured")
+        poi["image_url"] = None
+        return poi
     
-    # No enrichment available
-    return poi
+    try:
+        from .google_places_service import get_image_url_for_place
+        
+        # Call the complete flow: search → get place_id → get details → extract photo → build URL
+        image_url = get_image_url_for_place(
+            place_name=poi_name,
+            lat=lat,
+            lng=lng,
+            language='en'
+        )
+        
+        poi["image_url"] = image_url
+        if image_url:
+            logger.info(f"✅ Enriched '{poi_name}' with image URL from Google Places")
+        else:
+            logger.debug(f"No image URL found for '{poi_name}' (place found but no photos)")
+        
+        return poi
+        
+    except Exception as e:
+        logger.debug(f"Error enriching '{poi_name}' with image URL: {e}")
+        poi["image_url"] = None
+        return poi
 
 
 def get_pois_for_destination(destination: str, limit: int = 15) -> List[Dict]:

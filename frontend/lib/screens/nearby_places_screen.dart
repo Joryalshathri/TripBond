@@ -172,43 +172,78 @@ class _NearbyPlacesScreenState extends State<NearbyPlacesScreen> {
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: ListTile(
-        title: Text(place.name),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 4),
-            if (place.formattedAddress != null)
-              Text(
-                place.formattedAddress!,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Image section
+          if (place.imageUrl != null && place.imageUrl!.isNotEmpty)
+            Container(
+              width: double.infinity,
+              height: 150,
+              decoration: BoxDecoration(
+                color: Colors.grey[200],
               ),
-            const SizedBox(height: 4),
-            Row(
+              child: Image.network(
+                place.imageUrl!,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    color: Colors.grey[300],
+                    child: const Center(
+                      child: Icon(Icons.location_on, size: 48, color: Colors.grey),
+                    ),
+                  );
+                },
+              ),
+            )
+          else
+            Container(
+              width: double.infinity,
+              height: 150,
+              color: Colors.grey[300],
+              child: const Center(
+                child: Icon(Icons.location_on, size: 48, color: Colors.grey),
+              ),
+            ),
+          ListTile(
+            title: Text(place.name),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (distance != null)
+                const SizedBox(height: 4),
+                if (place.formattedAddress != null)
                   Text(
-                    '${distance.toStringAsFixed(1)}m away',
-                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    place.formattedAddress!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 12),
                   ),
-                const SizedBox(width: 16),
-                if (place.rating != null)
-                  Row(
-                    children: [
-                      const Icon(Icons.star, color: Colors.amber, size: 14),
-                      const SizedBox(width: 4),
-                      Text(place.rating!.toString(),
-                          style: const TextStyle(fontSize: 12)),
-                    ],
-                  ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    if (distance != null)
+                      Text(
+                        '${distance.toStringAsFixed(1)}m away',
+                        style: const TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
+                    const SizedBox(width: 16),
+                    if (place.rating != null)
+                      Row(
+                        children: [
+                          const Icon(Icons.star, color: Colors.amber, size: 14),
+                          const SizedBox(width: 4),
+                          Text(place.rating!.toString(),
+                              style: const TextStyle(fontSize: 12)),
+                        ],
+                      ),
+                  ],
+                ),
               ],
             ),
-          ],
-        ),
-        trailing: const Icon(Icons.location_on),
-        onTap: () => _showPlaceDetails(place),
+            trailing: const Icon(Icons.location_on),
+            onTap: () => _showPlaceDetails(place),
+          ),
+        ],
       ),
     );
   }

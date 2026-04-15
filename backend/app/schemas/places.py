@@ -34,6 +34,7 @@ class PlaceResult(BaseModel):
     types: List[str] = []
     opening_hours: Optional[PlaceOpeningHours] = None
     photos: List[PlacePhoto] = []
+    image_url: Optional[str] = None
     icon: Optional[str] = None
     business_status: Optional[str] = None
 
@@ -58,6 +59,7 @@ class PlaceDetailsResult(BaseModel):
     types: List[str] = []
     opening_hours: Optional[dict] = None
     photos: List[PlacePhoto] = []
+    image_url: Optional[str] = None
     url: Optional[str] = None
     editorial_summary: Optional[str] = None
 

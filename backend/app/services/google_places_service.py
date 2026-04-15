@@ -55,6 +55,14 @@ def _parse_place_result(place: dict) -> PlaceResult:
     opening = place.get("opening_hours")
     opening_hours = PlaceOpeningHours(open_now=opening.get("open_now")) if opening else None
 
+    # Construct image_url from first photo if available
+    image_url = None
+    if photos:
+        try:
+            image_url = get_photo_url(photos[0].photo_reference, max_width=800)
+        except Exception as e:
+            logger.debug(f"Could not construct photo URL: {e}")
+
     return PlaceResult(
         place_id=place["place_id"],
         name=place.get("name", ""),
@@ -67,6 +75,7 @@ def _parse_place_result(place: dict) -> PlaceResult:
         types=place.get("types", []),
         opening_hours=opening_hours,
         photos=photos,
+        image_url=image_url,
         icon=place.get("icon"),
         business_status=place.get("business_status"),
     )
@@ -250,6 +259,14 @@ def get_place_details(place_id: str, language: str = "en") -> PlaceDetailsRespon
 
     editorial = place.get("editorial_summary", {})
 
+    # Construct image_url from first photo if available
+    image_url = None
+    if photos:
+        try:
+            image_url = get_photo_url(photos[0].photo_reference, max_width=800)
+        except Exception as e:
+            logger.debug(f"Could not construct photo URL: {e}")
+
     result = PlaceDetailsResult(
         place_id=place.get("place_id", place_id),
         name=place.get("name", ""),
@@ -264,6 +281,7 @@ def get_place_details(place_id: str, language: str = "en") -> PlaceDetailsRespon
         types=place.get("types", []),
         opening_hours=place.get("opening_hours"),
         photos=photos,
+        image_url=image_url,
         url=place.get("url"),
         editorial_summary=editorial.get("overview") if isinstance(editorial, dict) else None,
     )
@@ -289,3 +307,68 @@ def get_photo_url(photo_reference: str, max_width: int = 800) -> str:
         f"&photo_reference={photo_reference}"
         f"&key={api_key}"
     )
+
+
+def get_image_url_for_place(place_name: str, lat: Optional[float] = None, lng: Optional[float] = None, language: str = "en") -> Optional[str]:
+    """
+    Complete flow: Search for a place → Get place_id → Get details → Extract photo → Build URL.
+    
+    This is the main entry point for enriching POIs with image URLs from Google Places.
+    
+    Args:
+        place_name: Name of the place to search for
+        lat: Optional latitude for nearby search bias
+        lng: Optional longitude for nearby search bias
+        language: BCP-47 language code
+        
+    Returns:
+        A complete photo URL or None if no photos found
+    """
+    try:
+        # Step 1: Search for the place
+        if lat is not None and lng is not None:
+            # Use nearby search if coordinates provided
+            search_response = nearby_search_places(
+                lat=lat,
+                lng=lng,
+                radius=2000,
+                keyword=place_name,
+                language=language
+            )
+        else:
+            # Use text search if no coordinates
+            search_response = text_search_places(
+                query=place_name,
+                language=language
+            )
+        
+        # Step 2: Check if we got results
+        if not search_response.results:
+            logger.debug(f"No search results for place: {place_name}")
+            return None
+        
+        # Step 3: Get the first result's place_id
+        first_result = search_response.results[0]
+        place_id = first_result.place_id
+        logger.debug(f"Found place: {first_result.name} (ID: {place_id})")
+        
+        # Step 4: Get full details including photos
+        details_response = get_place_details(place_id=place_id, language=language)
+        
+        # Step 5: Extract first photo_reference if available
+        if details_response.result.photos:
+            first_photo = details_response.result.photos[0]
+            # Step 6: Build and return the photo URL
+            photo_url = get_photo_url(photo_reference=first_photo.photo_reference, max_width=800)
+            logger.info(f"✅ Generated image URL for {place_name}")
+            return photo_url
+        else:
+            logger.debug(f"Place '{place_name}' found but has no photos")
+            return None
+            
+    except HTTPException:
+        # API key not configured or rate limited
+        return None
+    except Exception as e:
+        logger.debug(f"Error getting image URL for '{place_name}': {e}")
+        return None

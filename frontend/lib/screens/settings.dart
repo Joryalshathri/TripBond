@@ -218,7 +218,8 @@ class _SettingsScreenState extends State<Settings> {
           Switch(
             value: value,
             onChanged: onChanged,
-            activeThumbColor: const Color(0xFF4675B8),
+            activeColor: const Color(0xFF4675B8),
+            thumbColor: const MaterialStatePropertyAll(Color(0xFF4675B8)),
           ),
         ],
       ),

@@ -200,6 +200,19 @@ async def get_public_trip_itinerary(trip_id: str):
             lambda: list_items(itinerary["id"])
         )
         
+        # Build a map of place names/ids to trip_places for enrichment
+        places_response = await run_in_threadpool(
+            lambda: db.client.table("trip_places").select("*").eq("trip_id", trip_id).execute()
+        )
+        places_map = {}
+        if places_response.data:
+            for place in places_response.data:
+                # Map by name or external_place_id
+                if place.get("name"):
+                    places_map[place["name"].lower()] = place
+                if place.get("external_place_id"):
+                    places_map[place["external_place_id"]] = place
+        
         # Group by day_index → days[]
         days_dict = {}
         total_cost = 0.0
@@ -209,19 +222,28 @@ async def get_public_trip_itinerary(trip_id: str):
             if day_idx not in days_dict:
                 days_dict[day_idx] = {"day": day_idx, "activities": []}
             
+            # Try to enrich with place data
+            item_title = item.get("title", "Activity")
+            place_data = places_map.get(item_title.lower()) or places_map.get(item_title)
+            
             activity = {
                 "id": item["id"],
-                "name": item["title"],
+                "name": item_title,
                 "type": item.get("type", "activity"),
                 "location": item.get("location") or trip.get("destination", "Unknown"),
                 "start_time": item["start_time"],
                 "end_time": item["end_time"],
                 "description": item.get("notes", ""),
-                "cost": item.get("cost"),
-                "rating": item.get("rating"),
+                "cost": place_data.get("cost") if place_data else item.get("cost"),
+                "rating": place_data.get("rating") if place_data else item.get("rating"),
+                "user_ratings_total": place_data.get("user_ratings_total") if place_data else None,
                 "priority": item.get("priority", 1),
-                "photo_url": item.get("photo_url"),
+                "photo_url": item.get("photo_url") or (place_data.get("image_url") if place_data else None),
+                "address": place_data.get("address") if place_data else None,
                 "fsq_id": item.get("fsq_id"),
+                "external_place_id": item.get("external_place_id") or (place_data.get("external_place_id") if place_data else None),
+                "latitude": place_data.get("latitude") if place_data else None,
+                "longitude": place_data.get("longitude") if place_data else None,
                 "score": item.get("score")
             }
             days_dict[day_idx]["activities"].append(activity)
@@ -868,6 +890,19 @@ async def get_itinerary(
             except ValueError:
                 start_date_obj = None
         
+        # Build a map of place names/ids to trip_places for enrichment
+        places_response = await run_in_threadpool(
+            lambda: db.client.table("trip_places").select("*").eq("trip_id", trip_id).execute()
+        )
+        places_map = {}
+        if places_response.data:
+            for place in places_response.data:
+                # Map by name or external_place_id
+                if place.get("name"):
+                    places_map[place["name"].lower()] = place
+                if place.get("external_place_id"):
+                    places_map[place["external_place_id"]] = place
+        
         for item in items:
             day_idx = item["day_index"]
             if day_idx not in days_dict:
@@ -884,25 +919,35 @@ async def get_itinerary(
                     "total_duration_minutes": 0,
                 }
             
+            # Try to enrich with place data
+            item_title = item.get("title", "Activity")
+            place_data = places_map.get(item_title.lower()) or places_map.get(item_title)
+            
+            # If not found by name, try by external_place_id
+            if not place_data and item.get("external_place_id"):
+                place_data = places_map.get(item["external_place_id"])
+            
             activity = {
                 "id": item["id"],
-                "name": item.get("name") or item.get("title", "Activity"),
-                "title": item["title"],
+                "name": item.get("name") or item_title,
+                "title": item_title,
                 "type": item.get("type", "activity"),
                 "location": item.get("location") or item.get("notes") or trip.get("destination", "Unknown"),
                 "start_time": item["start_time"],
                 "end_time": item["end_time"],
                 "description": item.get("notes", ""),
                 "priority": item.get("priority", 1),
-                "rating": item.get("rating", 4.0),
-                "cost": item.get("cost", 0),
-                # Include place data fields where they may exist
-                "external_place_id": item.get("external_place_id"),
+                "rating": place_data.get("rating") if place_data else item.get("rating", 4.0),
+                "user_ratings_total": place_data.get("user_ratings_total") if place_data else None,
+                "cost": place_data.get("cost") if place_data else item.get("cost", 0),
+                "photo_url": item.get("photo_url") or (place_data.get("image_url") if place_data else None),
+                "address": place_data.get("address") if place_data else None,
+                # Place data fields
+                "external_place_id": item.get("external_place_id") or (place_data.get("external_place_id") if place_data else None),
                 "place_id": item.get("place_id"),
                 "fsq_id": item.get("fsq_id"),
-                "latitude": item.get("latitude"),
-                "longitude": item.get("longitude"),
-                "photo_url": item.get("photo_url"),
+                "latitude": place_data.get("latitude") if place_data else item.get("latitude"),
+                "longitude": place_data.get("longitude") if place_data else item.get("longitude"),
             }
             days_dict[day_idx]["activities"].append(activity)
         
@@ -1322,7 +1367,8 @@ async def add_place_to_trip(
         "address": str,
         "rating": float,
         "user_ratings_total": int,
-        "types": list
+        "types": list,
+        "image_url": str (optional)
     }
     
     Returns:
@@ -1346,6 +1392,7 @@ async def add_place_to_trip(
         rating = place_data.get("rating")
         user_ratings_total = place_data.get("user_ratings_total")
         types = place_data.get("types", [])
+        image_url = place_data.get("image_url")
         
         if not name or latitude is None or longitude is None:
             raise HTTPException(
@@ -1394,6 +1441,7 @@ async def add_place_to_trip(
             "rating": rating,
             "user_ratings_total": user_ratings_total,
             "place_types": types,
+            "image_url": image_url,
             "added_by": user_id,
             "added_at": datetime.utcnow().isoformat()
         }

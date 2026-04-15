@@ -275,6 +275,7 @@ class _PlaceDetailsPageState extends State<PlaceDetailsPage>
         'rating': result.rating,
         'user_ratings_total': result.userRatingsTotal,
         'types': result.types,
+        'image_url': result.imageUrl,
       };
 
       print('[PlaceDetailsPage] Payload: $payload');
@@ -603,9 +604,9 @@ class _PlaceDetailsPageState extends State<PlaceDetailsPage>
       child: Stack(
         fit: StackFit.expand,
         children: [
-          if (place.photos.isNotEmpty)
+          if (place.imageUrl != null && place.imageUrl!.isNotEmpty)
             Image.network(
-              place.photos.first.photoReference,
+              place.imageUrl!,
               fit: BoxFit.cover,
               errorBuilder: (context, error, stackTrace) {
                 return _buildPlaceholderImage();

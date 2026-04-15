@@ -104,8 +104,13 @@ class ItineraryActivity(BaseModel):
     priority: Optional[int] = 1
     coordinates: Optional[dict] = None
     rating: Optional[float] = None
+    user_ratings_total: Optional[int] = None
     photo_url: Optional[str] = None
     fsq_id: Optional[str] = None
+    external_place_id: Optional[str] = None
+    address: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
 
 
 class DayItinerary(BaseModel):

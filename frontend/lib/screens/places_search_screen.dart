@@ -117,60 +117,95 @@ class _PlacesSearchScreenState extends State<PlacesSearchScreen> {
   Widget _buildPlaceCard(PlaceResult place) {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              place.name,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Image section
+          if (place.imageUrl != null && place.imageUrl!.isNotEmpty)
+            Container(
+              width: double.infinity,
+              height: 200,
+              decoration: BoxDecoration(
+                color: Colors.grey[200],
+              ),
+              child: Image.network(
+                place.imageUrl!,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    color: Colors.grey[300],
+                    child: const Center(
+                      child: Icon(Icons.location_on, size: 48, color: Colors.grey),
+                    ),
+                  );
+                },
+              ),
+            )
+          else
+            Container(
+              width: double.infinity,
+              height: 200,
+              color: Colors.grey[300],
+              child: const Center(
+                child: Icon(Icons.location_on, size: 48, color: Colors.grey),
               ),
             ),
-            const SizedBox(height: 8),
-            if (place.formattedAddress != null)
-              Text(
-                place.formattedAddress!,
-                style: const TextStyle(color: Colors.grey),
-              ),
-            const SizedBox(height: 8),
-            Row(
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (place.geometry != null)
+                Text(
+                  place.name,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                if (place.formattedAddress != null)
                   Text(
-                    '📍 ${place.geometry!.lat.toStringAsFixed(4)}, ${place.geometry!.lng.toStringAsFixed(4)}',
-                    style: const TextStyle(fontSize: 12),
+                    place.formattedAddress!,
+                    style: const TextStyle(color: Colors.grey),
                   ),
-                const Spacer(),
-                if (place.rating != null)
-                  Row(
-                    children: [
-                      const Icon(Icons.star, color: Colors.amber, size: 16),
-                      const SizedBox(width: 4),
-                      Text(place.rating!.toString()),
-                    ],
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    if (place.geometry != null)
+                      Text(
+                        '📍 ${place.geometry!.lat.toStringAsFixed(4)}, ${place.geometry!.lng.toStringAsFixed(4)}',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    const Spacer(),
+                    if (place.rating != null)
+                      Row(
+                        children: [
+                          const Icon(Icons.star, color: Colors.amber, size: 16),
+                          const SizedBox(width: 4),
+                          Text(place.rating!.toString()),
+                        ],
+                      ),
+                  ],
+                ),
+                if (place.types.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: place.types
+                        .take(3)
+                        .map(
+                          (type) => Chip(
+                            label: Text(type),
+                            labelStyle: const TextStyle(fontSize: 12),
+                          ),
+                        )
+                        .toList(),
                   ),
+                ],
               ],
             ),
-            if (place.types.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                children: place.types
-                    .take(3)
-                    .map(
-                      (type) => Chip(
-                        label: Text(type),
-                        labelStyle: const TextStyle(fontSize: 12),
-                      ),
-                    )
-                    .toList(),
-              ),
-            ],
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
