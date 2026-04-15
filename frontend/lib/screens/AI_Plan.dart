@@ -650,7 +650,7 @@ class _AI_PlanState extends State<AI_Plan> {
           ),
           const SizedBox(height: 12),
           SizedBox(
-            height: 180,
+            height: MediaQuery.of(context).size.height * 0.22,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 27),
@@ -773,50 +773,55 @@ class _PlaceCard extends StatelessWidget {
       {required this.place, required this.showDelete, required this.onDelete});
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Container(
-          width: 155,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.grey.shade200),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
+  final double screenWidth = MediaQuery.of(context).size.width;
+  final double cardWidth = screenWidth * 0.38;
+  final double imageHeight = cardWidth * 0.72;
+
+  return Stack(
+    children: [
+      Container(
+        width: cardWidth,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey.shade200),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(16),
+                topRight: Radius.circular(16),
               ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ClipRRect(
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(16),
-                  topRight: Radius.circular(16),
-                ),
-                child: Image.asset(
-                  place.image,
-                  width: 155,
-                  height: 110,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      width: 155,
-                      height: 110,
-                      color: const Color(0xFF4675B8),
-                      child: const Icon(Icons.place,
-                          size: 50, color: Colors.white),
-                    );
-                  },
-                ),
+              child: Image.asset(
+                place.image,
+                width: cardWidth,
+                height: imageHeight,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    width: cardWidth,
+                    height: imageHeight,
+                    color: const Color(0xFF4675B8),
+                    child: const Icon(Icons.place, size: 50, color: Colors.white),
+                  );
+                },
               ),
-              Padding(
+            ),
+            Expanded(
+              child: Padding(
                 padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Row(
                       children: [
@@ -833,8 +838,7 @@ class _PlaceCard extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 4),
-                        const Icon(Icons.star,
-                            size: 12, color: Color(0xFFFACC15)),
+                        const Icon(Icons.star, size: 12, color: Color(0xFFFACC15)),
                         const SizedBox(width: 2),
                         Text(
                           '${place.rating}',
@@ -849,15 +853,17 @@ class _PlaceCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     Row(
                       children: [
-                        const Icon(Icons.location_on,
-                            size: 10, color: Color(0xFF4675B8)),
+                        const Icon(Icons.location_on, size: 10, color: Color(0xFF4675B8)),
                         const SizedBox(width: 4),
-                        Text(
-                          place.location,
-                          style: TextStyle(
-                            fontFamily: 'Poppins',
-                            fontSize: 11,
-                            color: Colors.grey.shade500,
+                        Expanded(
+                          child: Text(
+                            place.location,
+                            style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 11,
+                              color: Colors.grey.shade500,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
@@ -865,23 +871,24 @@ class _PlaceCard extends StatelessWidget {
                   ],
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
-        if (showDelete)
-          Positioned(
-            top: 4,
-            right: 4,
-            child: GestureDetector(
-              onTap: onDelete,
-              child: const Icon(
-                Icons.close,
-                color: Color.fromARGB(255, 0, 0, 0),
-                size: 20,
-              ),
+      ),
+      if (showDelete)
+        Positioned(
+          top: 4,
+          right: 4,
+          child: GestureDetector(
+            onTap: onDelete,
+            child: const Icon(
+              Icons.close,
+              color: Color.fromARGB(255, 0, 0, 0),
+              size: 20,
             ),
           ),
-      ],
-    );
-  }
+        ),
+    ],
+  );
+}
 }
