@@ -43,6 +43,7 @@ class ApiConfig {
   static const String placesPath = '/api/places';
   static const String chatPath = '/api/chat';
   static const String aiPath = '/api/ai';
+  static const String suggestionsPath = '/api/suggestions';
 
   // Request timeout
   static const Duration requestTimeout = Duration(seconds: 30);

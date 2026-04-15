@@ -5,6 +5,7 @@ import 'profile.dart';
 import 'close_spots.dart';
 import 'group_suggested_itinerary.dart';
 import 'plans_list.dart';
+import 'notifications_view.dart';
 import '../core/animations/animation_constants.dart';
 import '../services/bonder_service.dart';
 import '../services/chat_service.dart';
@@ -269,6 +270,19 @@ class _BondersState extends State<Bonders> {
                             const SizedBox(width: 15),
                             GestureDetector(
                               onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const NotificationsView(),
+                                  ),
+                                );
+                              },
+                              child: const Icon(Icons.notifications_outlined,
+                                  size: 24, color: Color(0xFF1E1E1E)),
+                            ),
+                            const SizedBox(width: 15),
+                            GestureDetector(
+                              onTap: () {
                                 setState(() {
                                   _isSearching = !_isSearching;
                                   if (!_isSearching) {
@@ -503,7 +517,7 @@ class _BondersState extends State<Bonders> {
                 onTap: () => Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(
-                        builder: (_) => const PlansList()))),
+                        builder: (_) => const PlansList(source: 'home')))),
             _navIcon(Icons.search,
                 onTap: () => Navigator.pushReplacement(
                     context,

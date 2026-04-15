@@ -660,7 +660,7 @@ class _DestinationLandingPageState extends State<DestinationLandingPage> {
                       onTap: () => Navigator.pushReplacement(
                           context,
                           MaterialPageRoute(
-                              builder: (_) => const PlansList()))),
+                              builder: (_) => const PlansList(source: 'home')))),
                   _navIcon(Icons.search, active: true),
                   _navIcon(Icons.location_on_outlined,
                       onTap: () => Navigator.pushReplacement(

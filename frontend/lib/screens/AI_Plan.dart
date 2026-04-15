@@ -5,6 +5,7 @@ import 'profile.dart';
 import 'close_spots.dart';
 import 'group_suggested_itinerary.dart';
 import 'plans_list.dart';
+import 'BondersSuggestions.dart';
 import '../services/trip_service.dart';
 
 class Place {
@@ -168,13 +169,20 @@ class _AI_PlanState extends State<AI_Plan> {
       final mappedSuggestions =
           _mapSuggestionsFromRecommendations(recommendations);
 
+      // Load actual place suggestions from database
+      final placeSuggestions =
+          await _tripService.getPlaceSuggestions(widget.tripId!);
+      final mappedPlaceSuggestions = _mapPlaceSuggestions(placeSuggestions);
+
       if (!mounted) return;
       setState(() {
         if (mapped.isNotEmpty) {
           _itinerary = mapped;
         }
-        if (mappedSuggestions.isNotEmpty) {
-          suggestions = mappedSuggestions;
+        // Combine AI recommendations and user-added suggestions
+        var allSuggestions = [...mappedSuggestions, ...mappedPlaceSuggestions];
+        if (allSuggestions.isNotEmpty) {
+          suggestions = allSuggestions;
           hasNotification = true;
         }
       });
@@ -253,6 +261,24 @@ class _AI_PlanState extends State<AI_Plan> {
     }).toList();
   }
 
+  List<Map<String, dynamic>> _mapPlaceSuggestions(
+      List<Map<String, dynamic>> placeSuggestions) {
+    return placeSuggestions.map((suggestion) {
+      return {
+        'name': (suggestion['name'] ?? 'Place').toString(),
+        'type': (suggestion['place_types'] is List &&
+                (suggestion['place_types'] as List).isNotEmpty)
+            ? ((suggestion['place_types'] as List).first).toString()
+            : 'Place',
+        'location': (suggestion['address'] ?? _activeDestination).toString(),
+        'person': 'You',
+        'personColor': const Color(0xFFC4A44A),
+        'highlight': true,
+        'action': 'add',
+      };
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -300,7 +326,7 @@ class _AI_PlanState extends State<AI_Plan> {
           GestureDetector(
             onTap: () => Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const PlansList()),
+              MaterialPageRoute(builder: (_) => const PlansList(source: 'generatedPlan')),
             ),
             child: const Icon(Icons.arrow_back, size: 24),
           ),
@@ -323,7 +349,15 @@ class _AI_PlanState extends State<AI_Plan> {
                     padding: EdgeInsets.zero,
                     icon: const Icon(Icons.notifications_outlined, size: 22),
                     onPressed: () {
-                      _showBondersSuggestions(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => BondersSuggestions(
+                            suggestions: suggestions,
+                            source: 'generatedPlan',
+                          ),
+                        ),
+                      );
                       setState(() => hasNotification = false);
                     },
                   ),
@@ -410,207 +444,6 @@ class _AI_PlanState extends State<AI_Plan> {
           ),
         ],
       ),
-    );
-  }
-
-  void _showBondersSuggestions(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return Container(
-          constraints: BoxConstraints(
-              maxHeight: MediaQuery.of(context).size.height * 0.75),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(28), topRight: Radius.circular(28)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Center(
-                child: Container(
-                  margin: const EdgeInsets.only(top: 12, bottom: 4),
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                      color: Colors.grey.shade300,
-                      borderRadius: BorderRadius.circular(2)),
-                ),
-              ),
-              const Padding(
-                padding: EdgeInsets.fromLTRB(24, 8, 24, 12),
-                child: Align(
-                  alignment: Alignment.center,
-                  child: Text(
-                    'Bonders Suggestions',
-                    style: TextStyle(
-                      fontFamily: 'Poppins',
-                      fontWeight: FontWeight.w700,
-                      fontSize: 22,
-                    ),
-                  ),
-                ),
-              ),
-              Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                child: Row(
-                  children: const [
-                    Text('Action',
-                        style:
-                            TextStyle(color: Color(0xFF9E9E9E), fontSize: 14)),
-                    SizedBox(width: 40),
-                    Text('Course',
-                        style:
-                            TextStyle(color: Color(0xFF9E9E9E), fontSize: 14)),
-                    Spacer(),
-                    Icon(Icons.filter_list, color: Color(0xFF9E9E9E), size: 20),
-                  ],
-                ),
-              ),
-              Flexible(
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                  itemCount: suggestions.length,
-                  itemBuilder: (context, i) {
-                    final s = suggestions[i];
-                    final isHighlight = s['highlight'] as bool;
-                    final isAdd = s['action'] == 'add';
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          SizedBox(
-                            width: 60,
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(isAdd ? 'Add' : 'Delete',
-                                    style: TextStyle(
-                                        fontFamily: 'Poppins',
-                                        fontSize: 12,
-                                        color: Colors.grey.shade500)),
-                                Icon(
-                                    isAdd
-                                        ? Icons.add_circle_outline
-                                        : Icons.delete_outline,
-                                    size: 24,
-                                    color: Colors.grey.shade600),
-                              ],
-                            ),
-                          ),
-                          Expanded(
-                            child: Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: isHighlight
-                                    ? const Color(0xFFE8D5A0)
-                                    : Colors.white,
-                                border: Border.all(
-                                    color: isHighlight
-                                        ? const Color(0xFFD4BC7A)
-                                        : Colors.grey.shade200),
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(s['name'] as String,
-                                          style: TextStyle(
-                                              fontFamily: 'Poppins',
-                                              fontWeight: FontWeight.w700,
-                                              fontSize: 16,
-                                              color: isHighlight
-                                                  ? Colors.white
-                                                  : Colors.black)),
-                                      Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(Icons.favorite_border,
-                                              size: 18,
-                                              color: isHighlight
-                                                  ? Colors.white
-                                                  : const Color(0xFFC4A44A)),
-                                          const SizedBox(width: 12),
-                                          Icon(Icons.close,
-                                              size: 18,
-                                              color: isHighlight
-                                                  ? Colors.white
-                                                  : const Color(0xFF1E1E1E)),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                  Text(s['type'] as String,
-                                      style: TextStyle(
-                                          fontFamily: 'Poppins',
-                                          fontSize: 13,
-                                          color: isHighlight
-                                              ? Colors.white70
-                                              : Colors.grey.shade500)),
-                                  const SizedBox(height: 8),
-                                  Row(
-                                    children: [
-                                      Icon(Icons.location_on,
-                                          size: 12,
-                                          color: isHighlight
-                                              ? Colors.white
-                                              : const Color(0xFF4675B8)),
-                                      const SizedBox(width: 4),
-                                      Text(s['location'] as String,
-                                          style: TextStyle(
-                                              fontFamily: 'Poppins',
-                                              fontSize: 12,
-                                              color: isHighlight
-                                                  ? Colors.white70
-                                                  : Colors.grey.shade500)),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Row(
-                                    children: [
-                                      CircleAvatar(
-                                          radius: 8,
-                                          backgroundColor:
-                                              s['personColor'] as Color,
-                                          child: Text(
-                                              (s['person'] as String)[0],
-                                              style: const TextStyle(
-                                                  fontSize: 8,
-                                                  color: Colors.white))),
-                                      const SizedBox(width: 4),
-                                      Text(s['person'] as String,
-                                          style: TextStyle(
-                                              fontFamily: 'Poppins',
-                                              fontSize: 12,
-                                              color: isHighlight
-                                                  ? Colors.white70
-                                                  : Colors.grey.shade500)),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        );
-      },
     );
   }
 
@@ -808,7 +641,7 @@ class _AI_PlanState extends State<AI_Plan> {
                 onTap: () => Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(
-                        builder: (_) => const PlansList()))),
+                        builder: (_) => const PlansList(source: 'home')))),
             _navIcon(Icons.search,
                 onTap: () => Navigator.pushReplacement(
                     context,

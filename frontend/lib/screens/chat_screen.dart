@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/chat_service.dart';
+import 'user_profile_view.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -289,6 +290,20 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
         title: Text(widget.otherUserName),
         backgroundColor: const Color(0xFF4675B8),
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.person),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => UserProfileView(
+                  userId: widget.otherUserId,
+                  userName: widget.otherUserName,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -311,6 +326,30 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                           return _MessageBubble(message: message);
                         },
                       ),
+          ),
+          // View Profile Button
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => UserProfileView(
+                      userId: widget.otherUserId,
+                      userName: widget.otherUserName,
+                    ),
+                  ),
+                ),
+                icon: const Icon(Icons.person),
+                label: Text('View ${widget.otherUserName}\'s Profile'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF4675B8),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            ),
           ),
           Container(
             padding: const EdgeInsets.all(16),

@@ -440,7 +440,7 @@ class _CloseSpotsViewState extends State<_CloseSpotsView> {
               Navigator.push(
                   context,
                   MaterialPageRoute(
-                      builder: (_) => const PlansList()));
+                      builder: (_) => const PlansList(source: 'home')));
             }),
             _navIcon(Icons.search, onTap: () {
               Navigator.push(

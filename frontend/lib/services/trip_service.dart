@@ -605,4 +605,54 @@ class TripService {
       throw Exception('Failed to add place to trip: ${e.toString()}');
     }
   }
+
+  // Suggest a place for the trip (adds to Bonders Suggestions)
+  Future<Map<String, dynamic>> suggestPlaceForTrip(
+    String tripId,
+    Map<String, dynamic> placeData,
+  ) async {
+    try {
+      final token = await _authService.getAuthToken();
+      if (token == null) {
+        throw Exception('Not authenticated');
+      }
+
+      final response = await _apiService.post(
+        '${ApiConfig.suggestionsPath}/$tripId/suggest-place',
+        placeData,
+        token: token,
+      );
+
+      return response;
+    } catch (e) {
+      throw Exception('Failed to suggest place: ${e.toString()}');
+    }
+  }
+
+  // Get Bonders Suggestions for a trip
+  Future<List<Map<String, dynamic>>> getPlaceSuggestions(
+    String tripId, {
+    String? status, // pending, approved
+  }) async {
+    try {
+      final token = await _authService.getAuthToken();
+      if (token == null) {
+        throw Exception('Not authenticated');
+      }
+
+      String url = '${ApiConfig.suggestionsPath}/$tripId/list';
+      if (status != null) {
+        url += '?status=$status';
+      }
+
+      final response = await _apiService.get(
+        url,
+        token: token,
+      );
+
+      return List<Map<String, dynamic>>.from(response['suggestions'] ?? []);
+    } catch (e) {
+      throw Exception('Failed to get suggestions: ${e.toString()}');
+    }
+  }
 }

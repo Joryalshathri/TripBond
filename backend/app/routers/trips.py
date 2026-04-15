@@ -1433,7 +1433,6 @@ async def add_place_to_trip(
         # Place doesn't exist, insert it
         place_record = {
             "trip_id": trip_id,
-            "external_place_id": external_place_id,
             "name": name,
             "address": address,
             "latitude": latitude,
@@ -1441,10 +1440,15 @@ async def add_place_to_trip(
             "rating": rating,
             "user_ratings_total": user_ratings_total,
             "place_types": types,
-            "image_url": image_url,
-            "added_by": user_id,
+            "added_by": None,
             "added_at": datetime.utcnow().isoformat()
         }
+        
+        # Add optional fields only if they have values
+        if external_place_id:
+            place_record["external_place_id"] = external_place_id
+        if image_url:
+            place_record["image_url"] = image_url
         
         insert_result = await run_in_threadpool(
             lambda: db.client.table("trip_places").insert(place_record).execute()

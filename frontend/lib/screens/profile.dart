@@ -677,7 +677,7 @@ class _ProfileState extends State<Profile> {
                 onTap: () => Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(
-                        builder: (_) => const PlansList()))),
+                        builder: (_) => const PlansList(source: 'home')))),
             _navIcon(Icons.search,
                 onTap: () => Navigator.pushReplacement(
                     context,

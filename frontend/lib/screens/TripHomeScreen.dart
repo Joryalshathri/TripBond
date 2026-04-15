@@ -240,7 +240,7 @@ class _TripHomeScreenState extends State<TripHomeScreen>
                         onTap: () => Navigator.pushReplacement(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => const PlansList(),
+                            builder: (_) => const PlansList(source: 'home'),
                           ),
                         ),
                         child: const Icon(Icons.arrow_back, color: Colors.grey),
@@ -562,15 +562,36 @@ class _TripHomeScreenState extends State<TripHomeScreen>
                       ],
                     ),
                     Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Icon(Icons.star, color: Colors.amber, size: 14),
-                        const SizedBox(width: 4),
-                        Text(
-                          rating.toStringAsFixed(1),
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.black,
+                        Row(
+                          children: [
+                            const Icon(Icons.star, color: Colors.amber, size: 14),
+                            const SizedBox(width: 4),
+                            Text(
+                              rating.toStringAsFixed(1),
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.black,
+                              ),
+                            ),
+                          ],
+                        ),
+                        ElevatedButton(
+                          onPressed: () => _addPlaceToItinerary(place),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF4675B8),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            minimumSize: const Size(0, 32),
+                          ),
+                          child: const Text(
+                            'Add',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                       ],
@@ -583,6 +604,101 @@ class _TripHomeScreenState extends State<TripHomeScreen>
         ),
       ),
     );
+  }
+
+  bool _hasValidCoordinates(Map<String, dynamic> place) {
+    final lat = place['latitude'];
+    final lon = place['longitude'];
+    
+    // Coordinates are valid if they exist and are not 0
+    bool latValid = lat != null && (lat is num) && lat != 0.0;
+    bool lonValid = lon != null && (lon is num) && lon != 0.0;
+    
+    return latValid && lonValid;
+  }
+  
+  Map<String, double> _getCoordinatesWithFallback(Map<String, dynamic> place, String destination) {
+    final lat = place['latitude'];
+    final lon = place['longitude'];
+    
+    // Use actual coordinates if available
+    if (lat != null && (lat is num) && lat != 0.0 &&
+        lon != null && (lon is num) && lon != 0.0) {
+      return {
+        'latitude': (lat as num).toDouble(),
+        'longitude': (lon as num).toDouble(),
+      };
+    }
+    
+    // Fallback: Use destination center coordinates (Jeddah example: 21.5426, 39.1725)
+    // For Jeddah
+    if (destination.toLowerCase().contains('jeddah')) {
+      return {
+        'latitude': 21.5426,
+        'longitude': 39.1725,
+      };
+    }
+    
+    // Generic fallback (could improve with geocoding API)
+    return {
+      'latitude': 0.0,
+      'longitude': 0.0,
+    };
+  }
+
+  Future<void> _addPlaceToItinerary(Map<String, dynamic> place) async {
+    try {
+      final name = place['name'] as String? ?? 'Unknown Place';
+      final address = place['location'] as String? ?? '';
+      final rating = place['rating'] as num? ?? 0.0;
+      final userRatingsTotal = place['review_count'] as int? ?? 0;
+      
+      // Get coordinates with fallback to destination center if missing
+      final coords = _getCoordinatesWithFallback(place, widget.destination ?? 'Jeddah');
+      final latitude = coords['latitude']!;
+      final longitude = coords['longitude']!;
+
+      // Build itinerary item with backend expected fields
+      // API returns 'type' (singular), backend endpoint expects 'types' (list)
+      final placeType = place['type'] as String? ?? 'attraction';
+      
+      final placeData = {
+        'name': name,
+        'latitude': latitude,
+        'longitude': longitude,
+        'address': address,
+        'rating': rating,
+        'user_ratings_total': userRatingsTotal,
+        'types': [placeType],  // Convert single type to list
+        'image_url': place['image_url'] ?? '',
+      };
+
+      // Suggest place to Bonders Suggestions (AI will evaluate)
+      await _tripService.suggestPlaceForTrip(
+        widget.tripId ?? '',
+        placeData,
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✓ $name added'),
+            duration: const Duration(seconds: 2),
+            backgroundColor: Colors.blue,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error suggesting place: $e'),
+            duration: const Duration(seconds: 2),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Widget _buildTopPlaceCard(Map<String, dynamic> place) {

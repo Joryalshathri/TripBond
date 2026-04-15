@@ -69,7 +69,8 @@ const List<Color> _avatarColors = [
 ];
 
 class PlansList extends StatefulWidget {
-  const PlansList({super.key});
+  final String source; // 'home' or 'generatedPlan'
+  const PlansList({super.key, this.source = 'home'});
 
   @override
   State<PlansList> createState() => _PlansListState();
@@ -270,16 +271,33 @@ class _PlansListState extends State<PlansList> {
         plan is PlanItem ? plan.name : (plan['destination'] ?? name).toString();
 
     return GestureDetector(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => TripHomeScreen(
-            tripId: tripId,
-            tripTitle: name,
-            destination: destination,
-          ),
-        ),
-      ),
+      onTap: () {
+        if (widget.source == 'generatedPlan' && tripId != null) {
+          // From generated plan - navigate to AI_Plan for that trip
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => AI_Plan(
+                tripId: tripId,
+                destination: destination,
+                tripTitle: name,
+              ),
+            ),
+          );
+        } else {
+          // From home - navigate to TripHomeScreen for editing
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => TripHomeScreen(
+                tripId: tripId,
+                tripTitle: name,
+                destination: destination,
+              ),
+            ),
+          );
+        }
+      },
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(12),
