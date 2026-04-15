@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'close_spots.dart';
 import 'Bonder.dart';
 import 'profile.dart';
@@ -7,6 +8,7 @@ import 'AI_Plan.dart';
 import 'plans_list.dart';
 import 'BondersSuggestions.dart';
 import '../services/trip_service.dart';
+import '../providers/user_provider.dart';
 
 final List<DateTime> _fallbackTripDays = [
   DateTime(2026, 4, 9),
@@ -187,7 +189,10 @@ class _GroupSuggestedItineraryState extends State<GroupSuggestedItinerary> {
       // Load actual place suggestions from database
       final placeSuggestions =
           await _tripService.getPlaceSuggestions(widget.tripId!);
-      final mappedPlaceSuggestions = _mapPlaceSuggestions(placeSuggestions);
+      final currentUserId =
+          Provider.of<UserProvider>(context, listen: false).currentProfile?['id'];
+      final mappedPlaceSuggestions =
+          _mapPlaceSuggestions(placeSuggestions, currentUserId);
 
       if (!mounted || mappedDays.isEmpty) return;
       print('DEBUG: Successfully loaded ${mappedDays.length} days from API');
@@ -225,8 +230,9 @@ class _GroupSuggestedItineraryState extends State<GroupSuggestedItinerary> {
   }
 
   List<Map<String, dynamic>> _mapPlaceSuggestions(
-      List<Map<String, dynamic>> placeSuggestions) {
+      List<Map<String, dynamic>> placeSuggestions, dynamic currentUserId) {
     return placeSuggestions.map((suggestion) {
+      final isCurrentUserSuggestion = suggestion['suggested_by'] == currentUserId;
       return {
         'name': (suggestion['name'] ?? 'Place').toString(),
         'type': (suggestion['place_types'] is List &&
@@ -234,10 +240,13 @@ class _GroupSuggestedItineraryState extends State<GroupSuggestedItinerary> {
             ? ((suggestion['place_types'] as List).first).toString()
             : 'Place',
         'location': (suggestion['address'] ?? widget.destination ?? 'Trip').toString(),
-        'person': 'You',
-        'personColor': const Color(0xFFC4A44A),
-        'highlight': true,
+        'person': isCurrentUserSuggestion ? 'You' : 'Bonder',
+        'personColor': isCurrentUserSuggestion
+            ? const Color(0xFFC4A44A)
+            : const Color(0xFF4675B8),
+        'highlight': isCurrentUserSuggestion,
         'action': 'add',
+        'suggested_by': suggestion['suggested_by'],
       };
     }).toList();
   }
@@ -564,17 +573,44 @@ class _GroupSuggestedItineraryState extends State<GroupSuggestedItinerary> {
                     visualDensity: VisualDensity.compact,
                     padding: EdgeInsets.zero,
                     icon: const Icon(Icons.notifications_outlined, size: 22),
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => BondersSuggestions(
-                            suggestions: suggestions,
-                            source: 'home',
-                          ),
-                        ),
-                      );
-                      setState(() => hasNotification = false);
+                    onPressed: () async {
+                      // Reload suggestions before opening the page
+                      try {
+                        final placeSuggestions =
+                            await _tripService.getPlaceSuggestions(widget.tripId!);
+                        final currentUserId =
+                            Provider.of<UserProvider>(context, listen: false)
+                                .currentProfile?['id'];
+                        final mappedPlaceSuggestions =
+                            _mapPlaceSuggestions(placeSuggestions, currentUserId);
+
+                        if (mounted) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => BondersSuggestions(
+                                suggestions: mappedPlaceSuggestions,
+                                source: 'home',
+                              ),
+                            ),
+                          );
+                          setState(() => hasNotification = false);
+                        }
+                      } catch (e) {
+                        print('Error reloading suggestions: $e');
+                        if (mounted) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => BondersSuggestions(
+                                suggestions: suggestions,
+                                source: 'home',
+                              ),
+                            ),
+                          );
+                          setState(() => hasNotification = false);
+                        }
+                      }
                     },
                   ),
                   if (hasNotification)

@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/user_provider.dart';
 
 class BondersSuggestions extends StatefulWidget {
   final List<Map<String, dynamic>> suggestions;
   final String? source;
+  final String? currentUserId;
 
   const BondersSuggestions({
     super.key,
     required this.suggestions,
     this.source = 'home',
+    this.currentUserId,
   });
 
   @override
@@ -15,8 +19,19 @@ class BondersSuggestions extends StatefulWidget {
 }
 
 class _BondersSuggestionsState extends State<BondersSuggestions> {
+  List<Map<String, dynamic>> _getFilteredSuggestions() {
+    // Show only suggestions marked as 'highlight: true' (added by current user)
+    return widget.suggestions.where((s) => s['highlight'] == true).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final filteredSuggestions = _getFilteredSuggestions();
+    print('DEBUG: BondersSuggestions - Total suggestions: ${widget.suggestions.length}');
+    print('DEBUG: Filtered suggestions (highlight=true): ${filteredSuggestions.length}');
+    for (var s in filteredSuggestions) {
+      print('DEBUG: Suggestion - ${s['name']}, highlight: ${s['highlight']}, person: ${s['person']}');
+    }
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -54,22 +69,35 @@ class _BondersSuggestionsState extends State<BondersSuggestions> {
             ),
           ),
           Expanded(
-            child: widget.suggestions.isEmpty
+            child: filteredSuggestions.isEmpty
                 ? Center(
-                    child: Text(
-                      'No suggestions yet',
-                      style: TextStyle(
-                        color: Colors.grey.shade600,
-                        fontSize: 16,
-                        fontFamily: 'Poppins',
-                      ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'No suggestions yet',
+                          style: TextStyle(
+                            color: Colors.grey.shade600,
+                            fontSize: 16,
+                            fontFamily: 'Poppins',
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Total suggestions received: ${widget.suggestions.length}',
+                          style: TextStyle(
+                            color: Colors.grey.shade400,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
                     ),
                   )
                 : ListView.builder(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                    itemCount: widget.suggestions.length,
+                    itemCount: filteredSuggestions.length,
                     itemBuilder: (context, i) {
-                      final s = widget.suggestions[i];
+                      final s = filteredSuggestions[i];
                       final isHighlight = s['highlight'] as bool;
                       final isAdd = s['action'] == 'add';
                       return Padding(

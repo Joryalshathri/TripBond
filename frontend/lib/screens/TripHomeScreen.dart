@@ -8,6 +8,7 @@ import 'DestinationLandingPage.dart';
 import 'profile.dart';
 import 'close_spots.dart';
 import 'group_suggested_itinerary.dart';
+import 'AI_Plan.dart';
 import 'Bonder.dart';
 import 'plans_list.dart';
 
@@ -253,9 +254,45 @@ class _TripHomeScreenState extends State<TripHomeScreen>
                           color: Colors.grey,
                         ),
                       ),
-                      const CircleAvatar(
-                        radius: 18,
-                        backgroundImage: AssetImage('assets/images/people/profile.png'),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Tooltip(
+                            message: 'View suggestions',
+                            child: GestureDetector(
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => AI_Plan(
+                                    tripId: widget.tripId,
+                                    tripTitle: widget.tripTitle,
+                                    destination: widget.destination,
+                                  ),
+                                ),
+                              ),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF4675B8),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Text(
+                                  'View',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          const CircleAvatar(
+                            radius: 18,
+                            backgroundImage: AssetImage('assets/images/people/profile.png'),
+                          ),
+                        ],
                       ),
                     ],
                   ),
