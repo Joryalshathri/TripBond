@@ -65,6 +65,13 @@ print(
 print("4) Fetch latest itinerary")
 latest = call("GET", f"/api/trips/{trip_id}/itinerary", token=token)
 print(f"   Latest itinerary days: {latest.get('total_days')}")
+# Print first day's activities to verify place names
+if latest.get("days") and len(latest["days"]) > 0:
+    first_day_activities = latest["days"][0].get("activities", [])
+    if first_day_activities:
+        print(f"   Day 1 activities:")
+        for activity in first_day_activities[:2]:
+            print(f"     - {activity.get('name', 'Unknown')} ({activity.get('title', 'N/A')})")
 
 print("5) Fetch recommendations")
 recs = call("GET", f"/api/trips/{trip_id}/recommendations?limit=3", token=token)

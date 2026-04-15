@@ -212,10 +212,17 @@ async def get_public_trip_itinerary(trip_id: str):
             activity = {
                 "id": item["id"],
                 "name": item["title"],
+                "type": item.get("type", "activity"),
+                "location": item.get("location") or trip.get("destination", "Unknown"),
                 "start_time": item["start_time"],
                 "end_time": item["end_time"],
-                "notes": item["notes"],
-                "score": item["score"]
+                "description": item.get("notes", ""),
+                "cost": item.get("cost"),
+                "rating": item.get("rating"),
+                "priority": item.get("priority", 1),
+                "photo_url": item.get("photo_url"),
+                "fsq_id": item.get("fsq_id"),
+                "score": item.get("score")
             }
             days_dict[day_idx]["activities"].append(activity)
         
@@ -787,14 +794,16 @@ async def generate_trip_itinerary(
         items_to_insert = []
         for day in itinerary_data.get("days", []):
             for activity in day.get("activities", []):
-                items_to_insert.append({
+                item = {
                     "day_index": day.get("day"),
                     "start_time": activity.get("start_time"),
                     "end_time": activity.get("end_time"),
                     "title": activity.get("name"),
                     "notes": activity.get("description"),
-                    "score": activity.get("score", 0.0)
-                })
+                    "score": activity.get("score", 0.0),
+                }
+                    
+                items_to_insert.append(item)
         
         await run_in_threadpool(
             lambda: insert_items(itinerary_id, items_to_insert)
@@ -877,13 +886,23 @@ async def get_itinerary(
             
             activity = {
                 "id": item["id"],
-                "name": item["title"],
-                "type": "activity",
-                "location": "Unknown",
+                "name": item.get("name") or item.get("title", "Activity"),
+                "title": item["title"],
+                "type": item.get("type", "activity"),
+                "location": item.get("location") or item.get("notes") or trip.get("destination", "Unknown"),
                 "start_time": item["start_time"],
                 "end_time": item["end_time"],
-                "description": item["notes"],
-                "priority": 1,
+                "description": item.get("notes", ""),
+                "priority": item.get("priority", 1),
+                "rating": item.get("rating", 4.0),
+                "cost": item.get("cost", 0),
+                # Include place data fields where they may exist
+                "external_place_id": item.get("external_place_id"),
+                "place_id": item.get("place_id"),
+                "fsq_id": item.get("fsq_id"),
+                "latitude": item.get("latitude"),
+                "longitude": item.get("longitude"),
+                "photo_url": item.get("photo_url"),
             }
             days_dict[day_idx]["activities"].append(activity)
         
@@ -1206,5 +1225,201 @@ async def mark_recommendations_selected(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to record selections"
+        )
+
+
+# ==================== Place Endpoints ====================
+
+@router.post("/{trip_id}/places/check-duplicate")
+async def check_place_duplicate(
+    trip_id: str,
+    place_data: dict,
+    user_context: tuple[str, str] = Depends(get_current_user_context)
+):
+    """
+    Check if a place already exists in the trip.
+    
+    Duplicate detection rules:
+    1. Prefer external_place_id for matching
+    2. Fallback to (name + latitude + longitude)
+    3. Include trip_id in check
+    
+    Returns:
+    {
+        "already_exists": bool,
+        "message": str,
+        "place_id": str (if exists)
+    }
+    """
+    user_id, token = user_context
+    
+    try:
+        await check_trip_access(trip_id, user_id, token=token, required_role="view")
+        
+        external_place_id = place_data.get("external_place_id")
+        name = place_data.get("name")
+        latitude = place_data.get("latitude")
+        longitude = place_data.get("longitude")
+        
+        db = SupabaseDB(admin=True)
+        
+        # Try to find by external_place_id first
+        if external_place_id:
+            result = await run_in_threadpool(
+                lambda: db.client.table("trip_places").select("id").eq("trip_id", trip_id).eq("external_place_id", external_place_id).execute()
+            )
+            
+            if result.data:
+                return {
+                    "already_exists": True,
+                    "message": f"This place is already in your trip",
+                    "place_id": result.data[0]["id"]
+                }
+        
+        # Fallback to name + lat/lng if no external_place_id
+        if name and latitude is not None and longitude is not None:
+            result = await run_in_threadpool(
+                lambda: db.client.table("trip_places").select("id").eq("trip_id", trip_id).eq("name", name).eq("latitude", latitude).eq("longitude", longitude).execute()
+            )
+            
+            if result.data:
+                return {
+                    "already_exists": True,
+                    "message": f"{name} is already in your trip",
+                    "place_id": result.data[0]["id"]
+                }
+        
+        return {
+            "already_exists": False,
+            "message": "Place is not in trip"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Failed to check place duplicate: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to check place duplicate"
+        )
+
+
+@router.post("/{trip_id}/places/add")
+async def add_place_to_trip(
+    trip_id: str,
+    place_data: dict,
+    user_context: tuple[str, str] = Depends(get_current_user_context)
+):
+    """
+    Add a place to the trip with duplicate detection.
+    
+    Expected place_data:
+    {
+        "external_place_id": str,
+        "name": str,
+        "latitude": float,
+        "longitude": float,
+        "address": str,
+        "rating": float,
+        "user_ratings_total": int,
+        "types": list
+    }
+    
+    Returns:
+    {
+        "success": bool,
+        "id": str (place id),
+        "already_exists": bool,
+        "message": str
+    }
+    """
+    user_id, token = user_context
+    
+    try:
+        await check_trip_access(trip_id, user_id, token=token, required_role="edit")
+        
+        external_place_id = place_data.get("external_place_id")
+        name = place_data.get("name")
+        latitude = place_data.get("latitude")
+        longitude = place_data.get("longitude")
+        address = place_data.get("address", "")
+        rating = place_data.get("rating")
+        user_ratings_total = place_data.get("user_ratings_total")
+        types = place_data.get("types", [])
+        
+        if not name or latitude is None or longitude is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Missing required fields: name, latitude, longitude"
+            )
+        
+        db = SupabaseDB(admin=True)
+        
+        # Check for duplicates first
+        # Try external_place_id
+        if external_place_id:
+            result = await run_in_threadpool(
+                lambda: db.client.table("trip_places").select("id").eq("trip_id", trip_id).eq("external_place_id", external_place_id).execute()
+            )
+            
+            if result.data:
+                return {
+                    "success": False,
+                    "already_exists": True,
+                    "id": result.data[0]["id"],
+                    "message": f"{name} is already in your trip"
+                }
+        
+        # Fallback to name + lat/lng
+        result = await run_in_threadpool(
+            lambda: db.client.table("trip_places").select("id").eq("trip_id", trip_id).eq("name", name).eq("latitude", latitude).eq("longitude", longitude).execute()
+        )
+        
+        if result.data:
+            return {
+                "success": False,
+                "already_exists": True,
+                "id": result.data[0]["id"],
+                "message": f"{name} is already in your trip"
+            }
+        
+        # Place doesn't exist, insert it
+        place_record = {
+            "trip_id": trip_id,
+            "external_place_id": external_place_id,
+            "name": name,
+            "address": address,
+            "latitude": latitude,
+            "longitude": longitude,
+            "rating": rating,
+            "user_ratings_total": user_ratings_total,
+            "place_types": types,
+            "added_by": user_id,
+            "added_at": datetime.utcnow().isoformat()
+        }
+        
+        insert_result = await run_in_threadpool(
+            lambda: db.client.table("trip_places").insert(place_record).execute()
+        )
+        
+        if insert_result.data:
+            place_id = insert_result.data[0]["id"]
+            logger.info(f"Added place {name} ({place_id}) to trip {trip_id}")
+            return {
+                "success": True,
+                "already_exists": False,
+                "id": place_id,
+                "message": f"✓ {name} added to your trip"
+            }
+        else:
+            raise Exception("Insert returned no data")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Failed to add place to trip: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to add place to trip: {str(e)}"
         )
 

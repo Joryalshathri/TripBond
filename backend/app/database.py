@@ -46,11 +46,12 @@ def get_supabase_admin_client() -> Client:
 
 @lru_cache()
 def get_supabase_anon_client() -> Client:
-    """Anon client: base client that respects RLS when user JWT is provided."""
+    """Base client for token validation and user-scoped requests."""
     settings = get_settings()
+    api_key = settings.supabase_service_role_key or settings.supabase_key
     return create_client(
         supabase_url=settings.supabase_url,
-        supabase_key=settings.supabase_anon_key
+        supabase_key=api_key
     )
 
 
@@ -62,13 +63,14 @@ def get_supabase_client_for_user(access_token: str) -> Client:
     apply correctly and operations are scoped to the authenticated user.
     """
     settings = get_settings()
+    api_key = settings.supabase_service_role_key or settings.supabase_key
     client = create_client(
         supabase_url=settings.supabase_url,
-        supabase_key=settings.supabase_anon_key
+        supabase_key=api_key
     )
     
     client.options.headers.update({
-        "apikey": settings.supabase_anon_key,
+        "apikey": api_key,
         "Authorization": f"Bearer {access_token}",
     })
     

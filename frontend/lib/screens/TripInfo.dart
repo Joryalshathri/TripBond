@@ -53,24 +53,33 @@ class _TripinfoState extends State<TripInfo> {
   }
 
   Future<void> _loadPreferredPlaces() async {
-    if (selectedCityForTrip.isEmpty) return;
+    if (selectedCityForTrip.isEmpty) {
+      print('DEBUG: selectedCityForTrip is empty');
+      return;
+    }
+    print('DEBUG: Loading places for $selectedCityForTrip');
     setState(() => _isLoadingPlaces = true);
     try {
       final places = await _placesService.searchPlaces(
         query: 'top places in $selectedCityForTrip',
       );
-      final names = places
-          .map((p) => (p['name'] ?? '').toString().trim())
+      print('DEBUG: Got places response with ${places.results.length} results');
+      final names = places.results
+          .map((p) => p.name.trim())
           .where((name) => name.isNotEmpty)
           .toSet()
           .toList();
+      print('DEBUG: Filtered to ${names.length} place names');
       if (!mounted) return;
       setState(() {
         _preferredPlaces
           ..clear()
           ..addAll(names.take(12));
       });
-    } catch (_) {
+      print('DEBUG: Updated UI with ${_preferredPlaces.length} places');
+    } catch (e, st) {
+      print('ERROR loading places: $e');
+      print('STACKTRACE: $st');
       if (!mounted) return;
       setState(() {
         _preferredPlaces
@@ -108,8 +117,27 @@ class _TripinfoState extends State<TripInfo> {
         'is_public': true,
       };
 
+      print('[TripInfo] Creating trip with data: $tripData');
       final createdTrip = await _tripService.createTrip(tripData);
       final tripId = (createdTrip['id'] ?? '').toString();
+      print('[TripInfo] Trip created with ID: $tripId');
+
+      if (tripId.isNotEmpty) {
+        print('[TripInfo] Generating itinerary for trip $tripId');
+        try {
+          await _tripService.generateItinerary(
+            tripId,
+            {
+              'trip_type': _selectedTripType,
+              'preferences': {},
+            },
+          );
+          print('[TripInfo] Itinerary generated successfully');
+        } catch (e) {
+          print('[TripInfo] Error generating itinerary: $e');
+          // Continue anyway, AI_Plan will show fallback
+        }
+      }
 
       if (!mounted) return;
       Navigator.push(

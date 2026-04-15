@@ -1,36 +1,41 @@
 """
-Google Places Router
+TomTom Search & Places Router
 
-Exposes Google Places API endpoints consumed by the TripBond homepage:
-  GET /api/places/search          – text search (destination search bar)
-  GET /api/places/nearby          – nearby places search
+Exposes TomTom Search API endpoints consumed by the TripBond app:
+  GET /api/places/search          – text/fuzzy search (destination search bar)
+  GET /api/places/nearby          – nearby places search (proximity search)
   GET /api/places/details/{id}    – full place details
-  GET /api/places/photo-url       – build a photo URL for a given photo_reference
+  GET /api/places/photo-url       – photo URL helper
 """
 
 from fastapi import APIRouter, Query
 from typing import Optional
 from ..schemas.places import PlacesSearchResponse, PlaceDetailsResponse
-from ..services import google_places_service
+from ..services import tomtom_service
 
 router = APIRouter()
 
 
 @router.get("/search", response_model=PlacesSearchResponse)
 async def search_places(
-    query: str = Query(..., description="Free-text search query, e.g. 'beaches in Bali'"),
+    q: str = Query(..., description="Free-text search query, e.g. 'beaches in Bali'"),
+    lat: Optional[float] = Query(None, description="Optional latitude for spatial biasing"),
+    lng: Optional[float] = Query(None, description="Optional longitude for spatial biasing"),
     language: str = Query("en", description="BCP-47 language code for results"),
-    next_page_token: Optional[str] = Query(None, description="Pagination token from a previous response"),
+    limit: int = Query(20, ge=1, le=100, description="Max results to return (1-100)"),
 ):
     """
-    Text-search Google Places.
-    Intended for the homepage destination search bar.
-    Returns up to 20 results per call; use next_page_token for subsequent pages.
+    Free-text/Fuzzy search using TomTom Search API.
+    Ideal for the homepage destination search bar.
+    Optionally biased by coordinates if provided.
+    Returns up to 100 results per call.
     """
-    return google_places_service.text_search_places(
-        query=query,
+    return tomtom_service.text_search_places(
+        query=q,
         language=language,
-        next_page_token=next_page_token,
+        lat=lat,
+        lng=lng,
+        limit=limit,
     )
 
 
@@ -38,25 +43,23 @@ async def search_places(
 async def nearby_places(
     lat: float = Query(..., description="Latitude of the search centre"),
     lng: float = Query(..., description="Longitude of the search centre"),
-    radius: int = Query(5000, ge=1, le=50000, description="Search radius in metres (max 50 000)"),
-    type: Optional[str] = Query(None, description="Google place type, e.g. 'tourist_attraction'"),
-    keyword: Optional[str] = Query(None, description="Keyword to filter results"),
+    radius: int = Query(5000, ge=100, le=50000, description="Search radius in metres (min 100, max 50000)"),
+    q: Optional[str] = Query(None, description="Keyword to filter results (e.g., 'restaurants')"),
     language: str = Query("en", description="BCP-47 language code for results"),
-    next_page_token: Optional[str] = Query(None, description="Pagination token from a previous response"),
+    limit: int = Query(20, ge=1, le=100, description="Max results to return (1-100)"),
 ):
     """
-    Search for places near a coordinate.
+    Search for places near a coordinate using TomTom Nearby Search API.
     Ideal for the 'Explore Nearby' homepage section.
-    Returns up to 20 results per call.
+    Returns up to 100 results per call.
     """
-    return google_places_service.nearby_search_places(
+    return tomtom_service.nearby_search_places(
         lat=lat,
         lng=lng,
         radius=radius,
-        place_type=type,
-        keyword=keyword,
+        keyword=q,
         language=language,
-        next_page_token=next_page_token,
+        limit=limit,
     )
 
 
@@ -64,24 +67,43 @@ async def nearby_places(
 async def get_place_details(
     place_id: str,
     language: str = Query("en", description="BCP-47 language code for results"),
+    latitude: Optional[float] = Query(None, description="Original latitude for fallback matching"),
+    longitude: Optional[float] = Query(None, description="Original longitude for fallback matching"),
+    country: Optional[str] = Query(None, description="Country code (e.g., 'SA') for filtering"),
+    fallback_name: Optional[str] = Query(None, description="Place name to use for fallback search"),
 ):
     """
-    Retrieve full details for a Google Places place_id.
-    Includes contact info, opening hours, photos, website, and more.
+    Retrieve full details for a TomTom place using its entity ID.
+    
+    If direct lookup fails, uses intelligent fallback:
+    - Searches by name with geographic context (lat/lng)
+    - Filters by country code if provided
+    - Matches closest result by coordinates
+    - Returns original data if no accurate match found
+    
+    This ensures that searching for "Ithra" in Dhahran, SA returns 
+    the correct location instead of "Ithra Tower" from Dubai.
     """
-    return google_places_service.get_place_details(place_id=place_id, language=language)
+    return tomtom_service.get_place_details(
+        entity_id=place_id,
+        language=language,
+        latitude=latitude,
+        longitude=longitude,
+        country=country,
+        fallback_name=fallback_name,
+    )
 
 
 @router.get("/photo-url")
 async def get_photo_url(
-    photo_reference: str = Query(..., description="photo_reference string from a PlacePhoto object"),
+    photo_reference: str = Query(..., description="Photo URL or reference from TomTom place details"),
     max_width: int = Query(800, ge=100, le=1600, description="Maximum image width in pixels"),
 ):
     """
-    Return the URL to fetch a place photo directly from Google.
-    The frontend can use this URL as an <img src> value.
+    Return a photo URL that can be used directly in <img src>.
+    For TomTom, the photo_reference is typically already a full URL.
     """
-    url = google_places_service.get_photo_url(
+    url = tomtom_service.get_photo_url(
         photo_reference=photo_reference,
         max_width=max_width,
     )

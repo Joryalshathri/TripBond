@@ -7,6 +7,11 @@ import 'providers/trip_provider.dart';
 import 'screens/splash_screen.dart';
 
 void main() {
+  FlutterError.onError = (FlutterErrorDetails details) {
+    print('Flutter Error: ${details.exception}');
+    print('Stack Trace: ${details.stack}');
+  };
+
   runApp(
     MultiProvider(
       providers: [

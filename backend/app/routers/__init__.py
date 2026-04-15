@@ -1,6 +1,6 @@
 """API Router modules for TripBond backend."""
 
-from . import auth, personality, preferences, trips, group, feedback, users, pois, favorites
+from . import auth, personality, preferences, trips, group, feedback, users, pois, favorites, places, chat
 
 __all__ = [
     "auth",
@@ -12,4 +12,6 @@ __all__ = [
     "pois",
     "group",
     "feedback",
+    "places",
+    "chat",
 ]

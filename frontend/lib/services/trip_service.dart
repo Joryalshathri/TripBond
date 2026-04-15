@@ -273,4 +273,336 @@ class TripService {
       throw Exception('Failed to get recommendations: ${e.toString()}');
     }
   }
+
+  // Submit selected recommendations
+  Future<Map<String, dynamic>> submitSelectedRecommendations(
+      String tripId, List<String> selectedRecommendationIds) async {
+    try {
+      final token = await _authService.getAuthToken();
+      if (token == null) {
+        throw Exception('Not authenticated');
+      }
+
+      final response = await _apiService.post(
+        '${ApiConfig.tripsPath}/$tripId/recommendations/selected',
+        {'selected_recommendation_ids': selectedRecommendationIds},
+        token: token,
+      );
+
+      return response;
+    } catch (e) {
+      throw Exception(
+          'Failed to submit selected recommendations: ${e.toString()}');
+    }
+  }
+
+  // Get trip summary
+  Future<Map<String, dynamic>> getTripSummary(String tripId) async {
+    try {
+      final token = await _authService.getAuthToken();
+      if (token == null) {
+        throw Exception('Not authenticated');
+      }
+
+      final response = await _apiService.get(
+        '${ApiConfig.tripsPath}/$tripId/summary',
+        token: token,
+      );
+
+      return response;
+    } catch (e) {
+      throw Exception('Failed to get trip summary: ${e.toString()}');
+    }
+  }
+
+  // Get public trip details
+  Future<Map<String, dynamic>> getPublicTripDetails(String tripId) async {
+    try {
+      final response = await _apiService.get(
+        '${ApiConfig.tripsPath}/public/$tripId',
+      );
+
+      return response;
+    } catch (e) {
+      throw Exception('Failed to get public trip details: ${e.toString()}');
+    }
+  }
+
+  // Get public itinerary
+  Future<Map<String, dynamic>> getPublicItinerary(String tripId) async {
+    try {
+      final response = await _apiService.get(
+        '${ApiConfig.tripsPath}/public/$tripId/itinerary',
+      );
+
+      return response;
+    } catch (e) {
+      throw Exception('Failed to get public itinerary: ${e.toString()}');
+    }
+  }
+
+  // Get pending trip members
+  Future<List<Map<String, dynamic>>> getPendingMembers(String tripId) async {
+    try {
+      final token = await _authService.getAuthToken();
+      if (token == null) {
+        throw Exception('Not authenticated');
+      }
+
+      final response = await _apiService.get(
+        '${ApiConfig.tripsPath}/$tripId/members/pending',
+        token: token,
+      );
+
+      if (response is List) {
+        return response.cast<Map<String, dynamic>>();
+      } else if (response is Map && response.containsKey('members')) {
+        final members = response['members'];
+        if (members is List) {
+          return members.cast<Map<String, dynamic>>();
+        }
+      }
+
+      return [];
+    } catch (e) {
+      throw Exception('Failed to get pending members: ${e.toString()}');
+    }
+  }
+
+  // Get all trip members
+  Future<List<Map<String, dynamic>>> getAllMembers(String tripId) async {
+    try {
+      final token = await _authService.getAuthToken();
+      if (token == null) {
+        throw Exception('Not authenticated');
+      }
+
+      final response = await _apiService.get(
+        '${ApiConfig.tripsPath}/$tripId/members/all',
+        token: token,
+      );
+
+      if (response is List) {
+        return response.cast<Map<String, dynamic>>();
+      } else if (response is Map && response.containsKey('members')) {
+        final members = response['members'];
+        if (members is List) {
+          return members.cast<Map<String, dynamic>>();
+        }
+      }
+
+      return [];
+    } catch (e) {
+      throw Exception('Failed to get all members: ${e.toString()}');
+    }
+  }
+
+  // Leave trip
+  Future<void> leaveTrip(String tripId) async {
+    try {
+      final token = await _authService.getAuthToken();
+      if (token == null) {
+        throw Exception('Not authenticated');
+      }
+
+      await _apiService.post(
+        '${ApiConfig.tripsPath}/$tripId/leave',
+        {},
+        token: token,
+      );
+    } catch (e) {
+      throw Exception('Failed to leave trip: ${e.toString()}');
+    }
+  }
+
+  // Get trip invites
+  Future<List<Map<String, dynamic>>> getInvites() async {
+    try {
+      final token = await _authService.getAuthToken();
+      if (token == null) {
+        throw Exception('Not authenticated');
+      }
+
+      final response = await _apiService.get(
+        '${ApiConfig.tripsPath}/invites',
+        token: token,
+      );
+
+      if (response is List) {
+        return response.cast<Map<String, dynamic>>();
+      } else if (response is Map && response.containsKey('invites')) {
+        final invites = response['invites'];
+        if (invites is List) {
+          return invites.cast<Map<String, dynamic>>();
+        }
+      }
+
+      return [];
+    } catch (e) {
+      throw Exception('Failed to get invites: ${e.toString()}');
+    }
+  }
+
+  // Accept trip invite
+  Future<Map<String, dynamic>> acceptInvite(String tripId) async {
+    try {
+      final token = await _authService.getAuthToken();
+      if (token == null) {
+        throw Exception('Not authenticated');
+      }
+
+      final response = await _apiService.post(
+        '${ApiConfig.tripsPath}/$tripId/invites/accept',
+        {},
+        token: token,
+      );
+
+      return response;
+    } catch (e) {
+      throw Exception('Failed to accept invite: ${e.toString()}');
+    }
+  }
+
+  // Decline trip invite
+  Future<void> declineInvite(String tripId) async {
+    try {
+      final token = await _authService.getAuthToken();
+      if (token == null) {
+        throw Exception('Not authenticated');
+      }
+
+      await _apiService.post(
+        '${ApiConfig.tripsPath}/$tripId/invites/decline',
+        {},
+        token: token,
+      );
+    } catch (e) {
+      throw Exception('Failed to decline invite: ${e.toString()}');
+    }
+  }
+
+  // Update itinerary item
+  Future<Map<String, dynamic>> updateItineraryItem(
+      String tripId, String itemId, Map<String, dynamic> updates) async {
+    try {
+      final token = await _authService.getAuthToken();
+      if (token == null) {
+        throw Exception('Not authenticated');
+      }
+
+      final response = await _apiService.put(
+        '${ApiConfig.tripsPath}/$tripId/itinerary/items/$itemId',
+        updates,
+        token: token,
+      );
+
+      return response;
+    } catch (e) {
+      throw Exception('Failed to update itinerary item: ${e.toString()}');
+    }
+  }
+
+  // Add itinerary item
+  Future<Map<String, dynamic>> addItineraryItem(
+      String tripId, Map<String, dynamic> itemData) async {
+    try {
+      final token = await _authService.getAuthToken();
+      if (token == null) {
+        throw Exception('Not authenticated');
+      }
+
+      final response = await _apiService.post(
+        '${ApiConfig.tripsPath}/$tripId/itinerary/items',
+        itemData,
+        token: token,
+      );
+
+      return response;
+    } catch (e) {
+      throw Exception('Failed to add itinerary item: ${e.toString()}');
+    }
+  }
+
+  // Delete itinerary item
+  Future<void> deleteItineraryItem(String tripId, String itemId) async {
+    try {
+      final token = await _authService.getAuthToken();
+      if (token == null) {
+        throw Exception('Not authenticated');
+      }
+
+      await _apiService.delete(
+        '${ApiConfig.tripsPath}/$tripId/itinerary/items/$itemId',
+        token: token,
+      );
+    } catch (e) {
+      throw Exception('Failed to delete itinerary item: ${e.toString()}');
+    }
+  }
+
+  // Recalculate itinerary
+  Future<Map<String, dynamic>> recalculateItinerary(String tripId) async {
+    try {
+      final token = await _authService.getAuthToken();
+      if (token == null) {
+        throw Exception('Not authenticated');
+      }
+
+      final response = await _apiService.put(
+        '${ApiConfig.tripsPath}/$tripId/recalculate',
+        {},
+        token: token,
+      );
+
+      return response;
+    } catch (e) {
+      throw Exception('Failed to recalculate itinerary: ${e.toString()}');
+    }
+  }
+
+  // Check if a place already exists in the trip
+  Future<Map<String, dynamic>> checkPlaceDuplicate(
+    String tripId,
+    Map<String, dynamic> placeData,
+  ) async {
+    try {
+      final token = await _authService.getAuthToken();
+      if (token == null) {
+        throw Exception('Not authenticated');
+      }
+
+      final response = await _apiService.post(
+        '${ApiConfig.tripsPath}/$tripId/places/check-duplicate',
+        placeData,
+        token: token,
+      );
+
+      return response;
+    } catch (e) {
+      throw Exception('Failed to check place duplicate: ${e.toString()}');
+    }
+  }
+
+  // Add a place to the trip (with duplicate detection)
+  Future<Map<String, dynamic>> addPlaceToTrip(
+    String tripId,
+    Map<String, dynamic> placeData,
+  ) async {
+    try {
+      final token = await _authService.getAuthToken();
+      if (token == null) {
+        throw Exception('Not authenticated');
+      }
+
+      final response = await _apiService.post(
+        '${ApiConfig.tripsPath}/$tripId/places/add',
+        placeData,
+        token: token,
+      );
+
+      return response;
+    } catch (e) {
+      throw Exception('Failed to add place to trip: ${e.toString()}');
+    }
+  }
 }

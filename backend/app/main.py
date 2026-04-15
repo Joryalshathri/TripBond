@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.concurrency import run_in_threadpool
 from .config import get_settings
-from .routers import auth, personality, preferences, trips, group, feedback, users, pois, favorites, places
+from .routers import auth, personality, preferences, trips, group, feedback, users, pois, favorites, places, chat, ai
 import logging
 import os
 import time
@@ -79,6 +79,8 @@ app.include_router(pois.router, prefix="/api/pois", tags=["Points of Interest"])
 app.include_router(group.router, prefix="/api/group", tags=["Group Modeling & Optimization"])
 app.include_router(feedback.router, prefix="/api/feedback", tags=["Feedback & Learning"])
 app.include_router(places.router, prefix="/api/places", tags=["Google Places"])
+app.include_router(chat.router, prefix="/api/chat", tags=["Chat"])
+app.include_router(ai.router, prefix="/api/ai", tags=["AI Recommendations & Optimization"])
 
 
 @app.get("/")

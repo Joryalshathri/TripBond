@@ -1,4 +1,5 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart'
+    show kIsWeb, defaultTargetPlatform, TargetPlatform;
 
 class ApiConfig {
   // Backend API base URL
@@ -17,8 +18,17 @@ class ApiConfig {
       return 'http://localhost:8000';
     }
 
-    return 'http://10.0.2.2:8000';
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      // Android emulator maps host localhost through 10.0.2.2.
+      return 'http://10.0.2.2:8000';
+    }
+
+    // Desktop/iOS simulators can use localhost directly.
+    return 'http://localhost:8000';
   }
+
+  // Google API Key for Maps/Places/Geocoding
+  static const String googleApiKey = 'AIzaSyAAID68aVlsYvCbhKMa5YKGvigSL9_xYIc';
 
   // API endpoints
   static const String authPath = '/api/auth';
@@ -31,6 +41,8 @@ class ApiConfig {
   static const String feedbackPath = '/api/feedback';
   static const String poisPath = '/api/pois';
   static const String placesPath = '/api/places';
+  static const String chatPath = '/api/chat';
+  static const String aiPath = '/api/ai';
 
   // Request timeout
   static const Duration requestTimeout = Duration(seconds: 30);

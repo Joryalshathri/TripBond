@@ -5,9 +5,47 @@ from ..auth import get_current_user_context
 from ..schemas.profile import ProfileResponse, UpdateProfileRequest
 from ..schemas.settings import UserSettingsResponse, UpdateSettingsRequest
 import logging
+from typing import List
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+@router.get("/bonders", response_model=List[dict])
+async def list_bonders(
+    limit: int = 50,
+    user_context: tuple[str, str] = Depends(get_current_user_context),
+):
+    """List discoverable users for the Bonders screen (excluding current user)."""
+    user_id, _token = user_context
+    safe_limit = max(1, min(limit, 200))
+
+    try:
+        db = SupabaseDB(admin=True)
+        response = await run_in_threadpool(
+            lambda: db.client.table("profiles")
+            .select("id,full_name,username,avatar_url,is_public")
+            .neq("id", user_id)
+            .eq("is_public", True)
+            .limit(safe_limit)
+            .execute()
+        )
+
+        items = response.data or []
+        return [
+            {
+                "id": p["id"],
+                "name": p.get("full_name") or p.get("username") or "TripBond User",
+                "avatar_url": p.get("avatar_url"),
+            }
+            for p in items
+        ]
+    except Exception:
+        logger.exception("Failed to list bonders")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve bonders",
+        )
 
 
 # ==================== Profile ====================
@@ -194,12 +232,14 @@ async def get_user_settings(
     user_context: tuple[str, str] = Depends(get_current_user_context),
 ):
     """Get user app settings."""
-    current_user_id, token = user_context
+    current_user_id, _token = user_context
     if user_id != current_user_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only view your own settings")
     try:
-        client = get_supabase_client_for_user(token)
-        resp = client.table("user_settings").select("*").eq("user_id", user_id).execute()
+        db = SupabaseDB(admin=True)
+        resp = await run_in_threadpool(
+            lambda: db.client.table("user_settings").select("*").eq("user_id", user_id).execute()
+        )
         if resp.data:
             s = resp.data[0]
             return UserSettingsResponse(
@@ -223,11 +263,11 @@ async def update_user_settings(
     user_context: tuple[str, str] = Depends(get_current_user_context),
 ):
     """Update user app settings."""
-    current_user_id, token = user_context
+    current_user_id, _token = user_context
     if user_id != current_user_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only update your own settings")
     try:
-        client = get_supabase_client_for_user(token)
+        db = SupabaseDB(admin=True)
         update_data: dict = {"user_id": user_id}
         if settings_update.security_enabled is not None:
             update_data["security_enabled"] = settings_update.security_enabled
@@ -236,11 +276,17 @@ async def update_user_settings(
         if settings_update.privacy_mode is not None:
             update_data["privacy_mode"] = settings_update.privacy_mode
 
-        existing = client.table("user_settings").select("*").eq("user_id", user_id).execute()
+        existing = await run_in_threadpool(
+            lambda: db.client.table("user_settings").select("*").eq("user_id", user_id).execute()
+        )
         if existing.data:
-            response = client.table("user_settings").update(update_data).eq("user_id", user_id).execute()
+            response = await run_in_threadpool(
+                lambda: db.client.table("user_settings").update(update_data).eq("user_id", user_id).execute()
+            )
         else:
-            response = client.table("user_settings").insert(update_data).execute()
+            response = await run_in_threadpool(
+                lambda: db.client.table("user_settings").insert(update_data).execute()
+            )
 
         if not response.data:
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update settings")

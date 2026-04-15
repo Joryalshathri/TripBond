@@ -8,15 +8,25 @@ import '../services/trip_service.dart';
 
 class Place {
   final String name;
-  final String image;
+  final String image; // Can be asset path or network URL
   final double rating;
   final String location;
+  final double? latitude;
+  final double? longitude;
+  final String? externalPlaceId;
+  final String? fsqId; // Foursquare ID for detail lookups
+  final String? photoUrl; // Direct photo URL from Foursquare
 
   const Place({
     required this.name,
     required this.image,
     required this.rating,
     required this.location,
+    this.latitude,
+    this.longitude,
+    this.externalPlaceId,
+    this.fsqId,
+    this.photoUrl,
   });
 }
 
@@ -191,16 +201,27 @@ class _AI_PlanState extends State<AI_Plan> {
       if (activities is List) {
         for (final item in activities) {
           if (item is! Map<String, dynamic>) continue;
+
+          final photoUrl = item['photo_url'];
+          final imageToUse =
+              (photoUrl != null && photoUrl.toString().isNotEmpty)
+                  ? photoUrl.toString()
+                  : 'assets/images/places/Ithra.png';
+
           places.add(
             Place(
               name: (item['name'] ?? 'Activity').toString(),
-              image: 'assets/images/places/Ithra.png',
-              rating: (item['score'] is num)
-                  ? (item['score'] as num).toDouble()
-                  : 4.0,
+              image: imageToUse,
+              rating: (item['rating'] is num)
+                  ? (item['rating'] as num).toDouble()
+                  : (item['score'] is num)
+                      ? (item['score'] as num).toDouble()
+                      : 4.0,
               location:
                   (item['location'] ?? item['notes'] ?? _activeDestination)
                       .toString(),
+              photoUrl: photoUrl != null ? photoUrl.toString() : null,
+              fsqId: item['fsq_id']?.toString(),
             ),
           );
         }
@@ -624,6 +645,77 @@ class _AI_PlanState extends State<AI_Plan> {
     );
   }
 
+  void _showPlaceModal(BuildContext context, Place place) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  place.name,
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Icon(Icons.location_on, size: 16, color: Colors.grey[600]),
+                const SizedBox(width: 6),
+                Text(place.location, style: const TextStyle(fontSize: 14)),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(Icons.star, size: 16, color: const Color(0xFFC8A858)),
+                const SizedBox(width: 6),
+                Text(
+                  '${place.rating.toStringAsFixed(1)} rating',
+                  style: const TextStyle(fontSize: 14),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Added ${place.name} to favorites'),
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF4675B8),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                child: const Text('Save Place'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildDaySection(Map<String, dynamic> day) {
     final int dayNum = day['day'];
     final List<Place> places = day['places'];
@@ -650,10 +742,10 @@ class _AI_PlanState extends State<AI_Plan> {
           ),
           const SizedBox(height: 12),
           SizedBox(
-            height: MediaQuery.of(context).size.height * 0.22,
+            height: 200, // Adjusted height to accommodate responsive cards
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 27),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
               itemCount: places.length,
               separatorBuilder: (_, __) => const SizedBox(width: 12),
               itemBuilder: (context, index) {
@@ -663,24 +755,27 @@ class _AI_PlanState extends State<AI_Plan> {
                   opacity: isDeleted ? 0.4 : 1.0,
                   child: AbsorbPointer(
                     absorbing: isDeleted,
-                    child: _PlaceCard(
-                      place: place,
-                      showDelete: isEditMode && !isDeleted,
-                      onDelete: () {
-                        setState(() {
-                          hasNotification = true;
-                          deletedPlaceNames.add(place.name);
-                          suggestions.insert(0, {
-                            'name': place.name,
-                            'type': 'Removed from Plan',
-                            'location': place.location,
-                            'person': 'You',
-                            'personColor': const Color(0xFF4675B8),
-                            'highlight': false,
-                            'action': 'delete',
+                    child: GestureDetector(
+                      onTap: () => _showPlaceModal(context, place),
+                      child: _PlaceCard(
+                        place: place,
+                        showDelete: isEditMode && !isDeleted,
+                        onDelete: () {
+                          setState(() {
+                            hasNotification = true;
+                            deletedPlaceNames.add(place.name);
+                            suggestions.insert(0, {
+                              'name': place.name,
+                              'type': 'Removed from Plan',
+                              'location': place.location,
+                              'person': 'You',
+                              'personColor': const Color(0xFF4675B8),
+                              'highlight': false,
+                              'action': 'delete',
+                            });
                           });
-                        });
-                      },
+                        },
+                      ),
                     ),
                   ),
                 );
@@ -771,124 +866,149 @@ class _PlaceCard extends StatelessWidget {
 
   const _PlaceCard(
       {required this.place, required this.showDelete, required this.onDelete});
+
   @override
   Widget build(BuildContext context) {
-  final double screenWidth = MediaQuery.of(context).size.width;
-  final double cardWidth = screenWidth * 0.38;
-  final double imageHeight = cardWidth * 0.72;
+    // Responsive Dimensions
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final double cardWidth = screenWidth * 0.42; // Uses percentage instead of fixed 165
+    final double imageHeight = 115;
 
-  return Stack(
-    children: [
-      Container(
-        width: cardWidth,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey.shade200),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ClipRRect(
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(16),
-                topRight: Radius.circular(16),
+    return Stack(
+      children: [
+        Container(
+          width: cardWidth,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.grey.shade200),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
               ),
-              child: Image.asset(
-                place.image,
-                width: cardWidth,
-                height: imageHeight,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    width: cardWidth,
-                    height: imageHeight,
-                    color: const Color(0xFF4675B8),
-                    child: const Icon(Icons.place, size: 50, color: Colors.white),
-                  );
-                },
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ClipRRect(
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(16),
+                  topRight: Radius.circular(16),
+                ),
+                child: _buildPlaceImage(place, cardWidth, imageHeight),
               ),
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            place.name,
-                            style: const TextStyle(
-                              fontFamily: 'Poppins',
-                              fontWeight: FontWeight.w600,
-                              fontSize: 13,
-                              color: Colors.black,
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              place.name,
+                              style: const TextStyle(
+                                fontFamily: 'Poppins',
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                                color: Colors.black,
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            overflow: TextOverflow.ellipsis,
                           ),
-                        ),
-                        const SizedBox(width: 4),
-                        const Icon(Icons.star, size: 12, color: Color(0xFFFACC15)),
-                        const SizedBox(width: 2),
-                        Text(
-                          '${place.rating}',
-                          style: TextStyle(
-                            fontFamily: 'Poppins',
-                            fontSize: 11,
-                            color: Colors.grey.shade500,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        const Icon(Icons.location_on, size: 10, color: Color(0xFF4675B8)),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            place.location,
+                          const Icon(Icons.star, size: 12, color: Color(0xFFFACC15)),
+                          const SizedBox(width: 2),
+                          Text(
+                            '${place.rating}',
                             style: TextStyle(
                               fontFamily: 'Poppins',
                               fontSize: 11,
                               color: Colors.grey.shade500,
                             ),
-                            overflow: TextOverflow.ellipsis,
                           ),
-                        ),
-                      ],
-                    ),
-                  ],
+                        ],
+                      ),
+                      Row(
+                        children: [
+                          const Icon(Icons.location_on, size: 10, color: Color(0xFF4675B8)),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              place.location,
+                              style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 11,
+                                color: Colors.grey.shade500,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (showDelete)
+          Positioned(
+            top: 4,
+            right: 4,
+            child: GestureDetector(
+              onTap: onDelete,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.8),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.close,
+                  color: Colors.black,
+                  size: 20,
                 ),
               ),
             ),
-          ],
-        ),
-      ),
-      if (showDelete)
-        Positioned(
-          top: 4,
-          right: 4,
-          child: GestureDetector(
-            onTap: onDelete,
-            child: const Icon(
-              Icons.close,
-              color: Color.fromARGB(255, 0, 0, 0),
-              size: 20,
-            ),
           ),
-        ),
-    ],
-  );
-}
+      ],
+    );
+  }
+
+  Widget _buildPlaceImage(Place place, double width, double height) {
+    final isNetworkUrl =
+        place.photoUrl != null && place.photoUrl!.startsWith('http');
+
+    if (isNetworkUrl) {
+      return Image.network(
+        place.photoUrl!,
+        width: width,
+        height: height,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => _buildPlaceholderImage(width, height),
+      );
+    } else {
+      return Image.asset(
+        place.image,
+        width: width,
+        height: height,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => _buildPlaceholderImage(width, height),
+      );
+    }
+  }
+
+  Widget _buildPlaceholderImage(double width, double height) {
+    return Container(
+      width: width,
+      height: height,
+      color: const Color(0xFF4675B8),
+      child: const Icon(Icons.place, size: 40, color: Colors.white),
+    );
+  }
 }

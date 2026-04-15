@@ -208,7 +208,7 @@ class _NewPasswordScreenState extends State<NewPasswordScreen> {
                           ),
                           elevation: 0,
                           disabledBackgroundColor:
-                              const Color(0xFF4675B8).withOpacity(0.6),
+                              const Color(0xFF4675B8).withValues(alpha: 0.6),
                         ),
                         child: _isLoading
                             ? const CustomLoadingSpinner(

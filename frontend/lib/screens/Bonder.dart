@@ -5,35 +5,14 @@ import 'profile.dart';
 import 'close_spots.dart';
 import 'group_suggested_itinerary.dart';
 import '../core/animations/animation_constants.dart';
+import '../services/bonder_service.dart';
+import '../services/chat_service.dart';
+import '../services/auth_service.dart';
 
-// Global "Bonders" list
-List<Map<String, String>> globalBonders = [
-  {
-    'name': 'Leen',
-    'image': 'assets/images/people/pesron4.png',
-    'lastMsg': 'Hey! How are you?'
-  },
-  {
-    'name': 'Khalid',
-    'image': 'assets/images/people/person5.png',
-    'lastMsg': 'The trip was amazing!'
-  },
-  {
-    'name': 'Huda',
-    'image': 'assets/images/people/person6.png',
-    'lastMsg': 'Check this out.'
-  },
-  {
-    'name': 'Ziyad',
-    'image': 'assets/images/people/person7.png',
-    'lastMsg': 'Let\'s go!'
-  },
-  {
-    'name': 'Friends',
-    'image': 'assets/images/people/friends.png',
-    'lastMsg': 'Group chat active'
-  },
-];
+class _BonderMeta {
+  final int unreadCount;
+  const _BonderMeta({this.unreadCount = 0});
+}
 
 class Bonders extends StatefulWidget {
   const Bonders({super.key});
@@ -43,22 +22,121 @@ class Bonders extends StatefulWidget {
 }
 
 class _BondersState extends State<Bonders> {
+  final BonderService _bonderService = BonderService();
+  final ChatService _chatService = ChatService();
   bool _isSearching = false;
   final TextEditingController _searchController = TextEditingController();
-  List<Map<String, String>> _filteredBonders = [];
+  List<BonderItem> _allBonders = [];
+  List<BonderItem> _filteredBonders = [];
+  Map<String, _BonderMeta> _bonderMeta = {};
+  bool _isLoading = false;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
-    _filteredBonders = List.from(globalBonders);
+    _loadBonders();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadBonders() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final bonders = await _bonderService.getBonders();
+      final previews = await _chatService.getConversationPreviews();
+      final previewByPartnerId = {
+        for (final p in previews) p.partnerId: p,
+      };
+      final metaByPartnerId = {
+        for (final p in previews)
+          p.partnerId: _BonderMeta(unreadCount: p.unreadCount),
+      };
+
+      final merged = bonders.map((b) {
+        final p = previewByPartnerId[b.id];
+        if (p == null) {
+          return b;
+        }
+        return b.copyWith(
+          avatarUrl: p.partnerAvatarUrl,
+          lastMsg: (p.lastMessage != null && p.lastMessage!.isNotEmpty)
+              ? p.lastMessage
+              : b.lastMsg,
+        );
+      }).toList()
+        ..sort((a, b) {
+          final aHasPreview = previewByPartnerId.containsKey(a.id);
+          final bHasPreview = previewByPartnerId.containsKey(b.id);
+          if (aHasPreview == bHasPreview) {
+            return 0;
+          }
+          return aHasPreview ? -1 : 1;
+        });
+
+      if (!mounted) return;
+
+      setState(() {
+        _allBonders = merged;
+        _filteredBonders = List.from(merged);
+        _bonderMeta = metaByPartnerId;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _error = e.toString().replaceAll('Exception: ', '');
+        _isLoading = false;
+      });
+    }
   }
 
   void _filterList(String query) {
     setState(() {
-      _filteredBonders = globalBonders
+      _filteredBonders = _allBonders
           .where((bonder) =>
-              bonder['name']!.toLowerCase().contains(query.toLowerCase()))
+              bonder.name.toLowerCase().contains(query.toLowerCase()))
           .toList();
+    });
+  }
+
+  void _updateLastMessage(String bonderId, String message) {
+    final allIndex = _allBonders.indexWhere((b) => b.id == bonderId);
+    final filteredIndex = _filteredBonders.indexWhere((b) => b.id == bonderId);
+
+    if (allIndex == -1) return;
+
+    final updated = _allBonders[allIndex].copyWith(lastMsg: message);
+
+    setState(() {
+      _allBonders.removeAt(allIndex);
+      _allBonders.insert(0, updated);
+
+      if (filteredIndex != -1) {
+        _filteredBonders.removeAt(filteredIndex);
+      }
+
+      final query = _searchController.text.trim().toLowerCase();
+      if (query.isEmpty || updated.name.toLowerCase().contains(query)) {
+        _filteredBonders.insert(0, updated);
+      }
+
+      _bonderMeta[bonderId] = const _BonderMeta(unreadCount: 0);
+    });
+  }
+
+  void _clearUnreadForBonder(String bonderId) {
+    setState(() {
+      _bonderMeta[bonderId] = const _BonderMeta(unreadCount: 0);
     });
   }
 
@@ -116,9 +194,10 @@ class _BondersState extends State<Bonders> {
                 title: const Text("Sort A-Z"),
                 onTap: () {
                   setState(() {
-                    _filteredBonders.sort((a, b) => a['name']!
-                        .toLowerCase()
-                        .compareTo(b['name']!.toLowerCase()));
+                    _filteredBonders.sort(
+                      (a, b) =>
+                          a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+                    );
                   });
                   Navigator.pop(context);
                 },
@@ -128,7 +207,7 @@ class _BondersState extends State<Bonders> {
                 title: const Text("Recent First"),
                 onTap: () {
                   setState(() {
-                    _filteredBonders = List.from(globalBonders);
+                    _filteredBonders = List.from(_allBonders);
                   });
                   Navigator.pop(context);
                 },
@@ -193,7 +272,7 @@ class _BondersState extends State<Bonders> {
                                   _isSearching = !_isSearching;
                                   if (!_isSearching) {
                                     _searchController.clear();
-                                    _filteredBonders = List.from(globalBonders);
+                                    _filteredBonders = List.from(_allBonders);
                                   }
                                 });
                               },
@@ -207,21 +286,58 @@ class _BondersState extends State<Bonders> {
                           ],
                         ).animate().fadeIn().slideY(begin: -0.1, end: 0),
                         const SizedBox(height: 24),
+                        if (_isLoading)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 40),
+                            child: Center(child: CircularProgressIndicator()),
+                          ),
+                        if (_error != null)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 24),
+                            child: Column(
+                              children: [
+                                Text(
+                                  _error!,
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontFamily: 'Poppins',
+                                    color: Colors.red.shade400,
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                ElevatedButton(
+                                  onPressed: _loadBonders,
+                                  child: const Text('Retry'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        if (!_isLoading &&
+                            _error == null &&
+                            _filteredBonders.isEmpty)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 40),
+                            child: Text(
+                              'No bonders found',
+                              style: TextStyle(
+                                  fontFamily: 'Poppins', color: Colors.grey),
+                            ),
+                          ),
                         ..._filteredBonders.asMap().entries.map((entry) {
                           final index = entry.key;
                           final b = entry.value;
 
                           // --- WRAPPED IN DISMISSIBLE FOR SWIPE-TO-DELETE ---
                           return Dismissible(
-                              key: Key(b['name']!),
+                              key: Key(b.id),
                               direction:
                                   DismissDirection.endToStart, // Swipe left
                               confirmDismiss: (direction) =>
-                                  _confirmDelete(b['name']!),
+                                  _confirmDelete(b.name),
                               onDismissed: (direction) {
                                 setState(() {
-                                  globalBonders.removeWhere((element) =>
-                                      element['name'] == b['name']);
+                                  _allBonders.removeWhere(
+                                      (element) => element.id == b.id);
                                   _filteredBonders.removeAt(index);
                                 });
                               },
@@ -239,17 +355,20 @@ class _BondersState extends State<Bonders> {
                               ),
                               child: GestureDetector(
                                   onTap: () async {
+                                    _clearUnreadForBonder(b.id);
                                     await Navigator.push(
                                       context,
                                       MaterialPageRoute(
                                         builder: (_) => ChatPage(
-                                            name: b['name']!,
-                                            imagePath: b['image']!),
+                                          bonderId: b.id,
+                                          name: b.name,
+                                          onMessageSent: (message) =>
+                                              _updateLastMessage(b.id, message),
+                                        ),
                                       ),
                                     );
                                     setState(() {
-                                      _filteredBonders =
-                                          List.from(globalBonders);
+                                      _filteredBonders = List.from(_allBonders);
                                     });
                                   },
                                   child: Container(
@@ -264,11 +383,7 @@ class _BondersState extends State<Bonders> {
                                     ),
                                     child: Row(
                                       children: [
-                                        CircleAvatar(
-                                          radius: 28,
-                                          backgroundImage:
-                                              AssetImage(b['image']!),
-                                        ),
+                                        _buildBonderAvatar(b),
                                         const SizedBox(width: 16),
                                         Expanded(
                                           child: Column(
@@ -276,15 +391,14 @@ class _BondersState extends State<Bonders> {
                                                 CrossAxisAlignment.start,
                                             children: [
                                               Text(
-                                                b['name']!,
+                                                b.name,
                                                 style: const TextStyle(
                                                     fontFamily: 'Poppins',
                                                     fontWeight: FontWeight.w700,
                                                     fontSize: 18),
                                               ),
                                               Text(
-                                                b['lastMsg'] ??
-                                                    'No messages yet',
+                                                b.lastMsg,
                                                 style: TextStyle(
                                                     fontFamily: 'Poppins',
                                                     color: Colors.grey.shade600,
@@ -295,6 +409,27 @@ class _BondersState extends State<Bonders> {
                                             ],
                                           ),
                                         ),
+                                        if ((_bonderMeta[b.id]?.unreadCount ??
+                                                0) >
+                                            0)
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 8, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFF4675B8),
+                                              borderRadius:
+                                                  BorderRadius.circular(999),
+                                            ),
+                                            child: Text(
+                                              '${_bonderMeta[b.id]!.unreadCount}',
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontFamily: 'Poppins',
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: 11,
+                                              ),
+                                            ),
+                                          ),
                                       ],
                                     ),
                                   )
@@ -328,6 +463,22 @@ class _BondersState extends State<Bonders> {
           _buildBottomNav(context),
         ],
       ),
+    );
+  }
+
+  Widget _buildBonderAvatar(BonderItem bonder) {
+    final avatarUrl = bonder.avatarUrl;
+    if (avatarUrl != null && avatarUrl.isNotEmpty) {
+      return CircleAvatar(
+        radius: 28,
+        backgroundImage: NetworkImage(avatarUrl),
+      );
+    }
+
+    return const CircleAvatar(
+      radius: 28,
+      backgroundColor: Color(0xFF4675B8),
+      child: Icon(Icons.person, color: Colors.white),
     );
   }
 
@@ -393,34 +544,202 @@ class _BondersState extends State<Bonders> {
 }
 
 class ChatPage extends StatefulWidget {
+  final String bonderId;
   final String name;
-  final String imagePath;
-  const ChatPage({super.key, required this.name, required this.imagePath});
+  final ValueChanged<String>? onMessageSent;
+  const ChatPage({
+    super.key,
+    required this.bonderId,
+    required this.name,
+    this.onMessageSent,
+  });
 
   @override
   State<ChatPage> createState() => _ChatPageState();
 }
 
 class _ChatPageState extends State<ChatPage> {
+  final ChatService _chatService = ChatService();
+  final AuthService _authService = AuthService();
   final TextEditingController _messageController = TextEditingController();
-  final List<String> _messages = [];
+  List<ChatMessage> _messages = [];
+  String? _currentUserId;
+  bool _isLoading = false;
+  bool _isSending = false;
+  String? _error;
 
-  void _sendMessage() {
-    String text = _messageController.text.trim();
-    if (text.isNotEmpty) {
+  @override
+  void initState() {
+    super.initState();
+    _loadMessages();
+  }
+
+  @override
+  void dispose() {
+    _messageController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadMessages() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final userId = await _authService.getUserId();
+      final messages = await _chatService.getMessagesWithUser(widget.bonderId);
+      await _chatService.markMessagesAsRead(widget.bonderId);
+      if (!mounted) return;
+
       setState(() {
-        _messages.add(text);
-        int existingIndex =
-            globalBonders.indexWhere((b) => b['name'] == widget.name);
-        if (existingIndex != -1) {
-          Map<String, String> updatedBonder =
-              globalBonders.removeAt(existingIndex);
-          updatedBonder['lastMsg'] = text;
-          globalBonders.insert(0, updatedBonder);
-        }
-        _messageController.clear();
+        _currentUserId = userId;
+        _messages = messages;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _error = e.toString().replaceAll('Exception: ', '');
+        _isLoading = false;
       });
     }
+  }
+
+  Future<void> _sendMessage() async {
+    final text = _messageController.text.trim();
+    if (text.isNotEmpty && !_isSending) {
+      setState(() {
+        _isSending = true;
+      });
+
+      try {
+        final sent = await _chatService.sendMessage(
+          otherUserId: widget.bonderId,
+          content: text,
+        );
+        if (!mounted) return;
+
+        setState(() {
+          _messages = [..._messages, sent];
+          _messageController.clear();
+          _isSending = false;
+        });
+        widget.onMessageSent?.call(text);
+      } catch (e) {
+        if (!mounted) return;
+
+        setState(() {
+          _isSending = false;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              e.toString().replaceAll('Exception: ', ''),
+              style: const TextStyle(fontFamily: 'Poppins'),
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  Widget _buildMessageList() {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_error != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                _error!,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    fontFamily: 'Poppins', color: Colors.red.shade400),
+              ),
+              const SizedBox(height: 12),
+              ElevatedButton(
+                  onPressed: _loadMessages, child: const Text('Retry')),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_messages.isEmpty) {
+      return const Center(
+        child: Text(
+          'No messages yet. Start the conversation.',
+          style: TextStyle(fontFamily: 'Poppins', color: Colors.grey),
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(20),
+      itemCount: _messages.length,
+      itemBuilder: (context, index) {
+        final message = _messages[index];
+        final isMine =
+            _currentUserId != null && message.senderId == _currentUserId;
+
+        return Align(
+          alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: isMine ? const Color(0xFF4675B8) : Colors.grey.shade200,
+              borderRadius: BorderRadius.circular(20).copyWith(
+                bottomRight: isMine ? Radius.zero : null,
+                bottomLeft: isMine ? null : Radius.zero,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment:
+                  isMine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+              children: [
+                Text(
+                  message.content,
+                  style: TextStyle(
+                    color: isMine ? Colors.white : Colors.black87,
+                    fontFamily: 'Poppins',
+                  ),
+                ),
+                if (isMine) ...[
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.done,
+                        size: 13,
+                        color: message.readAt == null
+                            ? Colors.white70
+                            : Colors.lightBlueAccent,
+                      ),
+                      if (message.readAt != null)
+                        const Icon(
+                          Icons.done,
+                          size: 13,
+                          color: Colors.lightBlueAccent,
+                        ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -443,33 +762,13 @@ class _ChatPageState extends State<ChatPage> {
       body: Column(
         children: [
           Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.all(20),
-              itemCount: _messages.length,
-              itemBuilder: (context, index) {
-                return Align(
-                  alignment: Alignment.centerRight,
-                  child: Container(
-                    margin: const EdgeInsets.only(bottom: 10),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 10),
-                    decoration: BoxDecoration(
-                        color: const Color(0xFF4675B8),
-                        borderRadius: BorderRadius.circular(20)
-                            .copyWith(bottomRight: Radius.zero)),
-                    child: Text(_messages[index],
-                        style: const TextStyle(
-                            color: Colors.white, fontFamily: 'Poppins')),
-                  ),
-                );
-              },
-            ),
+            child: _buildMessageList(),
           ),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(color: Colors.white, boxShadow: [
               BoxShadow(
-                  color: Colors.grey.withOpacity(0.2),
+                  color: Colors.grey.withValues(alpha: 0.2),
                   blurRadius: 10,
                   offset: const Offset(0, -2))
             ]),
@@ -484,6 +783,7 @@ class _ChatPageState extends State<ChatPage> {
                           borderRadius: BorderRadius.circular(25)),
                       child: TextField(
                         controller: _messageController,
+                        enabled: !_isSending,
                         decoration: const InputDecoration(
                             hintText: "Type a message...",
                             border: InputBorder.none,
@@ -495,9 +795,21 @@ class _ChatPageState extends State<ChatPage> {
                   const SizedBox(width: 10),
                   GestureDetector(
                     onTap: _sendMessage,
-                    child: const CircleAvatar(
-                        backgroundColor: Color(0xFF4675B8),
-                        child: Icon(Icons.send, color: Colors.white, size: 20)),
+                    child: CircleAvatar(
+                      backgroundColor: const Color(0xFF4675B8),
+                      child: _isSending
+                          ? const SizedBox(
+                              height: 16,
+                              width: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor:
+                                    AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : const Icon(Icons.send,
+                              color: Colors.white, size: 20),
+                    ),
                   ),
                 ],
               ),

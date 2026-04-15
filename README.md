@@ -1,70 +1,112 @@
 # TripBond
 
-<<<<<<< HEAD
-AI-powered group travel planning and companion matching application.
+AI-powered group travel planning and companion matching application with Flutter mobile frontend.
 
 ## Overview
 
-TripBond helps travelers find compatible travel companions and plan trips together using personality-based matching and intelligent itinerary generation.
+TripBond helps travelers find compatible travel companions and plan trips together using personality-based matching and intelligent itinerary generation. Built with a FastAPI backend and Flutter frontend.
 
 ## Features
 
 ✅ **Authentication** - Complete user authentication with email verification
-✅ **Personality Quiz** - Big 5 personality trait assessment for matching
+✅ **Personality Quiz** - Big 5 personality trait assessment for matching (MBTI in mobile)
 ✅ **Travel Preferences** - Trip-specific and general user preferences
 ✅ **User Profiles** - Rich profiles with stats, bio, and privacy settings
 ✅ **Trip Management** - Create, manage, and share trips
 ✅ **Favorites** - Save favorite destinations and trips
 ✅ **Settings** - Comprehensive app settings and privacy controls
+✅ **Smooth Animations** - Flutter Animate integration
+✅ **Responsive Design** - Works on iOS, Android, Web, and Desktop
+
+##  Tech Stack
+
+- **Backend**: FastAPI (Python)
+- **Frontend**: Flutter (Dart)
+- **Database**: Supabase (PostgreSQL)
+- **Authentication**: Custom JWT + Supabase Auth
+- **Deployment**: TBD
 
 ## Project Structure
 
 ```
 TripBond/
-├── backend/
+├── backend/                 # FastAPI backend
 │   ├── app/
-│   │   ├── routers/          # API endpoints
-│   │   │   ├── auth.py       # Authentication
-│   │   │   ├── personality.py # Big 5 quiz
-│   │   │   ├── preferences.py # Travel preferences
-│   │   │   ├── profile.py    # User profiles
-│   │   │   ├── adventures.py # Trips & favorites
-│   │   │   └── settings.py   # App settings
-│   │   ├── config.py         # Configuration
-│   │   ├── database.py       # Database connection
-│   │   └── main.py           # FastAPI app
-│   ├── requirements.txt      # Python dependencies
-│   ├── .env.example          # Environment template
-│   └── run.py                # Server entry point
+│   │   ├── routers/        # API endpoints
+│   │   │   ├── auth.py
+│   │   │   ├── personality.py
+│   │   │   ├── preferences.py
+│   │   │   ├── trips.py
+│   │   │   ├── users.py
+│   │   │   ├── favorites.py
+│   │   │   ├── chat.py
+│   │   │   └── ...
+│   │   ├── config.py
+│   │   ├── database.py
+│   │   └── main.py
+│   ├── requirements.txt
+│   ├── .env.example
+│   └── run.py
+├── frontend/                # Flutter frontend
+│   ├── lib/
+│   │   ├── main.dart
+│   │   ├── screens/
+│   │   ├── services/
+│   │   ├── providers/
+│   │   ├── core/
+│   │   └── utils/
+│   ├── pubspec.yaml
+│   └── android/, ios/, web/
 └── README.md
 ```
 
 ## Quick Start
 
-### 1. Setup Backend
+### Backend Setup
 
-```bash
-cd backend
-pip install -r requirements.txt
-```
+1. **Install Python dependencies**
+   ```bash
+   cd backend
+   pip install -r requirements.txt
+   ```
 
-### 2. Configure Environment
+2. **Configure environment**
+   ```bash
+   cp .env.example .env
+   # Edit .env with your Supabase credentials
+   ```
 
-Copy `.env.example` to `.env` and add your Supabase credentials:
+3. **Start the server**
+   ```bash
+   python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+   ```
 
-```bash
-cp .env.example .env
-```
+   API Documentation: http://localhost:8000/docs
 
-Edit `.env` with your Supabase project details.
+### Frontend Setup
 
-### 3. Start Server
+1. **Install Flutter dependencies**
+   ```bash
+   cd frontend
+   flutter pub get
+   ```
 
-```bash
-python run.py
-```
+2. **Run the app**
+   ```bash
+   flutter run
+   ```
 
-API Documentation: http://localhost:8000/docs
+3. **Build for production**
+   ```bash
+   # Android
+   flutter build apk --release
+   
+   # iOS
+   flutter build ios --release
+   
+   # Web
+   flutter build web --release
+   ```
 
 ## API Endpoints
 
@@ -74,36 +116,37 @@ API Documentation: http://localhost:8000/docs
 - `POST /signout` - Logout
 - `POST /reset-password` - Request password reset
 - `POST /update-password` - Update password
-- `POST /verify-email` - Verify email
+- `POST /verify-email-code` - Verify email with 6-digit code
 
 ### Personality (`/api/personality`)
 - `GET /questions` - Get quiz questions
 - `POST /submit` - Submit quiz answers
 - `GET /scores/{user_id}` - Get personality scores
-- `PUT /update/{user_id}` - Update scores
 
 ### Preferences (`/api/preferences`)
 - `GET /questionnaire` - Get questionnaire structure
 - `POST /trip/submit` - Submit trip preferences
 - `GET /trip/{trip_id}/{user_id}` - Get trip preferences
-- `POST /user/general` - Update general preferences
 
-### Profile (`/api/profile`)
+### Trips (`/api/trips`)
+- `GET /{user_id}` - Get user trips
+- `POST /create` - Create trip
+- `GET /{trip_id}` - Get trip details
+
+### Users (`/api/users`)
 - `GET /me` - Get current user profile
 - `GET /{user_id}` - Get user profile
-- `PUT /update/{user_id}` - Update profile
-- `POST /change-password/{user_id}` - Change password
+- `PUT /update` - Update profile
 
-### Adventures (`/api/adventures`)
-- `GET /trips/{user_id}` - Get user trips
-- `POST /trips/create` - Create trip
-- `GET /favorites/{user_id}` - Get favorites
-- `POST /favorites/add` - Add favorite
+### Chat (`/api/chat`)
+- `POST /send` - Send message
+- `GET /conversations` - Get conversations
+- `GET /messages/{conversation_id}` - Get messages
 
-### Settings (`/api/settings`)
-- `GET /settings/{user_id}` - Get settings
-- `PUT /settings/{user_id}` - Update settings
-- `POST /cache/clear/{user_id}` - Clear cache
+### Favorites (`/api/favorites`)
+- `GET /{user_id}` - Get user favorites
+- `POST /add` - Add favorite
+- `DELETE /{id}` - Remove favorite
 
 ## Database Schema
 
@@ -115,151 +158,42 @@ Supabase PostgreSQL with tables:
 - `personality_answers` - Quiz responses
 - `user_favorites` - Saved destinations
 - `user_settings` - App settings
-- `itineraries` - Trip itineraries
-- `pois` - Points of interest
+- `chat_conversations` - Chat conversations
+- `chat_messages` - Chat messages
 - And more...
-
-## Tech Stack
-
-- **Backend**: FastAPI (Python)
-- **Database**: Supabase (PostgreSQL)
-- **Authentication**: Supabase Auth
-- **Deployment**: TBD
 
 ## Development
 
+### Backend Development
+
 Enable hot reload:
 ```bash
-uvicorn app.main:app --reload
+cd backend
+python -m uvicorn app.main:app --reload
+```
+
+### Frontend Development
+
+Watch for changes:
+```bash
+cd frontend
+flutter run
+# Then press 'r' for hot reload, 'R' for hot restart
 ```
 
 ## Documentation
 
-- [API Docs](http://localhost:8000/docs) - Interactive API documentation
+- [API Docs](http://localhost:8000/docs) - Interactive API documentation (Swagger UI)
 - [Backend README](backend/README.md) - Backend documentation
+- [Frontend README](frontend/README.md) - Frontend documentation
 
 ## Coming Soon
 
 - 🔄 AI-powered itinerary generation
 - 🔄 Companion matching algorithm
 - 🔄 Real-time collaboration
-- 🔄 Flutter mobile app
 - 🔄 Social features (comments, ratings, votes)
-=======
-A Flutter-based travel companion application that helps users connect through shared travel experiences and personality compatibility.
-
-## 📱 About
-
-TripBond is a mobile application designed to help travelers bond through personalized travel experiences. The app features:
-
-- **MBTI Personality Assessment**: Understand your travel personality
-- **Personalized Recommendations**: Travel suggestions based on your preferences
-- **Modern UI/UX**: Smooth animations and intuitive design
-- **Cross-Platform**: Built with Flutter for iOS, Android, and Web support
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-- Flutter SDK (3.6.0 or higher)
-- Dart SDK
-- Android Studio / Xcode (for mobile development)
-- A code editor (VS Code, Android Studio, or IntelliJ IDEA)
-
-### Installation
-
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd tripbond_app/frontend
-   ```
-
-2. **Install dependencies**
-   ```bash
-   flutter pub get
-   ```
-
-3. **Run the app**
-   ```bash
-   flutter run
-   ```
-
-### Build for Production
-
-**Android:**
-```bash
-flutter build apk --release
-```
-
-**iOS:**
-```bash
-flutter build ios --release
-```
-
-**Web:**
-```bash
-flutter build web --release
-```
-
-## 🏗️ Project Structure
-
-```
-lib/
-├── main.dart                 # App entry point
-├── core/
-│   ├── animations/          # Animation utilities and page transitions
-│   └── constants/           # App-wide constants (colors, text styles, dimensions)
-└── screens/                 # UI screens
-    ├── auth_screen.dart
-    ├── onboarding_screen.dart
-    ├── mbti_screen.dart
-    ├── home_screen.dart
-    └── ...
-```
-
-## 🎨 Features
-
-- ✅ **Authentication**: User login and registration
-- ✅ **Onboarding**: Welcome experience for new users
-- ✅ **MBTI Assessment**: Travel personality questionnaire
-- ✅ **Profile Management**: User profile customization
-- ✅ **Smooth Animations**: Flutter Animate integration
-- ✅ **Responsive Design**: Adapts to different screen sizes
-
-## 📦 Dependencies
-
-Key packages used in this project:
-
-- `google_fonts` - Beautiful typography
-- `shared_preferences` - Local data storage
-- `flutter_animate` - Smooth animations
-- `lottie` - Vector animations
-- `animations` - Material Design motion
-
-See [frontend/pubspec.yaml](frontend/pubspec.yaml) for the complete list.
-
-## 🧪 Testing
-
-Run unit tests:
-```bash
-flutter test
-```
-
-Run integration tests:
-```bash
-flutter test integration_test
-```
-
-## 📸 Screenshots
-
-*Coming soon*
-
-<!-- 
-Add your app screenshots here:
-| Home | Profile | MBTI Assessment |
-|------|---------|----------------|
-| ![Home](screenshots/home.png) | ![Profile](screenshots/profile.png) | ![MBTI](screenshots/mbti.png) |
--->
+- 🔄 Payment integration
 
 ## 🤝 Contributing
 
@@ -273,11 +207,6 @@ This project is private and not licensed for public use.
 
 Developed by the TripBond team.
 
-## 📞 Contact
-
-For questions or support, please contact: [your-email@example.com]
-
 ---
 
-Built with ❤️ using Flutter
->>>>>>> 64e63e462e56f19c432aa5a2d9c1fea7e4e4094d
+Built with ❤️ using FastAPI & Flutter

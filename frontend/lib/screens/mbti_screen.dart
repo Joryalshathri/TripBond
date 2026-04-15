@@ -18,83 +18,80 @@ class MbtiScreen extends StatefulWidget {
 class _MbtiScreenState extends State<MbtiScreen> {
   int _currentScreen = 0;
   final Map<int, String> _answers = {};
+  final PersonalityService _personalityService = PersonalityService();
 
-  final List<Map<String, dynamic>> _questions = [
+  final List<Map<String, String>> _questionMeta = [
     {
-      'type': 'intro',
-      'title': 'Dear Bonder,\nlet\'s get to know\nyou!',
-      'illustration': 'assets/images/icons/mtbi1.png',
-    },
-    {
-      'type': 'question',
-      'text':
-          'I enjoy visiting new places and experiencing different cultures when I travel.',
       'illustration': 'assets/images/icons/mtbi2.png',
-      'dimension': 'E', // Extroversion
+      'dimension': 'E',
     },
     {
-      'type': 'question',
-      'text':
-          'I prefer trips that include museums, heritage sites, or unique local experiences.',
       'illustration': 'assets/images/icons/mtbi3.png',
-      'dimension': 'N', // Intuition
+      'dimension': 'N',
     },
     {
-      'type': 'question',
-      'text':
-          'I like my trips to be well organized with clear schedules and plans.',
       'illustration': 'assets/images/icons/mtbi4.png',
-      'dimension': 'J', // Judging
+      'dimension': 'J',
     },
     {
-      'type': 'question',
-      'text':
-          'I prefer following a planned itinerary rather than deciding activities spontaneously.',
       'illustration': 'assets/images/icons/mtbi5.png',
-      'dimension': 'J', // Judging
+      'dimension': 'J',
     },
     {
-      'type': 'question',
-      'text':
-          'I enjoy social activities such as events, nightlife, or group entertainment while traveling.',
       'illustration': 'assets/images/icons/mtbi6.png',
-      'dimension': 'E', // Extroversion
+      'dimension': 'E',
     },
     {
-      'type': 'question',
-      'text':
-          'I like traveling with others and participating in lively or group based activities.',
       'illustration': 'assets/images/icons/mtbi7.png',
-      'dimension': 'E', // Extroversion
+      'dimension': 'E',
     },
     {
-      'type': 'question',
-      'text':
-          'I prefer travel activities that help everyone in the group feel comfortable and relaxed.',
       'illustration': 'assets/images/icons/mtbi8.png',
-      'dimension': 'F', // Feeling
+      'dimension': 'F',
     },
     {
-      'type': 'question',
-      'text':
-          'I enjoy calm experiences such as nature, food tasting, or wellness activities.',
       'illustration': 'assets/images/icons/mtbi9.png',
-      'dimension': 'I', // Introversion
+      'dimension': 'I',
     },
     {
-      'type': 'question',
-      'text':
-          'I feel more comfortable visiting places that are familiar, safe, and predictable.',
       'illustration': 'assets/images/icons/mtbi10.png',
-      'dimension': 'S', // Sensing
+      'dimension': 'S',
     },
     {
-      'type': 'question',
-      'text': 'I prefer avoiding risky or stressful travel situations.',
       'illustration': 'assets/images/icons/mtbi11.png',
-      'dimension': 'T', // Thinking
+      'dimension': 'T',
     },
   ];
+
+  bool _isLoadingQuestions = true;
+  bool _isSubmitting = false;
+  String? _loadError;
+  List<Map<String, dynamic>> _quizQuestions = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadQuizQuestions();
+  }
+
+  Future<void> _loadQuizQuestions() async {
+    try {
+      final response = await _personalityService.getQuizQuestions();
+      final questions = response;
+      if (!mounted) return;
+      setState(() {
+        _quizQuestions = questions;
+        _isLoadingQuestions = false;
+        _loadError = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loadError = e.toString().replaceFirst('Exception: ', '');
+        _isLoadingQuestions = false;
+      });
+    }
+  }
 
   void _handleAnswer(String answer) {
     setState(() {
@@ -102,7 +99,7 @@ class _MbtiScreenState extends State<MbtiScreen> {
     });
 
     Future.delayed(const Duration(milliseconds: 300), () {
-      if (_currentScreen < _questions.length - 1) {
+      if (_currentScreen < _quizQuestions.length) {
         setState(() {
           _currentScreen++;
         });
@@ -113,7 +110,7 @@ class _MbtiScreenState extends State<MbtiScreen> {
   }
 
   void _handleNext() {
-    if (_currentScreen < _questions.length - 1) {
+    if (_currentScreen < _quizQuestions.length) {
       setState(() {
         _currentScreen++;
       });
@@ -123,7 +120,13 @@ class _MbtiScreenState extends State<MbtiScreen> {
   }
 
   Future<void> _completeAssessment() async {
+    if (_isSubmitting) return;
+
     try {
+      setState(() {
+        _isSubmitting = true;
+      });
+
       // Get user ID
       final authService = AuthService();
       final userId = await authService.getUserId();
@@ -132,23 +135,23 @@ class _MbtiScreenState extends State<MbtiScreen> {
         throw Exception('User not authenticated');
       }
 
-      // Prepare answers for backend API
       final answersForApi = <Map<String, dynamic>>[];
       _answers.forEach((index, answer) {
-        if (index > 0 && index < _questions.length) {
-          final question = _questions[index];
+        final questionIndex = index - 1;
+        if (questionIndex >= 0 && questionIndex < _quizQuestions.length) {
+          final question = _quizQuestions[questionIndex];
           answersForApi.add({
-            'question_number': index,
-            'question_text': question['text'],
-            'dimension': question['dimension'],
-            'answer': answer,
+            'question_id': question['id'],
+            'answer': answer.toLowerCase(),
           });
         }
       });
 
       // Submit to backend
-      final personalityService = PersonalityService();
-      final scores = await personalityService.submitQuiz(userId, answersForApi);
+      final scores = await _personalityService.submitQuizSubmission(
+        userId: userId,
+        answers: answersForApi,
+      );
 
       // Calculate MBTI type from scores
       final mbtiType = _calculateMbtiTypeFromScores(scores);
@@ -185,6 +188,12 @@ class _MbtiScreenState extends State<MbtiScreen> {
       Navigator.of(context).pushReplacement(
         SharedAxisPageRoute(page: const DestinationLandingPage()),
       );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
     }
   }
 
@@ -219,9 +228,10 @@ class _MbtiScreenState extends State<MbtiScreen> {
     };
 
     _answers.forEach((index, answer) {
-      if (index > 0 && index < _questions.length) {
-        final dimension = _questions[index]['dimension'] as String;
-        if (answer == 'Agree') {
+      final questionIndex = index - 1;
+      if (questionIndex >= 0 && questionIndex < _questionMeta.length) {
+        final dimension = _questionMeta[questionIndex]['dimension'] as String;
+        if (answer == AppStrings.agree) {
           scores[dimension] = (scores[dimension] ?? 0) + 1;
         }
       }
@@ -233,8 +243,40 @@ class _MbtiScreenState extends State<MbtiScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final currentQuestion = _questions[_currentScreen];
-    final isIntro = currentQuestion['type'] == 'intro';
+    if (_isLoadingQuestions) {
+      return const Scaffold(
+        backgroundColor: AppColors.background,
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_loadError != null) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _loadError!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.redAccent),
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: _loadQuizQuestions,
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    final isIntro = _currentScreen == 0;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -255,7 +297,9 @@ class _MbtiScreenState extends State<MbtiScreen> {
   }
 
   Widget _buildProgressIndicator() {
-    final progress = _currentScreen / (_questions.length - 1);
+    final totalQuestions = _quizQuestions.length;
+    final progress =
+        totalQuestions <= 1 ? 0.0 : _currentScreen / totalQuestions;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(32, 16, 32, 8),
@@ -265,7 +309,7 @@ class _MbtiScreenState extends State<MbtiScreen> {
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               Text(
-                '$_currentScreen/${_questions.length - 1}',
+                '$_currentScreen/${_quizQuestions.length}',
                 style: AppTextStyles.label,
               ),
             ],
@@ -413,8 +457,10 @@ class _MbtiScreenState extends State<MbtiScreen> {
   }
 
   Widget _buildQuestionScreen() {
-    final currentQuestion = _questions[_currentScreen];
+    final questionIndex = _currentScreen - 1;
+    final currentQuestion = _quizQuestions[questionIndex];
     final currentAnswer = _answers[_currentScreen];
+    final meta = _questionMeta[questionIndex];
 
     return SizedBox.expand(
       child: Stack(
@@ -482,7 +528,7 @@ class _MbtiScreenState extends State<MbtiScreen> {
                         );
                       },
                       child: Image.asset(
-                        currentQuestion['illustration'] as String,
+                        meta['illustration'] as String,
                         key: ValueKey<int>(_currentScreen),
                         height: 180,
                         fit: BoxFit.contain,
@@ -518,7 +564,7 @@ class _MbtiScreenState extends State<MbtiScreen> {
               width: AppDimensions.fabSize,
               height: AppDimensions.fabSize,
               child: FloatingActionButton(
-                onPressed: _currentScreen < _questions.length - 1
+                onPressed: _currentScreen < _quizQuestions.length
                     ? _handleNext
                     : _completeAssessment,
                 backgroundColor: AppColors.primary,

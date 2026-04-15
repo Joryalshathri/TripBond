@@ -2,12 +2,17 @@ from pydantic_settings import BaseSettings
 from pydantic import ConfigDict
 from typing import Optional
 from functools import lru_cache
+from pathlib import Path
 
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
 
-    model_config = ConfigDict(env_file=".env", case_sensitive=False, protected_namespaces=())
+    model_config = ConfigDict(
+        env_file=str(Path(__file__).parent.parent / ".env"),
+        case_sensitive=False,
+        protected_namespaces=()
+    )
 
     # Supabase
     supabase_url: str
@@ -22,6 +27,15 @@ class Settings(BaseSettings):
 
     # Google Maps / Places API
     google_maps_api_key: Optional[str] = None
+
+    # Geoapify Places API
+    geoapify_api_key: Optional[str] = None
+
+    # TomTom Search & Places API
+    tomtom_api_key: Optional[str] = None
+
+    # Foursquare API (for enriching POI data)
+    foursquare_api_key: Optional[str] = None
 
     # ML Model
     model_path: str = ""
