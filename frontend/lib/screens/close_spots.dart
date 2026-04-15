@@ -6,6 +6,7 @@ import 'DestinationLandingPage.dart';
 import 'Bonder.dart';
 import 'profile.dart';
 import 'AI_Plan.dart';
+import 'plans_list.dart';
 import '../core/animations/animation_constants.dart';
 import '../services/trip_service.dart';
 
@@ -435,6 +436,12 @@ class _CloseSpotsViewState extends State<_CloseSpotsView> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
+            _navIcon(Icons.home, onTap: () {
+              Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const PlansList()));
+            }),
             _navIcon(Icons.search, onTap: () {
               Navigator.push(
                   context,

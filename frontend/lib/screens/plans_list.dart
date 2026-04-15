@@ -3,11 +3,13 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 import '../core/animations/animation_constants.dart';
 import '../providers/trip_provider.dart';
+import '../providers/user_provider.dart';
 import 'AI_Plan.dart';
 import 'bonder.dart';
 import 'close_spots.dart';
 import 'DestinationLandingPage.dart';
 import 'profile.dart';
+import 'TripHomeScreen.dart';
 
 class PlanItem {
   final String name;
@@ -83,6 +85,7 @@ class _PlansListState extends State<PlansList> {
     super.initState();
     Future.microtask(() {
       Provider.of<TripProvider>(context, listen: false).fetchMyTrips();
+      Provider.of<UserProvider>(context, listen: false).fetchMyProfile();
     });
   }
 
@@ -181,22 +184,29 @@ class _PlansListState extends State<PlansList> {
   Widget _buildTopBar() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 50, 20, 12),
-      child: Row(
-        children: [
-          const SizedBox(width: 24),
-          const Spacer(),
-          const Text(
-            "Sara's Plans",
-            style: TextStyle(
-              fontFamily: 'Poppins',
-              fontWeight: FontWeight.w700,
-              fontSize: 24,
-              color: Colors.black,
-            ),
-          ),
-          const Spacer(),
-          const SizedBox(width: 24),
-        ],
+      child: Consumer<UserProvider>(
+        builder: (context, userProvider, child) {
+          final userName = userProvider.currentProfile?['first_name'] ?? 
+              userProvider.currentProfile?['full_name'] ?? 
+              'User';
+          return Row(
+            children: [
+              const SizedBox(width: 24),
+              const Spacer(),
+              Text(
+                "$userName's Plans",
+                style: const TextStyle(
+                  fontFamily: 'Poppins',
+                  fontWeight: FontWeight.w700,
+                  fontSize: 24,
+                  color: Colors.black,
+                ),
+              ),
+              const Spacer(),
+              const SizedBox(width: 24),
+            ],
+          );
+        },
       ),
     )
         .animate()
@@ -263,7 +273,7 @@ class _PlansListState extends State<PlansList> {
       onTap: () => Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => AI_Plan(
+          builder: (_) => TripHomeScreen(
             tripId: tripId,
             tripTitle: name,
             destination: destination,
@@ -419,6 +429,7 @@ class _PlansListState extends State<PlansList> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
+            _navIcon(Icons.home, active: true),
             _navIcon(Icons.search,
                 onTap: () => Navigator.pushReplacement(
                     context,

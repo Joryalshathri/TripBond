@@ -4,6 +4,7 @@ import 'DestinationLandingPage.dart';
 import 'profile.dart';
 import 'close_spots.dart';
 import 'group_suggested_itinerary.dart';
+import 'plans_list.dart';
 import '../core/animations/animation_constants.dart';
 import '../services/bonder_service.dart';
 import '../services/chat_service.dart';
@@ -498,6 +499,11 @@ class _BondersState extends State<Bonders> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
+            _navIcon(Icons.home,
+                onTap: () => Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const PlansList()))),
             _navIcon(Icons.search,
                 onTap: () => Navigator.pushReplacement(
                     context,

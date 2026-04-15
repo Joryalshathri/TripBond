@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'DestinationLandingPage.dart';
+import 'Bonder.dart';
 import 'profile.dart';
 import 'close_spots.dart';
 import 'group_suggested_itinerary.dart';
@@ -803,6 +804,11 @@ class _AI_PlanState extends State<AI_Plan> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
+            _navIcon(Icons.home,
+                onTap: () => Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const PlansList()))),
             _navIcon(Icons.search,
                 onTap: () => Navigator.pushReplacement(
                     context,
@@ -821,6 +827,7 @@ class _AI_PlanState extends State<AI_Plan> {
             ),
             _navIcon(
               Icons.airplanemode_active,
+              active: true,
               onTap: () => Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(
@@ -832,7 +839,9 @@ class _AI_PlanState extends State<AI_Plan> {
                 ),
               ),
             ),
-            _navIcon(Icons.group_outlined, active: true),
+            _navIcon(Icons.group_outlined,
+                onTap: () => Navigator.pushReplacement(context,
+                    MaterialPageRoute(builder: (_) => const Bonders()))),
             _navIcon(Icons.person_outline,
                 onTap: () => Navigator.pushReplacement(context,
                     MaterialPageRoute(builder: (_) => const Profile()))),

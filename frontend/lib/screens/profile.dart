@@ -9,6 +9,7 @@ import 'AI_Plan.dart';
 import 'chat_screen.dart';
 import 'personality_quiz_screen.dart';
 import 'feedback_screen.dart';
+import 'plans_list.dart';
 import 'package:top_snackbar_flutter/top_snack_bar.dart';
 import 'package:top_snackbar_flutter/custom_snack_bar.dart';
 import '../services/profileService.dart';
@@ -672,6 +673,11 @@ class _ProfileState extends State<Profile> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
+            _navIcon(Icons.home,
+                onTap: () => Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const PlansList()))),
             _navIcon(Icons.search,
                 onTap: () => Navigator.pushReplacement(
                     context,

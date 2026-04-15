@@ -86,16 +86,17 @@ def _enrich_with_photos(poi: Dict, lat: Optional[float], lng: Optional[float]) -
     settings = get_settings()
     poi_name = poi.get('name', 'Unknown')
     
+    # Keep existing image_url from CSV if available
+    existing_image = poi.get('image_url')
+    
     # Only proceed if coordinates are provided
     if lat is None or lng is None:
         logger.debug(f"Skipping enrichment for {poi_name}: missing coordinates (lat={lat}, lng={lng})")
-        poi["image_url"] = None
         return poi
     
     # Only proceed if Google Maps API key is configured
     if not settings.google_maps_api_key:
         logger.debug(f"Skipping enrichment for {poi_name}: Google Maps API key not configured")
-        poi["image_url"] = None
         return poi
     
     try:
@@ -109,11 +110,12 @@ def _enrich_with_photos(poi: Dict, lat: Optional[float], lng: Optional[float]) -
             language='en'
         )
         
-        poi["image_url"] = image_url
+        # Only update if Google Places found an image
         if image_url:
+            poi["image_url"] = image_url
             logger.info(f"✅ Enriched '{poi_name}' with image URL from Google Places")
         else:
-            logger.debug(f"No image URL found for '{poi_name}' (place found but no photos)")
+            logger.debug(f"No image URL found from Google Places for '{poi_name}' (keeping CSV image if available)")
         
         return poi
         
@@ -165,6 +167,7 @@ def get_pois_for_destination(destination: str, limit: int = 15) -> List[Dict]:
             "type": str(row.get('category', 'attraction')),
             "rating": float(row.get('rating', 4.0)),
             "description": str(row.get('description', '')),
+            "image_url": str(row.get('image_url', '')) if pd.notna(row.get('image_url')) else None,
             "latitude": float(row.get('latitude', 0)) if pd.notna(row.get('latitude')) else None,
             "longitude": float(row.get('longitude', 0)) if pd.notna(row.get('longitude')) else None,
             "review_count": int(row.get('review_count', 0)) if pd.notna(row.get('review_count')) else 0,

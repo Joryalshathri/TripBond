@@ -10,6 +10,7 @@ import 'AI_Plan.dart';
 import 'plans_list.dart';
 import 'chat_screen.dart';
 import 'poi_explorer_screen.dart';
+import 'TripHomeScreen.dart';
 import '../services/favorites_service.dart';
 
 String selectedCityForTrip = "";
@@ -655,6 +656,11 @@ class _DestinationLandingPageState extends State<DestinationLandingPage> {
             child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
+                  _navIcon(Icons.home,
+                      onTap: () => Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const PlansList()))),
                   _navIcon(Icons.search, active: true),
                   _navIcon(Icons.location_on_outlined,
                       onTap: () => Navigator.pushReplacement(

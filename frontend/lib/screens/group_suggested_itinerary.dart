@@ -886,6 +886,11 @@ class _GroupSuggestedItineraryState extends State<GroupSuggestedItinerary> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
+            _navIcon(Icons.home,
+                onTap: () => Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const PlansList()))),
             _navIcon(Icons.search,
                 onTap: () => Navigator.pushReplacement(
                     context,
@@ -902,7 +907,7 @@ class _GroupSuggestedItineraryState extends State<GroupSuggestedItinerary> {
                 ),
               ),
             ),
-            _navIcon(Icons.airplanemode_active),
+            _navIcon(Icons.airplanemode_active, active: true),
             _navIcon(Icons.group_outlined,
                 onTap: () => Navigator.pushReplacement(context,
                     MaterialPageRoute(builder: (_) => const Bonders()))),
@@ -915,10 +920,16 @@ class _GroupSuggestedItineraryState extends State<GroupSuggestedItinerary> {
     );
   }
 
-  Widget _navIcon(IconData icon, {VoidCallback? onTap}) {
+  Widget _navIcon(IconData icon, {VoidCallback? onTap, bool active = false}) {
     return GestureDetector(
       onTap: onTap,
-      child: Icon(icon, size: 24, color: Colors.white),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 24, color: Colors.white),
+          if (active) ...[const SizedBox(height: 4), Container(width: 20, height: 2, color: Colors.white)]
+        ],
+      ),
     );
   }
 }
