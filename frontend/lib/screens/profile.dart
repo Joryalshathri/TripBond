@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'settings.dart';
@@ -14,6 +17,7 @@ import 'package:top_snackbar_flutter/top_snack_bar.dart';
 import 'package:top_snackbar_flutter/custom_snack_bar.dart';
 import '../services/profileService.dart';
 import '../services/favorites_service.dart';
+import '../services/user_service.dart';
 import '../models/profile_model.dart';
 import '../models.dart';
 
@@ -34,9 +38,14 @@ class _ProfileState extends State<Profile> {
   bool _isLoading = true;
   String? _error;
   final FavoritesService _favoritesService = FavoritesService();
+  final UserService _userService = UserService();
   List<Map<String, dynamic>> _likedTrips = [];
   bool _isLoadingLikedTrips = true;
   String? _likedTripsError;
+  final List<Map<String, dynamic>> _followersData = [];
+  final List<Map<String, dynamic>> _followingData = [];
+  bool _isLoadingFollowers = false;
+  bool _isLoadingFollowing = false;
 
   @override
   void initState() {
@@ -78,26 +87,25 @@ class _ProfileState extends State<Profile> {
     }
   }
 
-  final List<Map<String, String>> _followerData = [
-    {'name': 'Leen', 'image': 'assets/images/people/pesron4.png'},
-    {'name': 'Khalid', 'image': 'assets/images/people/person5.png'},
-    {'name': 'Fatima Khan', 'image': ''},
-    {'name': 'Ahmed Ali', 'image': 'assets/images/cities/jeddah.png'},
-  ];
-
-  final List<Map<String, String>> _followingData = [
-    {'name': 'Huda', 'image': ''},
-    {'name': 'Ziyad', 'image': 'assets/images/people/person7.png'},
-    {'name': 'Friends', 'image': 'assets/images/people/friends.png'},
-    {'name': 'Leen', 'image': 'assets/images/people/pesron4.png'},
-  ];
-
   String _getTimeAgo(DateTime dateTime) {
     final duration = DateTime.now().difference(dateTime);
     if (duration.inDays > 0) return '${duration.inDays}d ago';
     if (duration.inHours > 0) return '${duration.inHours}h ago';
     if (duration.inMinutes > 0) return '${duration.inMinutes}m ago';
     return 'Just now';
+  }
+
+  Uint8List? _decodeDataUrlImage(String? value) {
+    if (value == null) return null;
+    final raw = value.trim();
+    if (!raw.startsWith('data:image')) return null;
+    final commaIndex = raw.indexOf(',');
+    if (commaIndex < 0 || commaIndex >= raw.length - 1) return null;
+    try {
+      return base64Decode(raw.substring(commaIndex + 1));
+    } catch (_) {
+      return null;
+    }
   }
 
   String _displayName() {
@@ -182,19 +190,101 @@ class _ProfileState extends State<Profile> {
   }
 
   void _showFollowersList() {
-    showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        builder: (context) => _buildFollowersModal());
+    final followersCount = _userProfile?.followers ?? 0;
+    if (followersCount <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No followers yet'),
+          backgroundColor: Color(0xFF4675B8),
+        ),
+      );
+      return;
+    }
+
+    _loadFollowers().then((_) {
+      if (!mounted) return;
+      showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (context) => _buildFollowersModal());
+    });
   }
 
   void _showFollowingList() {
-    showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        builder: (context) => _buildFollowingModal());
+    final followingCount = _userProfile?.following ?? 0;
+    if (followingCount <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Not following anyone yet'),
+          backgroundColor: Color(0xFF4675B8),
+        ),
+      );
+      return;
+    }
+
+    _loadFollowing().then((_) {
+      if (!mounted) return;
+      showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (context) => _buildFollowingModal());
+    });
+  }
+
+  Future<void> _loadFollowers() async {
+    if (_isLoadingFollowers) return;
+    setState(() => _isLoadingFollowers = true);
+    try {
+      final followers = await _userService.getMyFollowers();
+      if (!mounted) return;
+      setState(() {
+        _followersData
+          ..clear()
+          ..addAll(followers);
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            e.toString().replaceFirst('Exception: ', ''),
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingFollowers = false);
+      }
+    }
+  }
+
+  Future<void> _loadFollowing() async {
+    if (_isLoadingFollowing) return;
+    setState(() => _isLoadingFollowing = true);
+    try {
+      final following = await _userService.getMyFollowing();
+      if (!mounted) return;
+      setState(() {
+        _followingData
+          ..clear()
+          ..addAll(following);
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            e.toString().replaceFirst('Exception: ', ''),
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingFollowing = false);
+      }
+    }
   }
 
   @override
@@ -236,13 +326,8 @@ class _ProfileState extends State<Profile> {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 50, 20, 8),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        mainAxisAlignment: MainAxisAlignment.end,
         children: [
-          GestureDetector(
-              onTap: () => Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const editprofile())),
-              child: const Icon(Icons.edit_outlined,
-                  size: 20, color: Color(0xFF1E1E1E))),
           PopupMenuButton<String>(
             child:
                 const Icon(Icons.more_vert, size: 20, color: Color(0xFF1E1E1E)),
@@ -323,6 +408,8 @@ class _ProfileState extends State<Profile> {
     final displayName = _displayName();
     final int userTripCount =
         posts.where((p) => p.userName == displayName).length;
+    final avatarUrl = _userProfile?.avatarUrl?.trim() ?? '';
+    final avatarBytes = _decodeDataUrlImage(avatarUrl);
     return Column(
       children: [
         Container(
@@ -333,11 +420,19 @@ class _ProfileState extends State<Profile> {
               border: Border.all(
                   color: const Color.fromARGB(255, 244, 242, 242), width: 3)),
           child: ClipOval(
-            child: _userProfile?.avatarUrl != null &&
-                    _userProfile!.avatarUrl!.isNotEmpty
-                ? Image.network(_userProfile!.avatarUrl!, fit: BoxFit.cover)
-                : Image.asset('assets/images/people/profile.png',
-                    fit: BoxFit.cover),
+            child: avatarBytes != null
+                ? Image.memory(avatarBytes, fit: BoxFit.cover)
+                : (avatarUrl.isNotEmpty
+                    ? Image.network(
+                        avatarUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Image.asset(
+                          'assets/images/people/profile.png',
+                          fit: BoxFit.cover,
+                        ),
+                      )
+                    : Image.asset('assets/images/people/profile.png',
+                        fit: BoxFit.cover)),
           ),
         ).animate().scale(delay: 100.ms).fadeIn(),
         const SizedBox(height: 12),
@@ -717,14 +812,18 @@ class _ProfileState extends State<Profile> {
   }
 
   Widget _buildFollowersModal() {
-    return _buildUserListModal("Followers", _followerData);
+    return _buildUserListModal("Followers", _followersData, _isLoadingFollowers);
   }
 
   Widget _buildFollowingModal() {
-    return _buildUserListModal("Following", _followingData);
+    return _buildUserListModal("Following", _followingData, _isLoadingFollowing);
   }
 
-  Widget _buildUserListModal(String title, List<Map<String, String>> users) {
+  Widget _buildUserListModal(
+    String title,
+    List<Map<String, dynamic>> users,
+    bool isLoading,
+  ) {
     return Container(
       height: MediaQuery.of(context).size.height * 0.6,
       decoration: const BoxDecoration(
@@ -747,81 +846,71 @@ class _ProfileState extends State<Profile> {
                   fontSize: 20)),
           const Divider(),
           Expanded(
-            child: ListView.builder(
-              itemCount: users.length,
-              itemBuilder: (context, index) {
-                final user = users[index];
-                bool hasImage =
-                    user['image'] != null && user['image']!.isNotEmpty;
-                return ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: CircleAvatar(
-                    radius: 24,
-                    backgroundColor:
-                        hasImage ? Colors.transparent : const Color(0xFF4675B8),
-                    backgroundImage:
-                        hasImage ? AssetImage(user['image']!) : null,
-                    child: !hasImage
-                        ? Text(user['name']![0].toUpperCase(),
-                            style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 18))
-                        : null,
-                  ),
-                  title: Text(user['name']!,
-                      style: const TextStyle(
-                          fontFamily: 'Poppins', fontWeight: FontWeight.w600)),
-                  trailing: PopupMenuButton<String>(
-                    icon: const Icon(Icons.more_horiz, color: Colors.grey),
-                    onSelected: (value) {
-                      if (value == 'message') {
-                        Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) => ChatPage(
-                                    bonderId: user['name']!,
-                                    name: user['name']!)));
-                      } else if (value == 'remove') {
-                        setState(() {
-                          users.removeAt(index);
-                        });
-                      }
-                    },
-                    itemBuilder: (context) => [
-                      PopupMenuItem(
-                          value: 'message',
-                          child: Row(
-                            children: const [
-                              Icon(Icons.message_outlined,
-                                  size: 18, color: Colors.black),
-                              SizedBox(width: 10),
-                              Text("Message"),
-                            ],
-                          )),
-                      PopupMenuItem(
-                          value: 'remove',
-                          child: Row(
-                            children: [
-                              Icon(
-                                  title == "Followers"
-                                      ? Icons.person_remove_outlined
-                                      : Icons.remove_circle_outline,
-                                  size: 18,
-                                  color: Colors.red),
-                              const SizedBox(width: 10),
-                              Text(
-                                  title == "Followers"
-                                      ? "Remove Follower"
-                                      : "Unfollow",
-                                  style: const TextStyle(color: Colors.red)),
-                            ],
-                          )),
-                    ],
-                  ),
-                );
-              },
-            ),
+            child: isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : users.isEmpty
+                    ? Center(
+                        child: Text(
+                          title == 'Followers'
+                              ? 'No followers yet'
+                              : 'Not following anyone yet',
+                          style: TextStyle(color: Colors.grey.shade600),
+                        ),
+                      )
+                    : ListView.builder(
+                        itemCount: users.length,
+                        itemBuilder: (context, index) {
+                          final user = users[index];
+                          final name =
+                              (user['name'] ?? 'TripBond User').toString();
+                          final avatarUrl = (user['avatar_url'] ?? '').toString();
+                            final avatarBytes = _decodeDataUrlImage(avatarUrl);
+                          final userId = (user['id'] ?? '').toString();
+                          final hasAvatar = avatarUrl.isNotEmpty;
+
+                          return ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            leading: CircleAvatar(
+                              radius: 24,
+                              backgroundColor: hasAvatar
+                                  ? Colors.transparent
+                                  : const Color(0xFF4675B8),
+                                backgroundImage: avatarBytes != null
+                                  ? MemoryImage(avatarBytes)
+                                  : (hasAvatar ? NetworkImage(avatarUrl) : null),
+                              child: !hasAvatar
+                                  ? Text(
+                                      name.isNotEmpty
+                                          ? name[0].toUpperCase()
+                                          : 'U',
+                                      style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 18),
+                                    )
+                                  : null,
+                            ),
+                            title: Text(name,
+                                style: const TextStyle(
+                                    fontFamily: 'Poppins',
+                                    fontWeight: FontWeight.w600)),
+                            trailing: IconButton(
+                              icon: const Icon(Icons.message_outlined,
+                                  color: Colors.grey),
+                              onPressed: userId.isEmpty
+                                  ? null
+                                  : () {
+                                      Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                              builder: (_) => ChatPage(
+                                                  bonderId: userId,
+                                                  name: name)));
+                                    },
+                            ),
+                          );
+                        },
+                      ),
           ),
         ],
       ),

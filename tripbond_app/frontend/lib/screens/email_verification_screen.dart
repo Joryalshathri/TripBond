@@ -3,11 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
-import '../providers/auth_provider.dart';
-import '../core/animations/page_transitions.dart';
-import 'login_screen.dart';
-import 'mbti_screen.dart';
-import 'widgets/custom_loading_spinner.dart';
+import '../../../../frontend/lib/providers/auth_provider.dart';
+import '../../../../frontend/lib/core/animations/page_transitions.dart';
+import '../../../../frontend/lib/screens/mbti_screen.dart';
+import '../../../../frontend/lib/screens/widgets/custom_loading_spinner.dart';
 
 /// Shown right after a user registers.
 /// The user enters the 6-digit code that was emailed to them.
@@ -355,7 +354,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                           elevation: 0,
                           disabledBackgroundColor: const Color(
                             0xFF4675B8,
-                          ).withOpacity(0.6),
+                          ).withValues(alpha: 0.6),
                         ),
                         child: _isLoading
                             ? const CustomLoadingSpinner(

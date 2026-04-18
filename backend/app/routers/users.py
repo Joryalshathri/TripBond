@@ -5,10 +5,85 @@ from ..auth import get_current_user_context
 from ..schemas.profile import ProfileResponse, UpdateProfileRequest
 from ..schemas.settings import UserSettingsResponse, UpdateSettingsRequest
 import logging
-from typing import List
+from typing import Any, List
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+def _parse_connection_ids(raw_value: Any) -> list[str]:
+    """Normalize follower/following field values into a list of user IDs."""
+    if raw_value is None:
+        return []
+
+    if isinstance(raw_value, list):
+        ids: list[str] = []
+        for item in raw_value:
+            if isinstance(item, str) and item.strip():
+                ids.append(item.strip())
+            elif isinstance(item, dict):
+                candidate = (
+                    item.get("id")
+                    or item.get("user_id")
+                    or item.get("follower_id")
+                    or item.get("following_id")
+                )
+                if candidate:
+                    ids.append(str(candidate).strip())
+        return ids
+
+    if isinstance(raw_value, str):
+        value = raw_value.strip()
+        if not value:
+            return []
+        if "," in value:
+            return [part.strip() for part in value.split(",") if part.strip()]
+        return [value]
+
+    return []
+
+
+async def _get_connection_users(db: SupabaseDB, user_id: str, field_name: str) -> list[dict]:
+    """Resolve connection IDs from a profile field to lightweight user objects."""
+    profile_response = await run_in_threadpool(
+        lambda: db.client.table("profiles").select(field_name).eq("id", user_id).limit(1).execute()
+    )
+
+    if not profile_response.data:
+        return []
+
+    ids = _parse_connection_ids(profile_response.data[0].get(field_name))
+    if not ids:
+        return []
+
+    users_response = await run_in_threadpool(
+        lambda: db.client.table("profiles")
+        .select("id,full_name,username,avatar_url,is_public")
+        .in_("id", ids)
+        .execute()
+    )
+
+    users = users_response.data or []
+    users_by_id = {str(u.get("id")): u for u in users}
+
+    ordered: list[dict] = []
+    for connection_id in ids:
+        user = users_by_id.get(connection_id)
+        if not user:
+            continue
+
+        if user.get("is_public", True) is False:
+            continue
+
+        ordered.append(
+            {
+                "id": str(user.get("id", "")),
+                "name": user.get("full_name") or user.get("username") or "TripBond User",
+                "avatar_url": user.get("avatar_url"),
+            }
+        )
+
+    return ordered
 
 
 @router.get("/bonders", response_model=List[dict])
@@ -45,6 +120,40 @@ async def list_bonders(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve bonders",
+        )
+
+
+@router.get("/me/followers", response_model=List[dict])
+async def get_my_followers(
+    user_context: tuple[str, str] = Depends(get_current_user_context),
+):
+    """Return current user's followers as lightweight profile items."""
+    user_id, _token = user_context
+    try:
+        db = SupabaseDB(admin=True)
+        return await _get_connection_users(db, user_id, "followers")
+    except Exception:
+        logger.exception("Failed to get followers")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve followers",
+        )
+
+
+@router.get("/me/following", response_model=List[dict])
+async def get_my_following(
+    user_context: tuple[str, str] = Depends(get_current_user_context),
+):
+    """Return users followed by current user as lightweight profile items."""
+    user_id, _token = user_context
+    try:
+        db = SupabaseDB(admin=True)
+        return await _get_connection_users(db, user_id, "following")
+    except Exception:
+        logger.exception("Failed to get following")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve following",
         )
 
 
@@ -85,6 +194,8 @@ async def get_my_profile(user_context: tuple[str, str] = Depends(get_current_use
             past_trips_count=trips_response.count if trips_response else 0,
             liked_pages_count=0,
             favorites_count=favorites_response.count if favorites_response else 0,
+            followers_count=len(_parse_connection_ids(profile.get("followers"))),
+            following_count=len(_parse_connection_ids(profile.get("following"))),
         )
     except HTTPException:
         raise
@@ -100,7 +211,7 @@ async def get_user_profile(user_id: str):
         db = SupabaseDB(admin=True)
         profile_response = await run_in_threadpool(
             lambda: db.client.table("profiles").select(
-                "id,full_name,username,avatar_url,bio,current_location,is_public"
+                "id,full_name,username,avatar_url,bio,current_location,is_public,followers,following"
             ).eq("id", user_id).execute()
         )
         if not profile_response.data:
@@ -134,6 +245,8 @@ async def get_user_profile(user_id: str):
             past_trips_count=trips_response.count if trips_response else 0,
             liked_pages_count=0,
             favorites_count=favorites_response.count if favorites_response else 0,
+            followers_count=len(_parse_connection_ids(profile.get("followers"))),
+            following_count=len(_parse_connection_ids(profile.get("following"))),
         )
     except HTTPException:
         raise
@@ -153,12 +266,22 @@ async def update_profile(
     if user_id != current_user_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only update your own profile")
     try:
-        client = get_supabase_client_for_user(token)
+        # Profile updates are authorized by the user-id check above.
+        # Use the admin client here to avoid token/client mismatches while
+        # still restricting the operation to the authenticated user's own row.
+        client = SupabaseDB(admin=True).client
         update_data = {
             k: (v.isoformat() if hasattr(v, "isoformat") else v)
             for k, v in profile_update.model_dump().items()
             if v is not None
         }
+
+        gender_value = update_data.get("gender")
+        if isinstance(gender_value, str):
+            normalized_gender = gender_value.strip().lower()
+            if normalized_gender in {"male", "female"}:
+                update_data["gender"] = normalized_gender
+
         if not update_data:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No update data provided")
 
@@ -191,6 +314,8 @@ async def update_profile(
             past_trips_count=trips_response.count if trips_response else 0,
             liked_pages_count=0,
             favorites_count=favorites_response.count if favorites_response else 0,
+            followers_count=len(_parse_connection_ids(p.get("followers"))),
+            following_count=len(_parse_connection_ids(p.get("following"))),
         )
     except HTTPException:
         raise

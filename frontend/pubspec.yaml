@@ -43,6 +43,7 @@ dependencies:
   animations: ^2.0.11
   table_calendar: ^3.0.9
   image_picker: ^1.0.0
+  image: ^4.2.0
   flutter_svg: ^2.0.9
   
   # State Management & Security

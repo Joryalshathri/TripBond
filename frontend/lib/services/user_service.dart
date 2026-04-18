@@ -42,6 +42,56 @@ class UserService {
     }
   }
 
+  // Get current user's followers
+  Future<List<Map<String, dynamic>>> getMyFollowers() async {
+    try {
+      final token = await _authService.getAuthToken();
+      if (token == null) {
+        throw Exception('Not authenticated');
+      }
+
+      final response = await _apiService.get(
+        '${ApiConfig.usersPath}/me/followers',
+        token: token,
+      );
+
+      if (response is List) {
+        return response
+            .whereType<Map>()
+            .map((item) => Map<String, dynamic>.from(item))
+            .toList();
+      }
+      return [];
+    } catch (e) {
+      throw Exception('Failed to get followers: ${e.toString()}');
+    }
+  }
+
+  // Get current user's following list
+  Future<List<Map<String, dynamic>>> getMyFollowing() async {
+    try {
+      final token = await _authService.getAuthToken();
+      if (token == null) {
+        throw Exception('Not authenticated');
+      }
+
+      final response = await _apiService.get(
+        '${ApiConfig.usersPath}/me/following',
+        token: token,
+      );
+
+      if (response is List) {
+        return response
+            .whereType<Map>()
+            .map((item) => Map<String, dynamic>.from(item))
+            .toList();
+      }
+      return [];
+    } catch (e) {
+      throw Exception('Failed to get following: ${e.toString()}');
+    }
+  }
+
   // Update profile
   Future<Map<String, dynamic>> updateProfile(
       Map<String, dynamic> updates) async {

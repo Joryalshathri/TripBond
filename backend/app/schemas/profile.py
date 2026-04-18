@@ -24,6 +24,8 @@ class ProfileResponse(BaseModel):
     past_trips_count: Optional[int] = 0
     liked_pages_count: Optional[int] = 0
     favorites_count: Optional[int] = 0
+    followers_count: Optional[int] = 0
+    following_count: Optional[int] = 0
 
 
 class UpdateProfileRequest(BaseModel):
