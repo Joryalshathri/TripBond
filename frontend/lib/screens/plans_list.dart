@@ -60,30 +60,6 @@ class PlanItem {
   });
 }
 
-const List<PlanItem> currentPlans = [
-  PlanItem(
-    name: 'Khobar',
-    image: 'assets/images/cities/khobar.png',
-    dateRange: '9 - 11 Apr 2026',
-    avatarInitials: ['K', 'L', 'H'],
-  ),
-];
-
-const List<PlanItem> futurePlans = [
-  PlanItem(
-    name: 'Jeddah',
-    image: 'assets/images/cities/jeddah.png',
-    dateRange: '25 - 27 Jul 2026',
-    avatarInitials: ['Z'],
-  ),
-  PlanItem(
-    name: 'AlUla',
-    image: 'assets/images/cities/AlUla.png',
-    dateRange: '5 - 20 Oct 2026',
-  ),
-];
-
-
 const List<Color> _avatarColors = [
   Color(0xFF4675B8),
   Color(0xFFC4A44A),
