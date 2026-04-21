@@ -3,7 +3,6 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'DatesPage.dart';
 import 'Bonder.dart';
 import 'profile.dart';
-import 'close_spots.dart';
 import 'places_search_screen.dart';
 import 'nearby_places_screen.dart';
 import 'AI_Plan.dart';
@@ -183,7 +182,7 @@ class _DestinationLandingPageState extends State<DestinationLandingPage> {
 
   void _showPickTripSheet() {
     String selectedPrivacy = 'Public';
-    String selectedCategory = 'Past Plans';
+    String selectedCategory = 'Future Plans';
     PlanItem? selectedPlan;
     final TextEditingController titleController = TextEditingController();
 
@@ -196,14 +195,7 @@ class _DestinationLandingPageState extends State<DestinationLandingPage> {
       builder: (context) {
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setModalState) {
-            List<PlanItem> currentDisplayList;
-            if (selectedCategory == 'Current Plans') {
-              currentDisplayList = currentPlans;
-            } else if (selectedCategory == 'Future Plans') {
-              currentDisplayList = futurePlans;
-            } else {
-              currentDisplayList = pastPlans;
-            }
+            List<PlanItem> currentDisplayList = [];
             return Container(
               padding: EdgeInsets.only(
                   bottom: MediaQuery.of(context).viewInsets.bottom + 20,
@@ -254,23 +246,6 @@ class _DestinationLandingPageState extends State<DestinationLandingPage> {
                           }),
                         ),
                       ),
-
-                      // the following dropdown may be used in the future (for future improvements)
-                      /* Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: const Color(0xFF4675B8), width: 1.5),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: DropdownButtonHideUnderline(
-                            child: DropdownButton<String>(
-                              value: selectedPrivacy,
-                              style: const TextStyle(color: Color(0xFF4675B8), fontWeight: FontWeight.bold, fontSize: 13),
-                              onChanged: (val) => setModalState(() => selectedPrivacy = val!),
-                              items: ['Public', 'Private'].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
-                            ),
-                          ),
-                        ),*/
                     ],
                   ),
                   const Text("Select a Trip Location to post:",
@@ -424,12 +399,45 @@ class _DestinationLandingPageState extends State<DestinationLandingPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildHeader(context),
-                      const SizedBox(height: 4),
-                      _buildDestinationCards(context),
-                      const SizedBox(height: 16),
-                      _buildPeopleBanner(),
-                      const SizedBox(height: 16),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: Colors.grey.shade300,
+                              width: 1.5,
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                            color: Colors.grey.shade50,
+                          ),
+                          child: TextField(
+                            decoration: InputDecoration(
+                              hintText: 'Search for bonders...',
+                              hintStyle: TextStyle(
+                                color: Colors.grey.shade500,
+                                fontSize: 14,
+                              ),
+                              prefixIcon: Icon(
+                                Icons.search,
+                                color: Colors.grey.shade400,
+                              ),
+                              border: InputBorder.none,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 12,
+                              ),
+                            ),
+                            onTap: () {
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const Bonders(),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -458,91 +466,6 @@ class _DestinationLandingPageState extends State<DestinationLandingPage> {
         ],
       ),
     );
-  }
-
-  Widget _buildHeader(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 50, 20, 12),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          const Text('Where We Bonding?',
-              style: TextStyle(
-                  fontFamily: 'Poppins',
-                  fontWeight: FontWeight.w800,
-                  fontSize: 22)),
-          IconButton(
-              onPressed: () => showSearch(
-                  context: context, delegate: DestinationSearchDelegate()),
-              icon: const Icon(Icons.search, size: 28)),
-        ],
-      ),
-    ).animate().fadeIn().slideY(begin: -0.1);
-  }
-
-  Widget _buildDestinationCards(BuildContext context) {
-    return SizedBox(
-      height: 200,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        itemCount: destinations.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 16),
-        itemBuilder: (context, index) => _DestinationCard(
-                destination: destinations[index],
-                onTap: () {
-                  selectedCityForTrip = destinations[index].name;
-                  Navigator.push(context,
-                      MaterialPageRoute(builder: (_) => const DatesPage()));
-                })
-            .animate()
-            .fadeIn(delay: (100 + (index * 80)).ms)
-            .scale()
-            .slideX(begin: 0.2),
-      ),
-    );
-  }
-
-  Widget _buildPeopleBanner() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Container(
-        height: 50,
-        decoration: BoxDecoration(
-            color: const Color(0xFF4675B8),
-            borderRadius: BorderRadius.circular(12)),
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Row(
-          children: [
-            SizedBox(
-                width: 70,
-                child: Stack(
-                    children: List.generate(
-                        3,
-                        (i) => Positioned(
-                            left: i * 20.0,
-                            child: Container(
-                                width: 32,
-                                height: 32,
-                                decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                        color: const Color(0xFF4675B8),
-                                        width: 2)),
-                                child: const Icon(Icons.person,
-                                    size: 16, color: Color(0xFF4675B8))))))),
-            const SizedBox(width: 12),
-            const Expanded(
-                child: Text('+8 people like this destination',
-                    style: TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 13,
-                        color: Colors.white))),
-          ],
-        ),
-      ),
-    ).animate().fadeIn(delay: 350.ms).slideY(begin: 0.15);
   }
 
   Widget _buildPostCard(Post post) {
@@ -656,17 +579,16 @@ class _DestinationLandingPageState extends State<DestinationLandingPage> {
             child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _navIcon(Icons.home,
+                  _navIcon(Icons.home, active: true,
+                      onTap: () => Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const DestinationLandingPage()))),
+                  _navIcon(Icons.search,
                       onTap: () => Navigator.pushReplacement(
                           context,
                           MaterialPageRoute(
                               builder: (_) => const PlansList(source: 'home')))),
-                  _navIcon(Icons.search, active: true),
-                  _navIcon(Icons.location_on_outlined,
-                      onTap: () => Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) => const CloseSpots()))),
                   _navIcon(Icons.airplanemode_active,
                       onTap: () => Navigator.pushReplacement(context,
                           MaterialPageRoute(builder: (_) => const AI_Plan()))),

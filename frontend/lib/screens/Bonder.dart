@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'DestinationLandingPage.dart';
 import 'profile.dart';
-import 'close_spots.dart';
 import 'group_suggested_itinerary.dart';
 import 'plans_list.dart';
 import 'notifications_view.dart';
@@ -522,10 +521,7 @@ class _BondersState extends State<Bonders> {
                 onTap: () => Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(
-                        builder: (_) => const DestinationLandingPage()))),
-            _navIcon(Icons.location_on_outlined,
-                onTap: () => Navigator.pushReplacement(context,
-                    MaterialPageRoute(builder: (_) => const CloseSpots()))),
+                        builder: (_) => const PlansList(source: 'home')))),
             _navIcon(Icons.airplanemode_active,
                 onTap: () => Navigator.pushReplacement(
                     context,

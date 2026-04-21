@@ -6,7 +6,6 @@ import '../core/api_config.dart';
 import '../core/api_service.dart';
 import 'DestinationLandingPage.dart';
 import 'profile.dart';
-import 'close_spots.dart';
 import 'group_suggested_itinerary.dart';
 import 'AI_Plan.dart';
 import 'Bonder.dart';
@@ -34,38 +33,19 @@ class _TripHomeScreenState extends State<TripHomeScreen>
   final _authService = AuthService();
   final _poiService = POIService();
 
-  late TabController _tabController;
   List<Map<String, dynamic>> _allPlaces = [];
-  List<Map<String, dynamic>> _filteredPlaces = [];
   bool _isLoading = true;
   String? _error;
-  String _selectedCategory = 'All';
-  int _selectedIndex = 0;
-
-  final Map<String, String> _categoryMap = {
-    'All': '',
-    'Popular': '',
-    'Nearby': 'attraction',
-    'Recommended': 'hotel',
-  };
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
-    _tabController.addListener(_onTabChanged);
     _loadTripPlaces();
   }
 
   @override
   void dispose() {
-    _tabController.removeListener(_onTabChanged);
-    _tabController.dispose();
     super.dispose();
-  }
-
-  void _onTabChanged() {
-    _filterPlaces(_categoryMap.keys.toList()[_tabController.index] ?? 'All');
   }
 
   Future<void> _loadTripPlaces() async {
@@ -84,14 +64,12 @@ class _TripHomeScreenState extends State<TripHomeScreen>
         if (places.isNotEmpty) {
           setState(() {
             _allPlaces = places;
-            _filteredPlaces = List.from(places);
             _isLoading = false;
           });
         } else {
           // If no places from API, show a message but don't fail
           setState(() {
             _allPlaces = [];
-            _filteredPlaces = [];
             _error = 'No recommendations found for $destination';
             _isLoading = false;
           });
@@ -101,7 +79,6 @@ class _TripHomeScreenState extends State<TripHomeScreen>
         print('POI Service Error: $apiError');
         setState(() {
           _allPlaces = [];
-          _filteredPlaces = [];
           _error = 'Unable to fetch recommendations';
           _isLoading = false;
         });
@@ -112,22 +89,6 @@ class _TripHomeScreenState extends State<TripHomeScreen>
         _isLoading = false;
       });
     }
-  }
-
-  void _filterPlaces(String category) {
-    setState(() {
-      _selectedCategory = category;
-      if (category == 'All' || category.isEmpty) {
-        _filteredPlaces = List.from(_allPlaces);
-      } else {
-        _filteredPlaces = _allPlaces
-            .where((place) {
-              final placeType = (place['type'] ?? place['category'] ?? '').toString().toLowerCase();
-              return placeType.contains(category.toLowerCase());
-            })
-            .toList();
-      }
-    });
   }
 
   Widget _buildBottomNav(BuildContext context) {
@@ -148,15 +109,12 @@ class _TripHomeScreenState extends State<TripHomeScreen>
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            _navIcon(Icons.home, active: true),
-            _navIcon(Icons.search,
+            _navIcon(Icons.home),
+            _navIcon(Icons.search, active: true,
                 onTap: () => Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(
                         builder: (_) => const DestinationLandingPage()))),
-            _navIcon(Icons.location_on_outlined,
-                onTap: () => Navigator.pushReplacement(context,
-                    MaterialPageRoute(builder: (_) => CloseSpots(tripId: widget.tripId)))),
             _navIcon(Icons.airplanemode_active,
                 onTap: () => Navigator.pushReplacement(context,
                     MaterialPageRoute(builder: (_) => GroupSuggestedItinerary(
@@ -231,125 +189,18 @@ class _TripHomeScreenState extends State<TripHomeScreen>
           SafeArea(
             child: Column(
               children: [
-                // Header
+                // Discover Banner
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      GestureDetector(
-                        onTap: () => Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const PlansList(source: 'home'),
-                          ),
-                        ),
-                        child: const Icon(Icons.arrow_back, color: Colors.grey),
-                      ),
-                      const Text(
-                        'Home',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.grey,
-                        ),
-                      ),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Tooltip(
-                            message: 'View suggestions',
-                            child: GestureDetector(
-                              onTap: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => AI_Plan(
-                                    tripId: widget.tripId,
-                                    tripTitle: widget.tripTitle,
-                                    destination: widget.destination,
-                                  ),
-                                ),
-                              ),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF4675B8),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: const Text(
-                                  'View',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          const CircleAvatar(
-                            radius: 18,
-                            backgroundImage: AssetImage('assets/images/people/profile.png'),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                // Destination Header
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Discover ${widget.destination ?? "Destinations"}',
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      const Text(
-                        "Explore amazing places powered by Google Maps",
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey,
-                          fontStyle: FontStyle.italic,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                // Category Tabs
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: TabBar(
-                    controller: _tabController,
-                    tabs: const [
-                      Tab(text: 'All'),
-                      Tab(text: 'Popular'),
-                      Tab(text: 'Nearby'),
-                      Tab(text: 'Recommended'),
-                    ],
-                    indicator: UnderlineTabIndicator(
-                      borderSide: const BorderSide(
-                        color: Color(0xFF4675B8),
-                        width: 3,
-                      ),
-                      insets: EdgeInsets.symmetric(horizontal: 16),
-                    ),
-                    unselectedLabelColor: Colors.grey,
-                    labelColor: const Color(0xFF4675B8),
-                    labelStyle: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
+                  child: Text(
+                    'Discover ${widget.destination ?? "Places"}',
+                    style: const TextStyle(
+                      fontSize: 48,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
                     ),
                   ),
                 ),
-                const SizedBox(height: 12),
                 // Places Grid
                 Expanded(
                   child: _isLoading
@@ -366,112 +217,24 @@ class _TripHomeScreenState extends State<TripHomeScreen>
                                 ],
                               ),
                             )
-                          : _selectedCategory == 'Popular' && _allPlaces.isNotEmpty
-                              ? ListView(
+                          : _allPlaces.isEmpty
+                              ? const Center(child: Text('No places found'))
+                              : GridView.builder(
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 16, vertical: 8),
-                                  children: [
-                                    // Top Place Section for Popular tab
-                                    Container(
-                                      margin: const EdgeInsets.only(bottom: 20),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.spaceBetween,
-                                            children: [
-                                              const Text(
-                                                'Top Place',
-                                                style: TextStyle(
-                                                  fontSize: 16,
-                                                  fontWeight: FontWeight.w700,
-                                                  color: Colors.black,
-                                                ),
-                                              ),
-                                              GestureDetector(
-                                                onTap: () {
-                                                  // Navigate to all places
-                                                },
-                                                child: const Text(
-                                                  'View All',
-                                                  style: TextStyle(
-                                                    fontSize: 13,
-                                                    color: Color(0xFF4675B8),
-                                                    fontWeight: FontWeight.w500,
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 12),
-                                          _buildTopPlaceCard(_allPlaces.first),
-                                        ],
-                                      ),
-                                    ),
-                                    // Filtered places
-                                    if (_filteredPlaces.isNotEmpty)
-                                      Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          const Padding(
-                                            padding: EdgeInsets.only(
-                                                bottom: 12, top: 12),
-                                            child: Text(
-                                              'More Popular Places',
-                                              style: TextStyle(
-                                                fontSize: 16,
-                                                fontWeight: FontWeight.w700,
-                                                color: Colors.black,
-                                              ),
-                                            ),
-                                          ),
-                                          GridView.builder(
-                                            shrinkWrap: true,
-                                            physics:
-                                                const NeverScrollableScrollPhysics(),
-                                            gridDelegate:
-                                                const SliverGridDelegateWithFixedCrossAxisCount(
-                                              crossAxisCount: 2,
-                                              childAspectRatio: 2.0,
-                                              crossAxisSpacing: 6,
-                                              mainAxisSpacing: 6,
-                                            ),
-                                            itemCount: _filteredPlaces.length,
-                                            itemBuilder: (context, index) {
-                                              final place =
-                                                  _filteredPlaces[index];
-                                              return _buildPlaceCard(place);
-                                            },
-                                          ),
-                                        ],
-                                      )
-                                    else
-                                      const SizedBox(height: 40),
-                                  ],
-                                )
-                              : _filteredPlaces.isEmpty
-                                  ? const Center(
-                                      child: Text('No places found'),
-                                    )
-                                  : GridView.builder(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 16, vertical: 8),
-                                      gridDelegate:
-                                          const SliverGridDelegateWithFixedCrossAxisCount(
-                                        crossAxisCount: 2,
-                                        childAspectRatio: 2.0,
-                                        crossAxisSpacing: 6,
-                                        mainAxisSpacing: 6,
-                                      ),
-                                      itemCount: _filteredPlaces.length,
-                                      itemBuilder: (context, index) {
-                                        final place = _filteredPlaces[index];
-                                        return _buildPlaceCard(place);
-                                      },
-                                    ),
+                                  gridDelegate:
+                                      const SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 2,
+                                    childAspectRatio: 2.0,
+                                    crossAxisSpacing: 6,
+                                    mainAxisSpacing: 6,
+                                  ),
+                                  itemCount: _allPlaces.length,
+                                  itemBuilder: (context, index) {
+                                    final place = _allPlaces[index];
+                                    return _buildPlaceCard(place);
+                                  },
+                                ),
                 ),
                 // Top Place Section removed - now in Popular tab only
               ],
@@ -738,112 +501,4 @@ class _TripHomeScreenState extends State<TripHomeScreen>
     }
   }
 
-  Widget _buildTopPlaceCard(Map<String, dynamic> place) {
-    // Handle multiple possible field names from different APIs
-    final imageUrl = place['image_url'] as String? ?? 
-                     place['photo'] as String? ??
-                     place['photos']?[0] as String?;
-    final name = place['name'] as String? ?? 'Unknown';
-    final rating = place['rating'] as num? ?? 0;
-    final address = place['address'] as String? ?? 
-                    place['formatted_address'] as String? ?? 
-                    place['vicinity'] as String? ?? '';
-
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          // Image
-          Container(
-            width: 100,
-            height: 100,
-            decoration: BoxDecoration(
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(12),
-                bottomLeft: Radius.circular(12),
-              ),
-              color: Colors.grey[200],
-            ),
-            child: imageUrl != null && imageUrl.isNotEmpty
-                ? Image.network(
-                    imageUrl,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return const Icon(Icons.location_on,
-                          color: Colors.grey, size: 40);
-                    },
-                  )
-                : const Icon(Icons.location_on, color: Colors.grey, size: 40),
-          ),
-          // Details
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    name,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.black,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      const Icon(Icons.location_on,
-                          color: Color(0xFF4675B8), size: 12),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          address,
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.grey[600],
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      const Icon(Icons.star,
-                          color: Color(0xFFC8A858), size: 12),
-                      const SizedBox(width: 4),
-                      Text(
-                        rating.toStringAsFixed(1),
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }

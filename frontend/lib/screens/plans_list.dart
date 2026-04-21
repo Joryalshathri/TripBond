@@ -6,10 +6,45 @@ import '../providers/trip_provider.dart';
 import '../providers/user_provider.dart';
 import 'AI_Plan.dart';
 import 'bonder.dart';
-import 'close_spots.dart';
+import 'DatesPage.dart';
 import 'DestinationLandingPage.dart';
 import 'profile.dart';
 import 'TripHomeScreen.dart';
+
+String selectedCityForTrip = "";
+
+class Destination {
+  final int id;
+  final String name;
+  final String image;
+  final List<String> stars;
+  final bool featured;
+  const Destination(
+      {required this.id,
+      required this.name,
+      required this.image,
+      required this.stars,
+      this.featured = false});
+}
+
+final List<Destination> destinations = [
+  Destination(
+      id: 1,
+      name: 'Buraidah',
+      image: 'assets/images/cities/Buraidah.png',
+      stars: ['star', 'star', 'star']),
+  Destination(
+      id: 2,
+      name: 'Khobar',
+      image: 'assets/images/cities/Khobar.png',
+      stars: ['star', 'star', 'star'],
+      featured: true),
+  Destination(
+      id: 3,
+      name: 'Jeddah',
+      image: 'assets/images/cities/jeddah.png',
+      stars: ['star', 'star', 'star']),
+];
 
 class PlanItem {
   final String name;
@@ -48,19 +83,6 @@ const List<PlanItem> futurePlans = [
   ),
 ];
 
-const List<PlanItem> pastPlans = [
-  PlanItem(
-    name: 'Abha',
-    image: 'assets/images/cities/Abha.png',
-    dateRange: '2 - 7 Jan 2026',
-    avatarInitials: ['Z'],
-  ),
-  PlanItem(
-    name: 'Riyadh',
-    image: 'assets/images/cities/Riyadh.png',
-    dateRange: '5 - 20 Oct 2026',
-  ),
-];
 
 const List<Color> _avatarColors = [
   Color(0xFF4675B8),
@@ -114,6 +136,22 @@ class _PlansListState extends State<PlansList> {
     }).toList();
   }
 
+  List<Map<String, dynamic>> _filterPastTrips(
+      List<Map<String, dynamic>> trips) {
+    final now = DateTime.now();
+    return trips.where((trip) {
+      final endDate =
+          trip['end_date'] != null ? DateTime.tryParse(trip['end_date']) : null;
+
+      if (endDate == null) {
+        return false;
+      }
+
+      // Past: trips that have already ended
+      return endDate.isBefore(now);
+    }).toList();
+  }
+
   //the user must not be able to create a plan without setting the date (a safety net for edge cases like corrupted backend data.)
   String _formatDateRange(Map<String, dynamic> trip) {
     if (trip['start_date'] != null && trip['end_date'] != null) {
@@ -137,12 +175,26 @@ class _PlansListState extends State<PlansList> {
         builder: (context, tripProvider, child) {
           final currentTrips = _filterTripsByDate(tripProvider.myTrips, true);
           final futureTrips = _filterTripsByDate(tripProvider.myTrips, false);
+          final realPastTrips = _filterPastTrips(tripProvider.myTrips);
 
           return Stack(
             children: [
               Column(
                 children: [
-                  _buildTopBar(),
+                  Container(
+                    color: Colors.white,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildHeader(context),
+                        const SizedBox(height: 4),
+                        _buildDestinationCards(context),
+                        const SizedBox(height: 16),
+                        _buildPeopleBanner(),
+                        const SizedBox(height: 16),
+                      ],
+                    ),
+                  ),
                   Expanded(
                     child: tripProvider.isLoading
                         ? const Center(child: CircularProgressIndicator())
@@ -166,7 +218,7 @@ class _PlansListState extends State<PlansList> {
                                   const SizedBox(height: 16),
                                   _buildSection('Past Plans', pastOpen, () {
                                     setState(() => pastOpen = !pastOpen);
-                                  }, pastPlans),
+                                  }, realPastTrips),
                                 ],
                               ),
                             ),
@@ -431,6 +483,87 @@ class _PlansListState extends State<PlansList> {
     return months[month];
   }
 
+  Widget _buildHeader(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 50, 20, 12),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const Text('Where We Bonding?',
+              style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontWeight: FontWeight.w800,
+                  fontSize: 22)),
+          IconButton(
+              onPressed: () => showSearch(
+                  context: context, delegate: DestinationSearchDelegate()),
+              icon: const Icon(Icons.search, size: 28)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDestinationCards(BuildContext context) {
+    return SizedBox(
+      height: 200,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        itemCount: destinations.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 16),
+        itemBuilder: (context, index) => _DestinationCard(
+                destination: destinations[index],
+                onTap: () {
+                  selectedCityForTrip = destinations[index].name;
+                  Navigator.push(context,
+                      MaterialPageRoute(builder: (_) => const DatesPage()));
+                }),
+      ),
+    );
+  }
+
+  Widget _buildPeopleBanner() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Container(
+        height: 50,
+        decoration: BoxDecoration(
+            color: const Color(0xFF4675B8),
+            borderRadius: BorderRadius.circular(12)),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Row(
+          children: [
+            SizedBox(
+                width: 70,
+                child: Stack(
+                    children: List.generate(
+                        3,
+                        (i) => Positioned(
+                            left: i * 20.0,
+                            child: Container(
+                                width: 32,
+                                height: 32,
+                                decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                        color: const Color(0xFF4675B8),
+                                        width: 2)),
+                                child: const Icon(Icons.person,
+                                    size: 16, color: Color(0xFF4675B8))))))),
+            const SizedBox(width: 12),
+            const Expanded(
+                child: Text('+8 people like this destination',
+                    style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 13,
+                        color: Colors.white))),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildBottomNav(BuildContext context) {
     return Positioned(
       bottom: 0,
@@ -447,15 +580,16 @@ class _PlansListState extends State<PlansList> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            _navIcon(Icons.home, active: true),
-            _navIcon(Icons.search,
+            _navIcon(Icons.home,
                 onTap: () => Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(
                         builder: (_) => const DestinationLandingPage()))),
-            _navIcon(Icons.location_on_outlined,
-                onTap: () => Navigator.pushReplacement(context,
-                    MaterialPageRoute(builder: (_) => const CloseSpots()))),
+            _navIcon(Icons.search, active: true,
+                onTap: () => Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const PlansList(source: 'home')))),
             _navIcon(Icons.airplanemode_active,
                 onTap: () => Navigator.pushReplacement(context,
                     MaterialPageRoute(builder: (_) => const AI_Plan()))),
@@ -490,5 +624,101 @@ class _PlansListState extends State<PlansList> {
         ],
       ),
     );
+  }
+}
+
+class _DestinationCard extends StatefulWidget {
+  final Destination destination;
+  final VoidCallback onTap;
+  const _DestinationCard({required this.destination, required this.onTap});
+  @override
+  State<_DestinationCard> createState() => _DestinationCardState();
+}
+
+class _DestinationCardState extends State<_DestinationCard>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _scaleController;
+  late Animation<double> _scaleAnimation;
+  @override
+  void initState() {
+    super.initState();
+    _scaleController = AnimationController(vsync: this, duration: 150.ms);
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.95).animate(
+        CurvedAnimation(parent: _scaleController, curve: Curves.easeInOut));
+  }
+
+  @override
+  void dispose() {
+    _scaleController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+        onTapDown: (_) => _scaleController.forward(),
+        onTapUp: (_) {
+          _scaleController.reverse();
+          widget.onTap();
+        },
+        child: ScaleTransition(
+            scale: _scaleAnimation,
+            child: Container(
+                width: widget.destination.featured ? 170 : 150,
+                height: widget.destination.featured ? 200 : 180,
+                decoration:
+                    BoxDecoration(borderRadius: BorderRadius.circular(20)),
+                child: ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: Stack(fit: StackFit.expand, children: [
+                      Image.asset(widget.destination.image, fit: BoxFit.cover),
+                      Container(
+                          decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                  begin: Alignment.bottomCenter,
+                                  end: Alignment.center,
+                                  colors: [
+                            Colors.black.withValues(alpha: 0.6),
+                            Colors.transparent
+                          ]))),
+                      Positioned(
+                          bottom: 10,
+                          left: 0,
+                          right: 0,
+                          child: Text(widget.destination.name,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 15,
+                                  color: Colors.white)))
+                    ])))));
+  }
+}
+
+class DestinationSearchDelegate extends SearchDelegate {
+  @override
+  List<Widget>? buildActions(BuildContext context) =>
+      [IconButton(icon: const Icon(Icons.clear), onPressed: () => query = '')];
+  @override
+  Widget? buildLeading(BuildContext context) => IconButton(
+      icon: const Icon(Icons.arrow_back),
+      onPressed: () => close(context, null));
+  @override
+  Widget buildResults(BuildContext context) =>
+      Center(child: Text('Searching for "$query"...'));
+  @override
+  Widget buildSuggestions(BuildContext context) {
+    final list = destinations
+        .where((city) => city.name.toLowerCase().contains(query.toLowerCase()))
+        .toList();
+    return ListView.builder(
+        itemCount: list.length,
+        itemBuilder: (context, i) => ListTile(
+            title: Text(list[i].name),
+            onTap: () {
+              query = list[i].name;
+              showResults(context);
+            }));
   }
 }

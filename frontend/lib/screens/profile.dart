@@ -7,7 +7,6 @@ import 'settings.dart';
 import 'editProfile.dart';
 import 'DestinationLandingPage.dart';
 import 'Bonder.dart';
-import 'close_spots.dart';
 import 'AI_Plan.dart';
 import 'chat_screen.dart';
 import 'personality_quiz_screen.dart';
@@ -778,9 +777,6 @@ class _ProfileState extends State<Profile> {
                     context,
                     MaterialPageRoute(
                         builder: (_) => const DestinationLandingPage()))),
-            _navIcon(Icons.location_on_outlined,
-                onTap: () => Navigator.pushReplacement(context,
-                    MaterialPageRoute(builder: (_) => const CloseSpots()))),
             _navIcon(Icons.airplanemode_active,
                 onTap: () => Navigator.pushReplacement(context,
                     MaterialPageRoute(builder: (_) => const AI_Plan()))),

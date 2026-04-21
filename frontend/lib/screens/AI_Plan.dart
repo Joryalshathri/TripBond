@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import 'DestinationLandingPage.dart';
 import 'Bonder.dart';
 import 'profile.dart';
-import 'close_spots.dart';
 import 'group_suggested_itinerary.dart';
 import 'plans_list.dart';
 import 'BondersSuggestions.dart';
@@ -690,17 +689,6 @@ class _AI_PlanState extends State<AI_Plan> {
                     context,
                     MaterialPageRoute(
                         builder: (_) => const DestinationLandingPage()))),
-            _navIcon(
-              Icons.location_on_outlined,
-              onTap: () => Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => CloseSpots(
-                    tripId: widget.tripId,
-                  ),
-                ),
-              ),
-            ),
             _navIcon(
               Icons.airplanemode_active,
               active: true,

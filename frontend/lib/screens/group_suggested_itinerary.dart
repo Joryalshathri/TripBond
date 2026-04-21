@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'close_spots.dart';
 import 'Bonder.dart';
 import 'profile.dart';
 import 'DestinationLandingPage.dart';
@@ -737,17 +736,6 @@ class _GroupSuggestedItineraryState extends State<GroupSuggestedItinerary> {
                     context,
                     MaterialPageRoute(
                         builder: (_) => const DestinationLandingPage()))),
-            _navIcon(
-              Icons.location_on_outlined,
-              onTap: () => Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => CloseSpots(
-                    tripId: widget.tripId,
-                  ),
-                ),
-              ),
-            ),
             _navIcon(Icons.airplanemode_active, active: true),
             _navIcon(Icons.group_outlined,
                 onTap: () => Navigator.pushReplacement(context,
