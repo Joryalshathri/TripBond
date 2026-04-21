@@ -287,7 +287,20 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: Text(widget.otherUserName),
+        title: GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => UserProfileView(
+                  userId: widget.otherUserId,
+                  userName: widget.otherUserName,
+                ),
+              ),
+            );
+          },
+          child: Text(widget.otherUserName),
+        ),
         backgroundColor: const Color(0xFF4675B8),
         elevation: 0,
         actions: [

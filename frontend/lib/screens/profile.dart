@@ -899,9 +899,7 @@ class _ProfileState extends State<Profile> {
                                       Navigator.push(
                                           context,
                                           MaterialPageRoute(
-                                              builder: (_) => ChatPage(
-                                                  bonderId: userId,
-                                                  name: name)));
+                                              builder: (_) => const ChatScreen()));
                                     },
                             ),
                           );

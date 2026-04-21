@@ -202,4 +202,81 @@ class UserService {
       throw Exception('Failed to upload profile picture: ${e.toString()}');
     }
   }
-}
+
+  // Follow a user
+  Future<Map<String, dynamic>> followUser(String userId) async {
+    try {
+      final token = await _authService.getAuthToken();
+      if (token == null) {
+        throw Exception('Not authenticated');
+      }
+
+      final response = await _apiService.post(
+        '${ApiConfig.usersPath}/$userId/follow',
+        {},
+        token: token,
+      );
+
+      return response;
+    } catch (e) {
+      throw Exception('Failed to follow user: ${e.toString()}');
+    }
+  }
+
+  // Unfollow a user
+  Future<Map<String, dynamic>> unfollowUser(String userId) async {
+    try {
+      final token = await _authService.getAuthToken();
+      if (token == null) {
+        throw Exception('Not authenticated');
+      }
+
+      final response = await _apiService.delete(
+        '${ApiConfig.usersPath}/$userId/follow',
+        token: token,
+      );
+
+      return response;
+    } catch (e) {
+      throw Exception('Failed to unfollow user: ${e.toString()}');
+    }
+  }
+
+  // Send bond request
+  Future<Map<String, dynamic>> sendBondRequest(String userId) async {
+    try {
+      final token = await _authService.getAuthToken();
+      if (token == null) {
+        throw Exception('Not authenticated');
+      }
+
+      final response = await _apiService.post(
+        '${ApiConfig.usersPath}/$userId/bond-request',
+        {},
+        token: token,
+      );
+
+      return response;
+    } catch (e) {
+      throw Exception('Failed to send bond request: ${e.toString()}');
+    }
+  }
+
+  // Cancel bond request
+  Future<Map<String, dynamic>> cancelBondRequest(String userId) async {
+    try {
+      final token = await _authService.getAuthToken();
+      if (token == null) {
+        throw Exception('Not authenticated');
+      }
+
+      final response = await _apiService.delete(
+        '${ApiConfig.usersPath}/$userId/bond-request',
+        token: token,
+      );
+
+      return response;
+    } catch (e) {
+      throw Exception('Failed to cancel bond request: ${e.toString()}');
+    }
+  }}

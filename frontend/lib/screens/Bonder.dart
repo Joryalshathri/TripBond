@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'DestinationLandingPage.dart';
 import 'profile.dart';
+import 'user_profile_view.dart';
 import 'group_suggested_itinerary.dart';
 import 'plans_list.dart';
 import 'notifications_view.dart';
@@ -368,22 +369,16 @@ class _BondersState extends State<Bonders> {
                                     color: Colors.white),
                               ),
                               child: GestureDetector(
-                                  onTap: () async {
-                                    _clearUnreadForBonder(b.id);
-                                    await Navigator.push(
+                                  onTap: () {
+                                    Navigator.push(
                                       context,
                                       MaterialPageRoute(
-                                        builder: (_) => ChatPage(
-                                          bonderId: b.id,
-                                          name: b.name,
-                                          onMessageSent: (message) =>
-                                              _updateLastMessage(b.id, message),
+                                        builder: (_) => UserProfileView(
+                                          userId: b.id,
+                                          userName: b.name,
                                         ),
                                       ),
                                     );
-                                    setState(() {
-                                      _filteredBonders = List.from(_allBonders);
-                                    });
                                   },
                                   child: Container(
                                     margin: const EdgeInsets.only(bottom: 16),
@@ -397,7 +392,7 @@ class _BondersState extends State<Bonders> {
                                     ),
                                     child: Row(
                                       children: [
-                                        _buildBonderAvatar(b),
+                                        _buildBonderAvatarButton(b),
                                         const SizedBox(width: 16),
                                         Expanded(
                                           child: Column(
@@ -465,10 +460,12 @@ class _BondersState extends State<Bonders> {
                                             milliseconds:
                                                 AnimationConstants.normal),
                                         curve: AnimationConstants.cubicEaseOut,
-                                      )));
+                                      ),
+                                  ),
+                            );
                         }),
-                      ],
-                    ),
+                    ],
+                  ),
                   ),
                 ),
               ),
@@ -493,6 +490,23 @@ class _BondersState extends State<Bonders> {
       radius: 28,
       backgroundColor: Color(0xFF4675B8),
       child: Icon(Icons.person, color: Colors.white),
+    );
+  }
+
+  Widget _buildBonderAvatarButton(BonderItem bonder) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => UserProfileView(
+              userId: bonder.id,
+              userName: bonder.name,
+            ),
+          ),
+        );
+      },
+      child: _buildBonderAvatar(bonder),
     );
   }
 
