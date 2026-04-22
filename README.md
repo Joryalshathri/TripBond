@@ -1,105 +1,91 @@
-# TripBond ᯓ ✈︎
+# TripBond
 
-⊹ ࣪ ˖ **AI-powered group travel planner that turns conflicting preferences into perfectly balanced itineraries.**
+**AI-powered group travel planner that turns conflicting preferences into perfectly balanced itineraries.**
 
-**Plan smarter. Decide together. Travel better.**
+Plan smarter. Decide together. Travel better.
 
 ---
 
-## ⚠︎ The Problem
+## The Problem
 
 Planning group trips is chaotic:
-
 - Everyone has different preferences
-- Too many disconnected tools (maps, chats, bookings)
+- Too many disconnected tools
 - No fair way to make decisions
 
----
-
-## ✔︎ The Solution
+## The Solution
 
 TripBond combines AI + collaboration to:
+- Understand each traveler's personality and preferences
+- Balance group decisions fairly
+- Generate optimized itineraries
+- Adapt to real-time context (weather, time, location)
 
-- 🧠 **Understand** each traveler (personality + preferences)
-- 👥 **Balance** group decisions fairly
-- 📍 **Generate** optimized itineraries
-- 🌦️ **Adapt** to real-time context (weather, time, location)
-
-➡️ **All in ONE platform.**
+All in ONE platform.
 
 ---
 
-## ✨ Features
+## Features
 
-### 🧠 AI-Powered Planning
+### AI-Powered Planning
 - Personalized recommendations (Decision Tree + Random Forest)
 - Group preference aggregation (fairness-aware)
 - Itinerary optimization (Genetic Algorithm)
 
-### 👥 Group Travel Made Easy
-- Create trips & invite members
+### Group Travel Made Easy
+- Create trips and invite members
 - Voting system for decisions
 - Balanced recommendations (no user ignored)
 
-### 📍 Explore & Discover
-- POI explorer with photos & details
-- Nearby attractions & smart suggestions
+### Explore & Discover
+- POI explorer with photos and details
+- Nearby attractions and smart suggestions
 - Save favorites
 
-### 💬 Social Experience
-- In-app chat & conversations
-- Notifications & updates
-- Feedback & ratings
+### Social Experience
+- In-app chat and conversations
+- Notifications and updates
+- Feedback and ratings
 
-### 📱 Seamless UX
+### Seamless UX
 - Cross-platform (iOS, Android, Web, Desktop)
-- Smooth animations (Lottie, Flutter Animate)
+- Smooth animations
 - Responsive design
 
 ---
 
-## 🆚 Why TripBond?
+## Why TripBond?
 
 | Feature | Traditional Apps | TripBond |
 |---------|------------------|----------|
 | Group Planning | ❌ | ✅ |
 | Fair Decision Making | ❌ | ✅ |
-| AI Personalization | ⚠️ Limited | ✅ |
+| AI Personalization | Limited | ✅ |
 | Real-time Adaptation | ❌ | ✅ |
 | All-in-one Platform | ❌ | ✅ |
 
 ---
 
-## ⚙️ How It Works
+## How It Works
 
-1. 👤 **User Profiling**  
-   → Personality + preferences (Big Five + behavior)
-
-2. 👥 **Group Modeling**  
-   → Combine users using fairness strategies
-
-3. 🌍 **Context Awareness**  
-   → Adjust using weather, time, and location
-
-4. 📅 **Itinerary Generation**  
-   → Optimized plans using AI models
-
-5. 🔁 **Continuous Learning**  
-   → Improves using feedback
+1. **User Profiling** - Personality + preferences (Big Five + behavior)
+2. **Group Modeling** - Combine users using fairness strategies
+3. **Context Awareness** - Adjust using weather, time, and location
+4. **Itinerary Generation** - Optimized plans using AI models
+5. **Continuous Learning** - Improves using feedback
 
 ---
 
-## 📊 Performance
+## Performance
 
 - **Accuracy**: 83.63%
 - **ROC-AUC**: 85.88%
 
-✔️ Strong predictive performance  
-✔️ Effective group recommendation quality
+Strong predictive performance and effective group recommendation quality.
 
 ---
 
-## 🧠 What Makes TripBond Unique?
+## What Makes TripBond Unique?
 
 - Combines AI personalization + group fairness
 - Uses hybrid models (RF + GA + CF)
@@ -108,10 +94,10 @@ TripBond combines AI + collaboration to:
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
-**Backend**: FastAPI • SQLAlchemy • JWT Auth  
-**Frontend**: Flutter • Riverpod • Cross-platform  
+**Backend**: FastAPI, SQLAlchemy, JWT Auth
+**Frontend**: Flutter, Riverpod, Cross-platform
 **Database**: Supabase (PostgreSQL with RLS)
 
 ### AI
@@ -120,7 +106,7 @@ TripBond combines AI + collaboration to:
 - Genetic Algorithm (itinerary optimization)
 - Collaborative Filtering (learning)
 
-### APIs
+### External APIs
 - Google Places
 - Foursquare
 - Geoapify
@@ -133,55 +119,56 @@ TripBond combines AI + collaboration to:
 
 ---
 
-## 🧩 System Architecture
+## System Architecture
 
 ### Backend Services
 - AI recommendation engine
 - Itinerary generation
-- Authentication & security
-- Notifications & email
+- Authentication and security
+- Notifications and email
 - External API integrations
 
 ### Frontend Services
 - Trip management
-- Chat & messaging
-- POI exploration & maps
+- Chat and messaging
+- POI exploration and maps
 - AI interaction layer
-- State management (Riverpod)
+- State management
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 tripbond-app/
 ├── backend/              # FastAPI backend
 ├── tripbond_ai_backend/  # AI/ML service
 ├── frontend/             # Flutter app
-└── test_*.py            # Tests
+└── test_*.py             # Tests
 ```
 
 ---
 
-## 🗄️ Database Overview
+## Database Overview
 
 **Core tables**:
-- `profiles`
-- `trips`
-- `trip_members`
-- `personality_scores`
-- `user_preferences`
-- `suggestions` + voting
-- `chat` (messages & conversations)
-- `feedback`
+- profiles
+- trips
+- trip_members
+- personality_scores
+- user_preferences
+- suggestions + voting
+- chat (messages & conversations)
+- feedback
 
-✔️ **Includes Supabase Row-Level Security (RLS)**
+Includes Supabase Row-Level Security (RLS)
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### One-Command Setup (Windows)
+
 ```powershell
 .\start-dev.ps1
 .\start-full-stack.ps1
@@ -214,14 +201,14 @@ python run_ai.py
 
 ---
 
-## 📚 API Documentation
+## API Documentation
 
-**Swagger**: http://localhost:8000/docs  
+**Swagger**: http://localhost:8000/docs
 **ReDoc**: http://localhost:8000/redoc
 
 ---
 
-## 🧪 Testing
+## Testing
 
 ```bash
 pytest
@@ -230,7 +217,7 @@ flutter test
 
 ---
 
-## 🚀 Roadmap
+## Roadmap
 
 - Companion matching (AI bonding system)
 - Real-time itinerary updates
@@ -240,29 +227,29 @@ flutter test
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repo
-2. Create branch (`feature/name`)
+2. Create branch (feature/name)
 3. Commit changes
 4. Open Pull Request
 
 ---
 
-## ⸜(｡˃ ᵕ ˂ )⸝♡ Team
+## Team
 
-- **Jory Alshathri**
-- **Ghala Alroumaih**
-- **Dana Alanzi**
-- **Basmah Aljishi**
-- **Hawaraa Aljanabi**
+- Jory Alshathri
+- Ghala Alroumaih
+- Dana Alanzi
+- Basmah Aljishi
+- Hawaraa Aljanabi
 
 ---
 
-## 📄 License
+## License
 
 Academic and research use only.
 
 ---
 
-**Time to Bond ! ᯓ ✈︎**
+**Time to Bond!**
