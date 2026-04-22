@@ -20,86 +20,86 @@ Planning group trips is chaotic:
 
 TripBond combines AI + collaboration to:
 
-- ⊕ **Understand** each traveler (personality + preferences)
-- ◈ **Balance** group decisions fairly
-- ◎ **Generate** optimized itineraries
-- ◑ **Adapt** to real-time context (weather, time, location)
+- 🧠 **Understand** each traveler (personality + preferences)
+- 👥 **Balance** group decisions fairly
+- 📍 **Generate** optimized itineraries
+- 🌦️ **Adapt** to real-time context (weather, time, location)
 
 ➡️ **All in ONE platform.**
 
 ---
 
-## ✦ Features
+## ✨ Features
 
-### ⊕ AI-Powered Planning
+### 🧠 AI-Powered Planning
 - Personalized recommendations (Decision Tree + Random Forest)
 - Group preference aggregation (fairness-aware)
 - Itinerary optimization (Genetic Algorithm)
 
-### ◈ Group Travel Made Easy
+### 👥 Group Travel Made Easy
 - Create trips & invite members
 - Voting system for decisions
 - Balanced recommendations (no user ignored)
 
-### ◎ Explore & Discover
+### 📍 Explore & Discover
 - POI explorer with photos & details
 - Nearby attractions & smart suggestions
 - Save favorites
 
-### ◬ Social Experience
+### 💬 Social Experience
 - In-app chat & conversations
 - Notifications & updates
 - Feedback & ratings
 
-### ◻ Seamless UX
+### 📱 Seamless UX
 - Cross-platform (iOS, Android, Web, Desktop)
 - Smooth animations (Lottie, Flutter Animate)
 - Responsive design
 
 ---
 
-## ⊕ Why TripBond?
+## 🆚 Why TripBond?
 
 | Feature | Traditional Apps | TripBond |
 |---------|------------------|----------|
-| Group Planning | ✗ | ✓ |
-| Fair Decision Making | ✗ | ✓ |
-| AI Personalization | ⚠ Limited | ✓ |
-| Real-time Adaptation | ✗ | ✓ |
-| All-in-one Platform | ✗ | ✓ |
+| Group Planning | ❌ | ✅ |
+| Fair Decision Making | ❌ | ✅ |
+| AI Personalization | ⚠️ Limited | ✅ |
+| Real-time Adaptation | ❌ | ✅ |
+| All-in-one Platform | ❌ | ✅ |
 
 ---
 
-## ⊗ How It Works
+## ⚙️ How It Works
 
-1. ◈ **User Profiling**  
+1. 👤 **User Profiling**  
    → Personality + preferences (Big Five + behavior)
 
-2. ◈ **Group Modeling**  
+2. 👥 **Group Modeling**  
    → Combine users using fairness strategies
 
-3. ◑ **Context Awareness**  
+3. 🌍 **Context Awareness**  
    → Adjust using weather, time, and location
 
-4. ◆ **Itinerary Generation**  
+4. 📅 **Itinerary Generation**  
    → Optimized plans using AI models
 
-5. ◯ **Continuous Learning**  
+5. 🔁 **Continuous Learning**  
    → Improves using feedback
 
 ---
 
-## ◆ Performance
+## 📊 Performance
 
 - **Accuracy**: 83.63%
 - **ROC-AUC**: 85.88%
 
-✓ Strong predictive performance  
-✓ Effective group recommendation quality
+✔️ Strong predictive performance  
+✔️ Effective group recommendation quality
 
 ---
 
-## ⊕ What Makes TripBond Unique?
+## 🧠 What Makes TripBond Unique?
 
 - Combines AI personalization + group fairness
 - Uses hybrid models (RF + GA + CF)
@@ -108,41 +108,41 @@ TripBond combines AI + collaboration to:
 
 ---
 
-## ⊗ Tech Stack
+## 🛠️ Tech Stack
 
 **Backend**: FastAPI • SQLAlchemy • JWT Auth  
 **Frontend**: Flutter • Riverpod • Cross-platform  
 **Database**: Supabase (PostgreSQL with RLS)
 
-### ⊕ AI
+### AI
 - Random Forest (preference prediction)
 - Decision Trees (explainability)
 - Genetic Algorithm (itinerary optimization)
 - Collaborative Filtering (learning)
 
-### ◎ APIs
+### APIs
 - Google Places
 - Foursquare
 - Geoapify
 - TomTom
 
-### ▶ Infrastructure
+### Infrastructure
 - Docker
 - WebSockets (chat)
 - PowerShell automation scripts
 
 ---
 
-## ◈ System Architecture
+## 🧩 System Architecture
 
-### ⊕ Backend Services
+### Backend Services
 - AI recommendation engine
 - Itinerary generation
 - Authentication & security
 - Notifications & email
 - External API integrations
 
-### ◈ Frontend Services
+### Frontend Services
 - Trip management
 - Chat & messaging
 - POI exploration & maps
@@ -151,7 +151,7 @@ TripBond combines AI + collaboration to:
 
 ---
 
-## ▢ Project Structure
+## 📁 Project Structure
 
 ```
 tripbond-app/
@@ -163,7 +163,7 @@ tripbond-app/
 
 ---
 
-## ▢ Database Overview
+## 🗄️ Database Overview
 
 **Core tables**:
 - `profiles`
@@ -175,11 +175,11 @@ tripbond-app/
 - `chat` (messages & conversations)
 - `feedback`
 
-✓ **Includes Supabase Row-Level Security (RLS)**
+✔️ **Includes Supabase Row-Level Security (RLS)**
 
 ---
 
-## ▶ Quick Start
+## 🚀 Quick Start
 
 ### One-Command Setup (Windows)
 ```powershell
@@ -214,14 +214,14 @@ python run_ai.py
 
 ---
 
-## ▬ API Documentation
+## 📚 API Documentation
 
 **Swagger**: http://localhost:8000/docs  
 **ReDoc**: http://localhost:8000/redoc
 
 ---
 
-## ⟡ Testing
+## 🧪 Testing
 
 ```bash
 pytest
@@ -230,7 +230,7 @@ flutter test
 
 ---
 
-## ▶ Roadmap
+## 🚀 Roadmap
 
 - Companion matching (AI bonding system)
 - Real-time itinerary updates
@@ -240,7 +240,7 @@ flutter test
 
 ---
 
-## ◈ Contributing
+## 🤝 Contributing
 
 1. Fork the repo
 2. Create branch (`feature/name`)
@@ -259,7 +259,7 @@ flutter test
 
 ---
 
-## ▭ License
+## 📄 License
 
 Academic and research use only.
 
