@@ -29,7 +29,7 @@ TripBond combines AI + collaboration to:
 
 ---
 
-## .✦ ݁˖ Features
+## ✦ Features
 
 ### ⊕ AI-Powered Planning
 - Personalized recommendations (Decision Tree + Random Forest)
@@ -58,7 +58,7 @@ TripBond combines AI + collaboration to:
 
 ---
 
-## ( ദ്ദി ˙ᗜ˙ ) Why TripBond?
+## ⊕ Why TripBond?
 
 | Feature | Traditional Apps | TripBond |
 |---------|------------------|----------|
@@ -70,7 +70,7 @@ TripBond combines AI + collaboration to:
 
 ---
 
-## ✿  How It Works
+## ⊗ How It Works
 
 1. ◈ **User Profiling**  
    → Personality + preferences (Big Five + behavior)
