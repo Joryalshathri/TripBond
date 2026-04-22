@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:provider/provider.dart';
 import 'DatesPage.dart';
 import 'Bonder.dart';
 import 'profile.dart';
-import 'close_spots.dart';
 import 'places_search_screen.dart';
 import 'nearby_places_screen.dart';
 import 'AI_Plan.dart';
@@ -12,6 +12,7 @@ import 'chat_screen.dart';
 import 'poi_explorer_screen.dart';
 import 'TripHomeScreen.dart';
 import '../services/favorites_service.dart';
+import '../providers/trip_provider.dart';
 
 String selectedCityForTrip = "";
 
@@ -30,6 +31,7 @@ class Destination {
 }
 
 class Post {
+  final String id;
   final String userName;
   final String location;
   final String image;
@@ -39,6 +41,7 @@ class Post {
   final DateTime timestamp; // to track actual posting time
 
   Post({
+    String? id,
     required this.userName,
     required this.location,
     required this.image,
@@ -46,7 +49,7 @@ class Post {
     required this.likes,
     required this.privacy,
     required this.timestamp,
-  });
+  }) : id = id ?? '${DateTime.now().millisecondsSinceEpoch}_${title.hashCode}';
 }
 
 // --- GLOBAL LISTS ---
@@ -121,6 +124,10 @@ class _DestinationLandingPageState extends State<DestinationLandingPage> {
   void initState() {
     super.initState();
     _loadFavorites();
+    // Fetch trips from provider
+    Future.microtask(() {
+      Provider.of<TripProvider>(context, listen: false).fetchMyTrips();
+    });
   }
 
   Future<void> _loadFavorites() async {
@@ -165,7 +172,7 @@ class _DestinationLandingPageState extends State<DestinationLandingPage> {
       } else {
         final savedFavorite = await _favoritesService.addFavorite(
           destinationName: post.title,
-          destinationType: 'trip',
+          destinationType: post.location,
         );
         if (!mounted) return;
         setState(() {
@@ -183,8 +190,8 @@ class _DestinationLandingPageState extends State<DestinationLandingPage> {
 
   void _showPickTripSheet() {
     String selectedPrivacy = 'Public';
-    String selectedCategory = 'Past Plans';
-    PlanItem? selectedPlan;
+    String selectedCategory = 'Future Plans';
+    Map<String, dynamic>? selectedTrip;
     final TextEditingController titleController = TextEditingController();
 
     showModalBottomSheet(
@@ -196,96 +203,102 @@ class _DestinationLandingPageState extends State<DestinationLandingPage> {
       builder: (context) {
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setModalState) {
-            List<PlanItem> currentDisplayList;
-            if (selectedCategory == 'Current Plans') {
-              currentDisplayList = currentPlans;
-            } else if (selectedCategory == 'Future Plans') {
-              currentDisplayList = futurePlans;
-            } else {
-              currentDisplayList = pastPlans;
-            }
-            return Container(
-              padding: EdgeInsets.only(
-                  bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-                  left: 24,
-                  right: 24,
-                  top: 20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                          color: Colors.grey[300],
-                          borderRadius: BorderRadius.circular(10)),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  const Center(
-                    child: Text("Create Post",
-                        style: TextStyle(
-                            fontFamily: 'Poppins',
-                            fontWeight: FontWeight.bold,
-                            fontSize: 22)),
-                  ),
-                  const SizedBox(height: 15),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            final tripProvider = Provider.of<TripProvider>(context);
+            final allTrips = tripProvider.myTrips;
+            
+            print('DEBUG: TripProvider loading state: ${tripProvider.isLoading}');
+            print('DEBUG: All trips count: ${allTrips.length}');
+            print('DEBUG: All trips: $allTrips');
+            
+            List<Map<String, dynamic>> currentDisplayList = 
+              _filterTripsByCategory(allTrips, selectedCategory);
+            
+            print('DEBUG: Filtered trips for category "$selectedCategory": ${currentDisplayList.length}');
+            print('DEBUG: Filtered trips: $currentDisplayList');
+            
+            return DraggableScrollableSheet(
+              initialChildSize: 0.85,
+              minChildSize: 0.6,
+              maxChildSize: 0.95,
+              expand: false,
+              builder: (context, scrollController) {
+                return Container(
+                  padding: EdgeInsets.only(
+                      bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+                      left: 16,
+                      right: 16,
+                      top: 20),
+                  child: ListView(
+                    controller: scrollController,
                     children: [
-                      DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: selectedCategory,
-                          icon: const Icon(Icons.keyboard_arrow_down, size: 20),
-                          style: const TextStyle(
-                              fontFamily: 'Poppins',
-                              fontWeight: FontWeight.w700,
-                              fontSize: 18,
-                              color: Colors.black),
-                          items: ['Past Plans', 'Current Plans', 'Future Plans']
-                              .map((val) => DropdownMenuItem(
-                                  value: val, child: Text(val)))
-                              .toList(),
-                          onChanged: (val) => setModalState(() {
-                            selectedCategory = val!;
-                            selectedPlan = null;
-                          }),
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                              color: Colors.grey[300],
+                              borderRadius: BorderRadius.circular(10)),
                         ),
                       ),
-
-                      // the following dropdown may be used in the future (for future improvements)
-                      /* Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: const Color(0xFF4675B8), width: 1.5),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: DropdownButtonHideUnderline(
+                      const SizedBox(height: 20),
+                      const Center(
+                        child: Text("Create Post",
+                            style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontWeight: FontWeight.bold,
+                                fontSize: 22)),
+                      ),
+                      const SizedBox(height: 15),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          DropdownButtonHideUnderline(
                             child: DropdownButton<String>(
-                              value: selectedPrivacy,
-                              style: const TextStyle(color: Color(0xFF4675B8), fontWeight: FontWeight.bold, fontSize: 13),
-                              onChanged: (val) => setModalState(() => selectedPrivacy = val!),
-                              items: ['Public', 'Private'].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
+                              value: selectedCategory,
+                              icon: const Icon(Icons.keyboard_arrow_down, size: 20),
+                              style: const TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 18,
+                                  color: Colors.black),
+                              items: ['Past Plans', 'Current Plans', 'Future Plans']
+                                  .map((val) => DropdownMenuItem(
+                                      value: val, child: Text(val)))
+                                  .toList(),
+                              onChanged: (val) => setModalState(() {
+                                selectedCategory = val!;
+                                selectedTrip = null;
+                              }),
                             ),
                           ),
-                        ),*/
-                    ],
-                  ),
-                  const Text("Select a Trip Location to post:",
-                      style: TextStyle(
-                          color: Colors.grey,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500)),
-                  const SizedBox(height: 12),
-                  if (selectedPlan == null) ...[
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxHeight: 250),
-                      child: ListView(
-                        shrinkWrap: true,
-                        children: currentDisplayList
-                            .map((plan) => Container(
+                        ],
+                      ),
+                      const Text("Select a Trip Location to post:",
+                          style: TextStyle(
+                              color: Colors.grey,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500)),
+                      const SizedBox(height: 12),
+                      if (selectedTrip == null) ...[
+                        if (currentDisplayList.isEmpty)
+                          const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(20),
+                              child: Text(
+                                'No trips found in this category',
+                                style: TextStyle(color: Colors.grey),
+                              ),
+                            ),
+                          )
+                        else
+                          ...currentDisplayList
+                              .map((trip) {
+                                final tripName = trip['title'] ?? trip['name'] ?? 'Trip';
+                                final startDate = trip['start_date'] ?? '';
+                                final endDate = trip['end_date'] ?? '';
+                                final dateRange = '$startDate to $endDate';
+                                
+                                return Container(
                                   margin: const EdgeInsets.only(bottom: 10),
                                   decoration: BoxDecoration(
                                     border: Border.all(
@@ -295,109 +308,153 @@ class _DestinationLandingPageState extends State<DestinationLandingPage> {
                                   child: ListTile(
                                     leading: const Icon(Icons.location_on,
                                         color: Color(0xFF4675B8)),
-                                    title: Text(plan.name,
+                                    title: Text(tripName,
                                         style: const TextStyle(
                                             fontFamily: 'Poppins',
                                             fontWeight: FontWeight.w600)),
-                                    subtitle: Text(plan.dateRange,
+                                    subtitle: Text(dateRange,
                                         style: TextStyle(
                                             fontSize: 12,
                                             color: Colors.grey.shade600)),
                                     trailing: const Icon(Icons.chevron_right,
                                         size: 20),
                                     onTap: () => setModalState(
-                                        () => selectedPlan = plan),
+                                        () => selectedTrip = trip),
                                   ),
-                                ))
-                            .toList(),
-                      ),
-                    ),
-                  ] else ...[
-                    Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(15),
-                          child: Image.asset(selectedPlan!.image,
+                                );
+                              })
+                              .toList(),
+                      ] else ...[
+                        Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(15),
+                              child: Container(
+                                height: 180,
+                                width: double.infinity,
+                                color: const Color(0xFFF0F0F0),
+                                child: selectedTrip!['image_url'] != null
+                                    ? Image.network(
+                                        selectedTrip!['image_url'],
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) =>
+                                            const Center(
+                                              child: Icon(Icons.image_not_supported),
+                                            ),
+                                      )
+                                    : const Center(
+                                        child: Icon(Icons.image_not_supported),
+                                      ),
+                              ),
+                            ),
+                            Container(
                               height: 180,
                               width: double.infinity,
-                              fit: BoxFit.cover),
+                              decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(15)),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.9),
+                                  shape: BoxShape.circle),
+                              child: const Icon(Icons.add_a_photo,
+                                  color: Color(0xFF4675B8), size: 28),
+                            ),
+                          ],
                         ),
-                        Container(
-                          height: 180,
-                          width: double.infinity,
-                          decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(15)),
+                        const SizedBox(height: 20),
+                        TextField(
+                          controller: titleController,
+                          decoration: InputDecoration(
+                            hintText: "Title your post...",
+                            enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(15),
+                                borderSide: BorderSide(
+                                    color: Colors.grey.shade400, width: 2)),
+                            focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(15),
+                                borderSide: const BorderSide(
+                                    color: Color(0xFF4675B8), width: 2.5)),
+                          ),
                         ),
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.9),
-                              shape: BoxShape.circle),
-                          child: const Icon(Icons.add_a_photo,
-                              color: Color(0xFF4675B8), size: 28),
+                        const SizedBox(height: 25),
+                        Center(
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF4675B8),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 80, vertical: 15),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(30)),
+                            ),
+                            onPressed: () {
+                              if (titleController.text.isNotEmpty) {
+                                setState(() {
+                                  posts.insert(
+                                      0,
+                                      Post(
+                                        userName: 'Sarah Mohamed',
+                                        location: selectedTrip!['title'] ?? 
+                                                  selectedTrip!['name'] ?? 
+                                                  'Trip',
+                                        image: selectedTrip!['image_url'] ?? 
+                                               'assets/images/cities/jeddah.png',
+                                        title: titleController.text,
+                                        likes: 0,
+                                        privacy: selectedPrivacy,
+                                        timestamp: DateTime.now(),
+                                      ));
+                                });
+                                Navigator.pop(context);
+                              }
+                            },
+                            child: const Text("Post",
+                                style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold)),
+                          ),
                         ),
                       ],
-                    ),
-                    const SizedBox(height: 20),
-                    TextField(
-                      controller: titleController,
-                      decoration: InputDecoration(
-                        hintText: "Title your ${selectedPlan!.name} trip...",
-                        enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(15),
-                            borderSide: BorderSide(
-                                color: Colors.grey.shade400, width: 2)),
-                        focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(15),
-                            borderSide: const BorderSide(
-                                color: Color(0xFF4675B8), width: 2.5)),
-                      ),
-                    ),
-                    const SizedBox(height: 25),
-                    Center(
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF4675B8),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 80, vertical: 15),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(30)),
-                        ),
-                        onPressed: () {
-                          if (titleController.text.isNotEmpty) {
-                            setState(() {
-                              posts.insert(
-                                  0,
-                                  Post(
-                                    userName: 'Sarah Mohamed',
-                                    location: selectedPlan!.name,
-                                    image: selectedPlan!.image,
-                                    title: titleController.text,
-                                    likes: 0,
-                                    privacy: selectedPrivacy,
-                                    timestamp: DateTime.now(),
-                                  ));
-                            });
-                            Navigator.pop(context);
-                          }
-                        },
-                        child: const Text("Post",
-                            style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold)),
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 20),
-                ],
-              ),
+                      const SizedBox(height: 20),
+                    ],
+                  ),
+                );
+              },
             );
           },
         );
       },
     );
+  }
+
+  List<Map<String, dynamic>> _filterTripsByCategory(
+      List<Map<String, dynamic>> trips, String category) {
+    final now = DateTime.now();
+    
+    return trips.where((trip) {
+      final startDate = trip['start_date'] != null
+          ? DateTime.tryParse(trip['start_date'])
+          : null;
+      final endDate = trip['end_date'] != null
+          ? DateTime.tryParse(trip['end_date'])
+          : null;
+
+      if (startDate == null || endDate == null) {
+        return category == 'Future Plans';
+      }
+
+      if (category == 'Past Plans') {
+        return endDate.isBefore(now);
+      } else if (category == 'Current Plans') {
+        return startDate.isBefore(now) && endDate.isAfter(now);
+      } else {
+        // Future Plans
+        return startDate.isAfter(now);
+      }
+    }).toList();
   }
 
   @override
@@ -424,12 +481,45 @@ class _DestinationLandingPageState extends State<DestinationLandingPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildHeader(context),
-                      const SizedBox(height: 4),
-                      _buildDestinationCards(context),
-                      const SizedBox(height: 16),
-                      _buildPeopleBanner(),
-                      const SizedBox(height: 16),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: Colors.grey.shade300,
+                              width: 1.5,
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                            color: Colors.grey.shade50,
+                          ),
+                          child: TextField(
+                            decoration: InputDecoration(
+                              hintText: 'Search for bonders...',
+                              hintStyle: TextStyle(
+                                color: Colors.grey.shade500,
+                                fontSize: 14,
+                              ),
+                              prefixIcon: Icon(
+                                Icons.search,
+                                color: Colors.grey.shade400,
+                              ),
+                              border: InputBorder.none,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 12,
+                              ),
+                            ),
+                            onTap: () {
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const Bonders(),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -458,91 +548,6 @@ class _DestinationLandingPageState extends State<DestinationLandingPage> {
         ],
       ),
     );
-  }
-
-  Widget _buildHeader(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 50, 20, 12),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          const Text('Where We Bonding?',
-              style: TextStyle(
-                  fontFamily: 'Poppins',
-                  fontWeight: FontWeight.w800,
-                  fontSize: 22)),
-          IconButton(
-              onPressed: () => showSearch(
-                  context: context, delegate: DestinationSearchDelegate()),
-              icon: const Icon(Icons.search, size: 28)),
-        ],
-      ),
-    ).animate().fadeIn().slideY(begin: -0.1);
-  }
-
-  Widget _buildDestinationCards(BuildContext context) {
-    return SizedBox(
-      height: 200,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        itemCount: destinations.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 16),
-        itemBuilder: (context, index) => _DestinationCard(
-                destination: destinations[index],
-                onTap: () {
-                  selectedCityForTrip = destinations[index].name;
-                  Navigator.push(context,
-                      MaterialPageRoute(builder: (_) => const DatesPage()));
-                })
-            .animate()
-            .fadeIn(delay: (100 + (index * 80)).ms)
-            .scale()
-            .slideX(begin: 0.2),
-      ),
-    );
-  }
-
-  Widget _buildPeopleBanner() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Container(
-        height: 50,
-        decoration: BoxDecoration(
-            color: const Color(0xFF4675B8),
-            borderRadius: BorderRadius.circular(12)),
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Row(
-          children: [
-            SizedBox(
-                width: 70,
-                child: Stack(
-                    children: List.generate(
-                        3,
-                        (i) => Positioned(
-                            left: i * 20.0,
-                            child: Container(
-                                width: 32,
-                                height: 32,
-                                decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                        color: const Color(0xFF4675B8),
-                                        width: 2)),
-                                child: const Icon(Icons.person,
-                                    size: 16, color: Color(0xFF4675B8))))))),
-            const SizedBox(width: 12),
-            const Expanded(
-                child: Text('+8 people like this destination',
-                    style: TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 13,
-                        color: Colors.white))),
-          ],
-        ),
-      ),
-    ).animate().fadeIn(delay: 350.ms).slideY(begin: 0.15);
   }
 
   Widget _buildPostCard(Post post) {
@@ -652,35 +657,35 @@ class _DestinationLandingPageState extends State<DestinationLandingPage> {
                 borderRadius: BorderRadius.only(
                     topLeft: Radius.circular(25),
                     topRight: Radius.circular(25))),
-            padding: const EdgeInsets.symmetric(horizontal: 32),
+            padding: const EdgeInsets.symmetric(horizontal: 0),
             child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  _navIcon(Icons.home,
+                  SizedBox(width: 50, child: _navIcon(Icons.home, active: true,
                       onTap: () => Navigator.pushReplacement(
                           context,
                           MaterialPageRoute(
-                              builder: (_) => const PlansList(source: 'home')))),
-                  _navIcon(Icons.search, active: true),
-                  _navIcon(Icons.location_on_outlined,
+                              builder: (_) => const DestinationLandingPage())))),
+                  SizedBox(width: 50, child: _navIcon(Icons.search,
                       onTap: () => Navigator.pushReplacement(
                           context,
                           MaterialPageRoute(
-                              builder: (_) => const CloseSpots()))),
-                  _navIcon(Icons.airplanemode_active,
+                              builder: (_) => const PlansList(source: 'home'))))),
+                  SizedBox(width: 50, child: _navIcon(Icons.airplanemode_active,
                       onTap: () => Navigator.pushReplacement(context,
-                          MaterialPageRoute(builder: (_) => const AI_Plan()))),
-                  _navIcon(Icons.group_outlined,
+                          MaterialPageRoute(builder: (_) => const AI_Plan())))),
+                  SizedBox(width: 50, child: _navIcon(Icons.group_outlined,
                       onTap: () => Navigator.pushReplacement(context,
-                          MaterialPageRoute(builder: (_) => const Bonders()))),
-                  _navIcon(Icons.person_outline,
+                          MaterialPageRoute(builder: (_) => const Bonders())))),
+                  SizedBox(width: 50, child: _navIcon(Icons.person_outline,
                       onTap: () => Navigator.pushReplacement(context,
-                          MaterialPageRoute(builder: (_) => const Profile()))),
+                          MaterialPageRoute(builder: (_) => const Profile())))),
                 ])));
   }
 
   Widget _navIcon(IconData icon, {VoidCallback? onTap, bool active = false}) {
     return GestureDetector(
+        behavior: HitTestBehavior.opaque,
         onTap: onTap,
         child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
           Icon(icon, size: 24, color: Colors.white),

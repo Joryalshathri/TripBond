@@ -7,7 +7,6 @@ import 'settings.dart';
 import 'editProfile.dart';
 import 'DestinationLandingPage.dart';
 import 'Bonder.dart';
-import 'close_spots.dart';
 import 'AI_Plan.dart';
 import 'chat_screen.dart';
 import 'personality_quiz_screen.dart';
@@ -764,30 +763,27 @@ class _ProfileState extends State<Profile> {
             color: Color(0xFF4675B8),
             borderRadius: BorderRadius.only(
                 topLeft: Radius.circular(25), topRight: Radius.circular(25))),
-        padding: const EdgeInsets.symmetric(horizontal: 32),
+        padding: const EdgeInsets.symmetric(horizontal: 0),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            _navIcon(Icons.home,
+            SizedBox(width: 50, child: _navIcon(Icons.home,
                 onTap: () => Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(
-                        builder: (_) => const PlansList(source: 'home')))),
-            _navIcon(Icons.search,
+                        builder: (_) => const PlansList(source: 'home'))))),
+            SizedBox(width: 50, child: _navIcon(Icons.search,
                 onTap: () => Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(
-                        builder: (_) => const DestinationLandingPage()))),
-            _navIcon(Icons.location_on_outlined,
+                        builder: (_) => const DestinationLandingPage())))),
+            SizedBox(width: 50, child: _navIcon(Icons.airplanemode_active,
                 onTap: () => Navigator.pushReplacement(context,
-                    MaterialPageRoute(builder: (_) => const CloseSpots()))),
-            _navIcon(Icons.airplanemode_active,
+                    MaterialPageRoute(builder: (_) => const AI_Plan())))),
+            SizedBox(width: 50, child: _navIcon(Icons.group_outlined,
                 onTap: () => Navigator.pushReplacement(context,
-                    MaterialPageRoute(builder: (_) => const AI_Plan()))),
-            _navIcon(Icons.group_outlined,
-                onTap: () => Navigator.pushReplacement(context,
-                    MaterialPageRoute(builder: (_) => const Bonders()))),
-            _navIcon(Icons.person_outline, active: true),
+                    MaterialPageRoute(builder: (_) => const Bonders())))),
+            SizedBox(width: 50, child: _navIcon(Icons.person_outline, active: true)),
           ],
         ),
       ),
@@ -796,6 +792,7 @@ class _ProfileState extends State<Profile> {
 
   Widget _navIcon(IconData icon, {VoidCallback? onTap, bool active = false}) {
     return GestureDetector(
+        behavior: HitTestBehavior.opaque,
         onTap: onTap,
         child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
           Icon(icon, size: 24, color: Colors.white),
@@ -903,9 +900,7 @@ class _ProfileState extends State<Profile> {
                                       Navigator.push(
                                           context,
                                           MaterialPageRoute(
-                                              builder: (_) => ChatPage(
-                                                  bonderId: userId,
-                                                  name: name)));
+                                              builder: (_) => const ChatScreen()));
                                     },
                             ),
                           );

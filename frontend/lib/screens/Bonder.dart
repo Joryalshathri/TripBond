@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'DestinationLandingPage.dart';
 import 'profile.dart';
-import 'close_spots.dart';
+import 'user_profile_view.dart';
 import 'group_suggested_itinerary.dart';
 import 'plans_list.dart';
 import 'notifications_view.dart';
@@ -369,22 +369,16 @@ class _BondersState extends State<Bonders> {
                                     color: Colors.white),
                               ),
                               child: GestureDetector(
-                                  onTap: () async {
-                                    _clearUnreadForBonder(b.id);
-                                    await Navigator.push(
+                                  onTap: () {
+                                    Navigator.push(
                                       context,
                                       MaterialPageRoute(
-                                        builder: (_) => ChatPage(
-                                          bonderId: b.id,
-                                          name: b.name,
-                                          onMessageSent: (message) =>
-                                              _updateLastMessage(b.id, message),
+                                        builder: (_) => UserProfileView(
+                                          userId: b.id,
+                                          userName: b.name,
                                         ),
                                       ),
                                     );
-                                    setState(() {
-                                      _filteredBonders = List.from(_allBonders);
-                                    });
                                   },
                                   child: Container(
                                     margin: const EdgeInsets.only(bottom: 16),
@@ -398,7 +392,7 @@ class _BondersState extends State<Bonders> {
                                     ),
                                     child: Row(
                                       children: [
-                                        _buildBonderAvatar(b),
+                                        _buildBonderAvatarButton(b),
                                         const SizedBox(width: 16),
                                         Expanded(
                                           child: Column(
@@ -466,10 +460,12 @@ class _BondersState extends State<Bonders> {
                                             milliseconds:
                                                 AnimationConstants.normal),
                                         curve: AnimationConstants.cubicEaseOut,
-                                      )));
+                                      ),
+                                  ),
+                            );
                         }),
-                      ],
-                    ),
+                    ],
+                  ),
                   ),
                 ),
               ),
@@ -497,6 +493,23 @@ class _BondersState extends State<Bonders> {
     );
   }
 
+  Widget _buildBonderAvatarButton(BonderItem bonder) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => UserProfileView(
+              userId: bonder.id,
+              userName: bonder.name,
+            ),
+          ),
+        );
+      },
+      child: _buildBonderAvatar(bonder),
+    );
+  }
+
   Widget _buildBottomNav(BuildContext context) {
     return Positioned(
       bottom: 0,
@@ -509,32 +522,29 @@ class _BondersState extends State<Bonders> {
           borderRadius: BorderRadius.only(
               topLeft: Radius.circular(25), topRight: Radius.circular(25)),
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 32),
+        padding: const EdgeInsets.symmetric(horizontal: 0),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            _navIcon(Icons.home,
+            SizedBox(width: 50, child: _navIcon(Icons.home,
                 onTap: () => Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(
-                        builder: (_) => const PlansList(source: 'home')))),
-            _navIcon(Icons.search,
+                        builder: (_) => const PlansList(source: 'home'))))),
+            SizedBox(width: 50, child: _navIcon(Icons.search,
                 onTap: () => Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(
-                        builder: (_) => const DestinationLandingPage()))),
-            _navIcon(Icons.location_on_outlined,
+                        builder: (_) => const PlansList(source: 'home'))))),
+            SizedBox(width: 50, child: _navIcon(Icons.airplanemode_active,
+                onTap: () => Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const GroupSuggestedItinerary())))),
+            SizedBox(width: 50, child: _navIcon(Icons.group_outlined, active: true)),
+            SizedBox(width: 50, child: _navIcon(Icons.person_outline,
                 onTap: () => Navigator.pushReplacement(context,
-                    MaterialPageRoute(builder: (_) => const CloseSpots()))),
-            _navIcon(Icons.airplanemode_active,
-                onTap: () => Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => const GroupSuggestedItinerary()))),
-            _navIcon(Icons.group_outlined, active: true),
-            _navIcon(Icons.person_outline,
-                onTap: () => Navigator.pushReplacement(context,
-                    MaterialPageRoute(builder: (_) => const Profile()))),
+                    MaterialPageRoute(builder: (_) => const Profile())))),
           ],
         ),
       ),
@@ -543,6 +553,7 @@ class _BondersState extends State<Bonders> {
 
   Widget _navIcon(IconData icon, {VoidCallback? onTap, bool active = false}) {
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,

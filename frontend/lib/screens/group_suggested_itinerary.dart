@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'close_spots.dart';
 import 'Bonder.dart';
 import 'profile.dart';
 import 'DestinationLandingPage.dart';
@@ -723,38 +722,27 @@ class _GroupSuggestedItineraryState extends State<GroupSuggestedItinerary> {
                 offset: Offset(0, -4)),
           ],
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 32),
+        padding: const EdgeInsets.symmetric(horizontal: 0),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            _navIcon(Icons.home,
+            SizedBox(width: 50, child: _navIcon(Icons.home,
                 onTap: () => Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(
-                        builder: (_) => const PlansList(source: 'home')))),
-            _navIcon(Icons.search,
+                        builder: (_) => const PlansList(source: 'home'))))),
+            SizedBox(width: 50, child: _navIcon(Icons.search,
                 onTap: () => Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(
-                        builder: (_) => const DestinationLandingPage()))),
-            _navIcon(
-              Icons.location_on_outlined,
-              onTap: () => Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => CloseSpots(
-                    tripId: widget.tripId,
-                  ),
-                ),
-              ),
-            ),
-            _navIcon(Icons.airplanemode_active, active: true),
-            _navIcon(Icons.group_outlined,
+                        builder: (_) => const DestinationLandingPage())))),
+            SizedBox(width: 50, child: _navIcon(Icons.airplanemode_active, active: true)),
+            SizedBox(width: 50, child: _navIcon(Icons.group_outlined,
                 onTap: () => Navigator.pushReplacement(context,
-                    MaterialPageRoute(builder: (_) => const Bonders()))),
-            _navIcon(Icons.person_outline,
+                    MaterialPageRoute(builder: (_) => const Bonders())))),
+            SizedBox(width: 50, child: _navIcon(Icons.person_outline,
                 onTap: () => Navigator.pushReplacement(context,
-                    MaterialPageRoute(builder: (_) => const Profile()))),
+                    MaterialPageRoute(builder: (_) => const Profile())))),
           ],
         ),
       ),
@@ -763,6 +751,7 @@ class _GroupSuggestedItineraryState extends State<GroupSuggestedItinerary> {
 
   Widget _navIcon(IconData icon, {VoidCallback? onTap, bool active = false}) {
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
