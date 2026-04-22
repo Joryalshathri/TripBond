@@ -59,6 +59,10 @@ class FavoritesService {
         throw Exception('User ID not found');
       }
 
+      // The database constraint requires at least one entity to be non-null:
+      // trip_id (must reference existing trip), destination_name, or poi_id
+      // For destination favorites, only send destination_name and destination_type
+      // For trip favorites, send tripId
       if ((tripId == null || tripId.isEmpty) &&
           (destinationName == null || destinationName.isEmpty) &&
           (poiId == null || poiId.isEmpty)) {

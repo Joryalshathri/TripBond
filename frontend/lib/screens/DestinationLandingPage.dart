@@ -31,6 +31,7 @@ class Destination {
 }
 
 class Post {
+  final String id;
   final String userName;
   final String location;
   final String image;
@@ -40,6 +41,7 @@ class Post {
   final DateTime timestamp; // to track actual posting time
 
   Post({
+    String? id,
     required this.userName,
     required this.location,
     required this.image,
@@ -47,7 +49,7 @@ class Post {
     required this.likes,
     required this.privacy,
     required this.timestamp,
-  });
+  }) : id = id ?? '${DateTime.now().millisecondsSinceEpoch}_${title.hashCode}';
 }
 
 // --- GLOBAL LISTS ---
@@ -170,7 +172,7 @@ class _DestinationLandingPageState extends State<DestinationLandingPage> {
       } else {
         final savedFavorite = await _favoritesService.addFavorite(
           destinationName: post.title,
-          destinationType: 'trip',
+          destinationType: post.location,
         );
         if (!mounted) return;
         setState(() {

@@ -38,6 +38,9 @@ def get_user_favorites(user_id: str) -> List[FavoriteResponse]:
 def add_favorite(user_id: str, favorite: AddFavoriteRequest) -> FavoriteResponse:
     """Add a destination, trip, or POI to a user's favorites."""
     db = SupabaseDB()
+    
+    # Debug log what we're receiving
+    logger.info(f"Adding favorite for user {user_id}: trip_id={favorite.trip_id}, destination_name={favorite.destination_name}, destination_type={favorite.destination_type}, poi_id={favorite.poi_id}")
 
     query = db.client.table("user_favorites").select("id").eq("user_id", user_id)
     if favorite.trip_id:
@@ -50,13 +53,21 @@ def add_favorite(user_id: str, favorite: AddFavoriteRequest) -> FavoriteResponse
     if query.execute().data:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Already in favorites")
 
+    # Only include non-null values in the insert data
     favorite_data = {
         "user_id": user_id,
-        "trip_id": favorite.trip_id,
-        "destination_name": favorite.destination_name,
-        "destination_type": favorite.destination_type,
-        "poi_id": favorite.poi_id,
     }
+    
+    if favorite.trip_id is not None:
+        favorite_data["trip_id"] = favorite.trip_id
+    if favorite.destination_name is not None:
+        favorite_data["destination_name"] = favorite.destination_name
+    if favorite.destination_type is not None:
+        favorite_data["destination_type"] = favorite.destination_type
+    if favorite.poi_id is not None:
+        favorite_data["poi_id"] = favorite.poi_id
+    
+    logger.info(f"Inserting favorite_data: {favorite_data}")
 
     response = db.client.table("user_favorites").insert(favorite_data).execute()
     if not response.data:
