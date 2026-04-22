@@ -105,29 +105,29 @@ class _TripHomeScreenState extends State<TripHomeScreen>
             topRight: Radius.circular(25),
           ),
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 0),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            _navIcon(Icons.home),
-            _navIcon(Icons.search, active: true,
+            SizedBox(width: 50, child: _navIcon(Icons.home)),
+            SizedBox(width: 50, child: _navIcon(Icons.search, active: true,
                 onTap: () => Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(
-                        builder: (_) => const DestinationLandingPage()))),
-            _navIcon(Icons.airplanemode_active,
+                        builder: (_) => const DestinationLandingPage())))),
+            SizedBox(width: 50, child: _navIcon(Icons.airplanemode_active,
                 onTap: () => Navigator.pushReplacement(context,
                     MaterialPageRoute(builder: (_) => GroupSuggestedItinerary(
                       tripId: widget.tripId,
                       destination: widget.destination,
                       tripTitle: widget.tripTitle,
-                    )))),
-            _navIcon(Icons.group_outlined,
+                    ))))),
+            SizedBox(width: 50, child: _navIcon(Icons.group_outlined,
                 onTap: () => Navigator.pushReplacement(context,
-                    MaterialPageRoute(builder: (_) => const Bonders()))),
-            _navIcon(Icons.person_outline,
+                    MaterialPageRoute(builder: (_) => const Bonders())))),
+            SizedBox(width: 50, child: _navIcon(Icons.person_outline,
                 onTap: () => Navigator.pushReplacement(context,
-                    MaterialPageRoute(builder: (_) => const Profile()))),
+                    MaterialPageRoute(builder: (_) => const Profile())))),
           ],
         ),
       ),
@@ -136,6 +136,7 @@ class _TripHomeScreenState extends State<TripHomeScreen>
 
   Widget _navIcon(IconData icon, {VoidCallback? onTap, bool active = false}) {
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,

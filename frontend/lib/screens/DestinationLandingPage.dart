@@ -655,34 +655,35 @@ class _DestinationLandingPageState extends State<DestinationLandingPage> {
                 borderRadius: BorderRadius.only(
                     topLeft: Radius.circular(25),
                     topRight: Radius.circular(25))),
-            padding: const EdgeInsets.symmetric(horizontal: 32),
+            padding: const EdgeInsets.symmetric(horizontal: 0),
             child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  _navIcon(Icons.home, active: true,
+                  SizedBox(width: 50, child: _navIcon(Icons.home, active: true,
                       onTap: () => Navigator.pushReplacement(
                           context,
                           MaterialPageRoute(
-                              builder: (_) => const DestinationLandingPage()))),
-                  _navIcon(Icons.search,
+                              builder: (_) => const DestinationLandingPage())))),
+                  SizedBox(width: 50, child: _navIcon(Icons.search,
                       onTap: () => Navigator.pushReplacement(
                           context,
                           MaterialPageRoute(
-                              builder: (_) => const PlansList(source: 'home')))),
-                  _navIcon(Icons.airplanemode_active,
+                              builder: (_) => const PlansList(source: 'home'))))),
+                  SizedBox(width: 50, child: _navIcon(Icons.airplanemode_active,
                       onTap: () => Navigator.pushReplacement(context,
-                          MaterialPageRoute(builder: (_) => const AI_Plan()))),
-                  _navIcon(Icons.group_outlined,
+                          MaterialPageRoute(builder: (_) => const AI_Plan())))),
+                  SizedBox(width: 50, child: _navIcon(Icons.group_outlined,
                       onTap: () => Navigator.pushReplacement(context,
-                          MaterialPageRoute(builder: (_) => const Bonders()))),
-                  _navIcon(Icons.person_outline,
+                          MaterialPageRoute(builder: (_) => const Bonders())))),
+                  SizedBox(width: 50, child: _navIcon(Icons.person_outline,
                       onTap: () => Navigator.pushReplacement(context,
-                          MaterialPageRoute(builder: (_) => const Profile()))),
+                          MaterialPageRoute(builder: (_) => const Profile())))),
                 ])));
   }
 
   Widget _navIcon(IconData icon, {VoidCallback? onTap, bool active = false}) {
     return GestureDetector(
+        behavior: HitTestBehavior.opaque,
         onTap: onTap,
         child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
           Icon(icon, size: 24, color: Colors.white),

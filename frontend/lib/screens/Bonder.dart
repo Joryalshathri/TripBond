@@ -522,29 +522,29 @@ class _BondersState extends State<Bonders> {
           borderRadius: BorderRadius.only(
               topLeft: Radius.circular(25), topRight: Radius.circular(25)),
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 32),
+        padding: const EdgeInsets.symmetric(horizontal: 0),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            _navIcon(Icons.home,
+            SizedBox(width: 50, child: _navIcon(Icons.home,
                 onTap: () => Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(
-                        builder: (_) => const PlansList(source: 'home')))),
-            _navIcon(Icons.search,
+                        builder: (_) => const PlansList(source: 'home'))))),
+            SizedBox(width: 50, child: _navIcon(Icons.search,
                 onTap: () => Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(
-                        builder: (_) => const PlansList(source: 'home')))),
-            _navIcon(Icons.airplanemode_active,
+                        builder: (_) => const PlansList(source: 'home'))))),
+            SizedBox(width: 50, child: _navIcon(Icons.airplanemode_active,
                 onTap: () => Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(
-                        builder: (_) => const GroupSuggestedItinerary()))),
-            _navIcon(Icons.group_outlined, active: true),
-            _navIcon(Icons.person_outline,
+                        builder: (_) => const GroupSuggestedItinerary())))),
+            SizedBox(width: 50, child: _navIcon(Icons.group_outlined, active: true)),
+            SizedBox(width: 50, child: _navIcon(Icons.person_outline,
                 onTap: () => Navigator.pushReplacement(context,
-                    MaterialPageRoute(builder: (_) => const Profile()))),
+                    MaterialPageRoute(builder: (_) => const Profile())))),
           ],
         ),
       ),
@@ -553,6 +553,7 @@ class _BondersState extends State<Bonders> {
 
   Widget _navIcon(IconData icon, {VoidCallback? onTap, bool active = false}) {
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
