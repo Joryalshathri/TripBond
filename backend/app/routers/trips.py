@@ -1,10 +1,10 @@
 from fastapi import APIRouter, HTTPException, status, Query, Depends
 from fastapi.concurrency import run_in_threadpool
-from typing import List
+from typing import Any, Dict, List
 from datetime import datetime, timedelta
-from ..database import SupabaseDB, get_supabase_client_for_user
+from ..database import SupabaseDB
 from ..services.trip_access import check_trip_access
-from ..services import trip_service
+from ..services import trip_flow_service, trip_service
 from ..services.itinerary_service import (
     generate_itinerary,
     create_itinerary,
@@ -15,7 +15,8 @@ from ..services.itinerary_service import (
     delete_item,
     get_itinerary_with_items,
 )
-from ..services.recommendation_service import calculate_poi_score
+from ..services.recommendation_service import rank_recommendations
+from ..services import ai_poi_service, vote_service, notification_service
 from ..schemas.trips import (
     TripResponse,
     CreateTripRequest,
@@ -39,6 +40,28 @@ router = APIRouter()
 from ..auth import get_current_user_context
 
 
+def _trip_phase(trip: Dict[str, Any]) -> str:
+    return str(trip.get("phase") or "planning")
+
+
+def _to_trip_response(trip: Dict[str, Any]) -> TripResponse:
+    return TripResponse(
+        id=trip["id"],
+        created_by=trip["created_by"],
+        title=trip.get("title", ""),
+        destination=trip.get("destination", ""),
+        phase=_trip_phase(trip),
+        location=trip.get("location"),
+        start_date=trip.get("start_date"),
+        end_date=trip.get("end_date"),
+        trip_type=trip.get("trip_type"),
+        description=trip.get("description"),
+        image_url=trip.get("image_url"),
+        is_public=trip.get("is_public", True),
+        created_at=trip.get("created_at"),
+    )
+
+
 # ==================== Trip Endpoints ====================
 
 @router.get("/me", response_model=List[TripResponse])
@@ -49,23 +72,7 @@ async def get_my_created_trips(user_context: tuple[str, str] = Depends(get_curre
     try:
         trips_data = await trip_service.get_user_trips(user_id, token)
         
-        return [
-            TripResponse(
-                id=trip["id"],
-                created_by=trip["created_by"],
-                title=trip.get("title", ""),
-                destination=trip.get("destination", ""),
-                location=trip.get("location"),
-                start_date=trip.get("start_date"),
-                end_date=trip.get("end_date"),
-                trip_type=trip.get("trip_type"),
-                description=trip.get("description"),
-                image_url=trip.get("image_url"),
-                is_public=trip.get("is_public", True),
-                created_at=trip.get("created_at")
-            )
-            for trip in trips_data
-        ]
+        return [_to_trip_response(trip) for trip in trips_data]
         
     except HTTPException:
         raise
@@ -86,20 +93,7 @@ async def get_trips_by_user(user_id: str):
             lambda: db.client.table("trips").select("*").eq("created_by", user_id).execute()
         )
         return [
-            TripResponse(
-                id=trip["id"],
-                created_by=trip["created_by"],
-                title=trip.get("title", ""),
-                destination=trip.get("destination", ""),
-                location=trip.get("location"),
-                start_date=trip.get("start_date"),
-                end_date=trip.get("end_date"),
-                trip_type=trip.get("trip_type"),
-                description=trip.get("description"),
-                image_url=trip.get("image_url"),
-                is_public=trip.get("is_public", True),
-                created_at=trip.get("created_at"),
-            )
+            _to_trip_response(trip)
             for trip in (response.data or [])
             if trip.get("is_public", True)
         ]
@@ -136,20 +130,7 @@ async def get_public_trip_detail(trip_id: str):
                 detail="This trip is private"
             )
         
-        return TripResponse(
-            id=trip["id"],
-            created_by=trip["created_by"],
-            title=trip.get("title", ""),
-            destination=trip.get("destination", ""),
-            location=trip.get("location"),
-            start_date=trip.get("start_date"),
-            end_date=trip.get("end_date"),
-            trip_type=trip.get("trip_type"),
-            description=trip.get("description"),
-            image_url=trip.get("image_url"),
-            is_public=trip.get("is_public", True),
-            created_at=trip.get("created_at")
-        )
+        return _to_trip_response(trip)
         
     except HTTPException:
         raise
@@ -281,20 +262,7 @@ async def get_trip_detail(
     try:
         trip = await check_trip_access(trip_id, user_id, token=token, required_role="view")
         
-        return TripResponse(
-            id=trip["id"],
-            created_by=trip["created_by"],
-            title=trip.get("title", ""),
-            destination=trip.get("destination", ""),
-            location=trip.get("location"),
-            start_date=trip.get("start_date"),
-            end_date=trip.get("end_date"),
-            trip_type=trip.get("trip_type"),
-            description=trip.get("description"),
-            image_url=trip.get("image_url"),
-            is_public=trip.get("is_public", True),
-            created_at=trip.get("created_at")
-        )
+        return _to_trip_response(trip)
         
     except HTTPException:
         raise
@@ -316,17 +284,16 @@ async def get_trip_summary(
     
     try:
         trip = await check_trip_access(trip_id, user_id, token=token, required_role="view")
-        client = get_supabase_client_for_user(token)
+        db = SupabaseDB(admin=True)
         
         members_response = await run_in_threadpool(
-            lambda: client.table("trip_participants").select("user_id", count="exact")
+            lambda: db.client.table("trip_participants").select("user_id", count="exact")
             .eq("trip_id", trip_id)
             .eq("status", "accepted")
             .execute()
         )
         member_count = members_response.count if members_response.count else 0
         
-        db = SupabaseDB(admin=True)
         itinerary_response = await run_in_threadpool(
             lambda: db.client.table("itineraries").select("id")
             .eq("trip_id", trip_id)
@@ -352,7 +319,7 @@ async def get_trip_summary(
         is_creator = trip["created_by"] == user_id
         
         participant_response = await run_in_threadpool(
-            lambda: client.table("trip_participants").select("user_id, status")
+            lambda: db.client.table("trip_participants").select("user_id, status")
             .eq("trip_id", trip_id)
             .eq("user_id", user_id)
             .execute()
@@ -363,6 +330,7 @@ async def get_trip_summary(
             trip_id=trip["id"],
             title=trip.get("title", ""),
             destination=trip.get("destination", ""),
+            phase=_trip_phase(trip),
             member_count=member_count,
             has_itinerary=has_itinerary,
             itinerary_days=itinerary_days,
@@ -401,25 +369,13 @@ async def create_new_trip(
             "trip_type": trip.trip_type,
             "description": trip.description,
             "image_url": trip.image_url,
-            "is_public": trip.is_public
+            "is_public": trip.is_public,
+            "phase": "planning",
         }
         
         created_trip = await trip_service.create_trip(user_id, token, trip_data)
         
-        return TripResponse(
-            id=created_trip["id"],
-            created_by=created_trip["created_by"],
-            title=created_trip.get("title", ""),
-            destination=created_trip.get("destination", ""),
-            location=created_trip.get("location"),
-            start_date=created_trip.get("start_date"),
-            end_date=created_trip.get("end_date"),
-            trip_type=created_trip.get("trip_type"),
-            description=created_trip.get("description"),
-            image_url=created_trip.get("image_url"),
-            is_public=created_trip.get("is_public", True),
-            created_at=created_trip.get("created_at")
-        )
+        return _to_trip_response(created_trip)
         
     except HTTPException:
         raise
@@ -481,20 +437,7 @@ async def update_trip_endpoint(
         
         updated_trip = await trip_service.update_trip(trip_id, token, update_data)
         
-        return TripResponse(
-            id=updated_trip["id"],
-            created_by=updated_trip["created_by"],
-            title=updated_trip.get("title", ""),
-            destination=updated_trip.get("destination", ""),
-            location=updated_trip.get("location"),
-            start_date=updated_trip.get("start_date"),
-            end_date=updated_trip.get("end_date"),
-            trip_type=updated_trip.get("trip_type"),
-            description=updated_trip.get("description"),
-            image_url=updated_trip.get("image_url"),
-            is_public=updated_trip.get("is_public", True),
-            created_at=updated_trip.get("created_at")
-        )
+        return _to_trip_response(updated_trip)
         
     except HTTPException:
         raise
@@ -768,6 +711,132 @@ async def decline_trip_invite(
         )
 
 
+# ==================== Trip Flow Progress Endpoints ====================
+
+@router.get("/{trip_id}/flow-status")
+async def get_trip_flow_status_endpoint(
+    trip_id: str,
+    user_context: tuple[str, str] = Depends(get_current_user_context),
+):
+    """Return the gated trip flow state for the current user."""
+    user_id, token = user_context
+    try:
+        trip = await check_trip_access(trip_id, user_id, token=token, required_role="member")
+        return trip_flow_service.get_trip_flow_status(trip, user_id)
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Failed to get trip flow status")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get trip flow status",
+        )
+
+
+@router.post("/{trip_id}/flow/places-complete")
+async def mark_places_complete(
+    trip_id: str,
+    user_context: tuple[str, str] = Depends(get_current_user_context),
+):
+    """Mark the current user's place-picking stage as complete."""
+    user_id, token = user_context
+    try:
+        trip = await check_trip_access(trip_id, user_id, token=token, required_role="member")
+        if _trip_phase(trip) != "planning":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Places can only be marked complete during planning.",
+            )
+        trip_flow_service.mark_progress(trip_id, user_id, "places_completed_at")
+        return trip_flow_service.get_trip_flow_status(trip, user_id)
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Failed to mark places complete")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to mark places complete",
+        )
+
+
+@router.delete("/{trip_id}/flow/places-complete")
+async def clear_places_complete(
+    trip_id: str,
+    user_context: tuple[str, str] = Depends(get_current_user_context),
+):
+    """Let the current user reopen their place-picking stage while planning."""
+    user_id, token = user_context
+    try:
+        trip = await check_trip_access(trip_id, user_id, token=token, required_role="member")
+        if _trip_phase(trip) != "planning":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Places can only be changed during planning.",
+            )
+        trip_flow_service.clear_progress(trip_id, user_id, "places_completed_at")
+        return trip_flow_service.get_trip_flow_status(trip, user_id)
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Failed to reopen places")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to reopen places",
+        )
+
+
+@router.post("/{trip_id}/flow/voting-complete")
+async def mark_voting_complete(
+    trip_id: str,
+    user_context: tuple[str, str] = Depends(get_current_user_context),
+):
+    """Mark the current user's voting stage as complete."""
+    user_id, token = user_context
+    try:
+        trip = await check_trip_access(trip_id, user_id, token=token, required_role="member")
+        if _trip_phase(trip) != "voting":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Voting can only be marked complete while voting is open.",
+            )
+        trip_flow_service.mark_progress(trip_id, user_id, "voting_completed_at")
+        return trip_flow_service.get_trip_flow_status(trip, user_id)
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Failed to mark voting complete")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to mark voting complete",
+        )
+
+
+@router.delete("/{trip_id}/flow/voting-complete")
+async def clear_voting_complete(
+    trip_id: str,
+    user_context: tuple[str, str] = Depends(get_current_user_context),
+):
+    """Let the current user update votes while voting remains open."""
+    user_id, token = user_context
+    try:
+        trip = await check_trip_access(trip_id, user_id, token=token, required_role="member")
+        if _trip_phase(trip) != "voting":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Voting can only be changed while voting is open.",
+            )
+        trip_flow_service.clear_progress(trip_id, user_id, "voting_completed_at")
+        return trip_flow_service.get_trip_flow_status(trip, user_id)
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Failed to reopen voting")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to reopen voting",
+        )
+
+
 # ==================== Itinerary Endpoints ====================
 
 @router.post("/{trip_id}/generate-itinerary", response_model=ItineraryResponse)
@@ -776,27 +845,43 @@ async def generate_trip_itinerary(
     request: GenerateItineraryRequest,
     user_context: tuple[str, str] = Depends(get_current_user_context)
 ):
-    """Generate optimized itinerary using GA (creator only)"""
+    """Generate optimized itinerary from top-voted trip places (creator only).
+
+    Pipeline:
+      1. Validate access + (recommended) trip phase == 'finalized'.
+      2. Pull top-voted trip_places via the vote service.
+      3. Run smart scheduler (distance + time-of-day aware) over them.
+      4. Persist itineraries + itinerary_items.
+      5. Notify members.
+    """
     user_id, token = user_context
-    
+
     try:
         trip = await check_trip_access(trip_id, user_id, token=token, required_role="creator")
-        
+        if _trip_phase(trip) != "finalized":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Voting must be closed before generating the AI plan.",
+            )
+
         db = SupabaseDB(admin=True)
         group_prefs_response = await run_in_threadpool(
             lambda: db.client.table("group_models").select("*").eq("trip_id", trip_id).execute()
         )
-        
         group_prefs = group_prefs_response.data[0] if group_prefs_response.data else None
-        
-        # Service layer handles strategy selection
+
+        voted = await run_in_threadpool(
+            lambda: vote_service.top_voted_places(trip_id, top_n=24)
+        )
+
         itinerary_data, strategy = generate_itinerary(
             trip=trip,
             group_preferences=group_prefs.get("aggregated_preferences") if group_prefs else None,
             use_ga=request.use_ga,
             max_budget=request.max_budget,
             pace=request.pace,
-            preferences=request.preferences
+            preferences=request.preferences,
+            voted_places=voted,
         )
         
         # Insert itinerary record using helper function
@@ -821,16 +906,33 @@ async def generate_trip_itinerary(
                     "start_time": activity.get("start_time"),
                     "end_time": activity.get("end_time"),
                     "title": activity.get("name"),
-                    "notes": activity.get("description"),
+                    "notes": activity.get("description") or activity.get("category"),
                     "score": activity.get("score", 0.0),
                 }
-                    
                 items_to_insert.append(item)
-        
+
         await run_in_threadpool(
             lambda: insert_items(itinerary_id, items_to_insert)
         )
-        
+
+        # Notify members + creator that the plan is ready
+        try:
+            members = await run_in_threadpool(
+                lambda: db.client.table("trip_participants").select("user_id").eq("trip_id", trip_id).eq("status", "accepted").execute()
+            )
+            recipients = [m["user_id"] for m in (members.data or [])]
+            if trip.get("created_by") and trip["created_by"] not in recipients:
+                recipients.append(trip["created_by"])
+            notification_service.emit_many(
+                user_ids=recipients,
+                notif_type="itinerary_generated",
+                title="Plan ready",
+                body=f"AI generated a new plan for '{trip.get('title','your trip')}'.",
+                payload={"trip_id": trip_id, "itinerary_id": itinerary_id, "strategy": strategy},
+            )
+        except Exception:
+            logger.exception("Failed to notify members of generated itinerary")
+
         return ItineraryResponse(
             trip_id=trip_id,
             days=itinerary_data["days"],
@@ -843,6 +945,11 @@ async def generate_trip_itinerary(
         
     except HTTPException:
         raise
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        )
     except Exception as e:
         logger.exception("Failed to generate itinerary")
         raise HTTPException(
@@ -861,6 +968,7 @@ async def get_itinerary(
     
     try:
         trip = await check_trip_access(trip_id, user_id, token=token, required_role="view")
+        db = SupabaseDB(admin=True)
         
         # Fetch latest itinerary
         itinerary = await run_in_threadpool(
@@ -994,7 +1102,7 @@ async def update_itinerary_item(
     user_id, token = user_context
     
     try:
-        await check_trip_access(trip_id, user_id, token=token, required_role="creator")
+        await check_trip_access(trip_id, user_id, token=token, required_role="member")
         
         # Verify itinerary exists for this trip
         itinerary = await run_in_threadpool(
@@ -1049,11 +1157,11 @@ async def add_itinerary_item(
     activity: ItineraryActivity,
     user_context: tuple[str, str] = Depends(get_current_user_context)
 ):
-    """Add activity to itinerary day (creator only)"""
+    """Add activity to itinerary day (any accepted member)"""
     user_id, token = user_context
     
     try:
-        await check_trip_access(trip_id, user_id, token=token, required_role="creator")
+        await check_trip_access(trip_id, user_id, token=token, required_role="member")
         
         # Get itinerary for this trip
         itinerary = await run_in_threadpool(
@@ -1104,11 +1212,11 @@ async def delete_itinerary_item(
     item_id: str,
     user_context: tuple[str, str] = Depends(get_current_user_context)
 ):
-    """Remove activity from itinerary (creator only)"""
+    """Remove activity from itinerary (any accepted member)"""
     user_id, token = user_context
     
     try:
-        await check_trip_access(trip_id, user_id, token=token, required_role="creator")
+        await check_trip_access(trip_id, user_id, token=token, required_role="member")
         
         # Verify itinerary exists for this trip
         itinerary = await run_in_threadpool(
@@ -1146,6 +1254,99 @@ async def delete_itinerary_item(
 
 # ==================== POI Recommendations ====================
 
+def _as_float(value: Any) -> float | None:
+    try:
+        if value is None:
+            return None
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _as_tags(value: Any) -> List[str]:
+    if isinstance(value, list):
+        return [str(item) for item in value if item]
+    if isinstance(value, str) and value.strip():
+        return [value.strip()]
+    return []
+
+
+def _as_int(value: Any) -> int | None:
+    try:
+        if value is None:
+            return None
+        return int(float(value))
+    except (TypeError, ValueError):
+        return None
+
+
+def _opening_hours_dict(value: Any) -> dict | None:
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, list):
+        return {"weekday_text": value}
+    if isinstance(value, str) and value.strip() and value.strip().lower() != "nan":
+        return {"text": value.strip()}
+    return None
+
+
+def _recommendation_poi_response(poi: dict, destination: str) -> POIResponse:
+    latitude = _as_float(poi.get("latitude") or poi.get("lat"))
+    longitude = _as_float(poi.get("longitude") or poi.get("lng") or poi.get("lon"))
+    coordinates = poi.get("coordinates")
+    if not isinstance(coordinates, dict) and latitude is not None and longitude is not None:
+        coordinates = {"lat": latitude, "lng": longitude}
+
+    poi_id = (
+        poi.get("id")
+        or poi.get("poi_id")
+        or poi.get("place_id")
+        or poi.get("external_place_id")
+        or poi.get("name")
+    )
+    poi_type = poi.get("poi_type") or poi.get("type") or poi.get("category") or "attraction"
+    location = (
+        poi.get("location")
+        or poi.get("address")
+        or poi.get("formatted_address")
+        or poi.get("city")
+        or destination
+    )
+
+    return POIResponse(
+        id=str(poi_id),
+        name=str(poi.get("name") or "Unknown place"),
+        type=str(poi_type),
+        category=poi.get("category"),
+        poi_type=poi.get("poi_type"),
+        location=str(location),
+        address=poi.get("address") or poi.get("formatted_address"),
+        description=poi.get("description"),
+        rating=_as_float(poi.get("rating")),
+        review_count=_as_int(poi.get("review_count")),
+        user_ratings_total=_as_int(poi.get("user_ratings_total") or poi.get("review_count")),
+        price_level=poi.get("price_level"),
+        image_url=poi.get("image_url"),
+        coordinates=coordinates,
+        latitude=latitude,
+        longitude=longitude,
+        coordinates_inferred=poi.get("coordinates_inferred"),
+        external_place_id=(
+            poi.get("external_place_id")
+            or poi.get("place_id")
+            or poi.get("id")
+            or poi.get("poi_id")
+        ),
+        place_id=poi.get("place_id") or poi.get("external_place_id") or poi.get("id"),
+        types=_as_tags(poi.get("types")),
+        province=poi.get("province"),
+        tags=_as_tags(poi.get("tags") or poi.get("types") or poi.get("category")),
+        opening_hours=_opening_hours_dict(poi.get("opening_hours")),
+        contact=poi.get("contact"),
+        created_at=poi.get("created_at")
+    )
+
+
 @router.get("/{trip_id}/recommendations", response_model=List[RecommendationResponse])
 async def get_trip_recommendations(
     trip_id: str,
@@ -1159,7 +1360,10 @@ async def get_trip_recommendations(
         trip = await check_trip_access(trip_id, user_id, token=token, required_role="view")
         
         db = SupabaseDB(admin=True)
-        destination = trip.get("destination", "")
+        destination = (trip.get("destination") or trip.get("location") or "").strip()
+        if not destination:
+            return []
+        limit = max(1, min(limit, 100))
         
         group_prefs_response = await run_in_threadpool(
             lambda: db.client.table("group_models").select("*")
@@ -1171,55 +1375,38 @@ async def get_trip_recommendations(
         
         group_prefs = group_prefs_response.data[0] if group_prefs_response.data else None
         
-        try:
-            pois_response = await run_in_threadpool(
-                lambda: db.client.table("pois").select("*")
-                .ilike("location", f"%{destination}%")
-                .order("rating", desc=True)
-                .limit(100)
-                .execute()
+        candidate_limit = max(limit * 3, 30)
+        pois = await run_in_threadpool(
+            lambda: ai_poi_service.get_pois_for_destination(
+                destination,
+                limit=candidate_limit,
+                require_coordinates=True,
             )
-        except Exception:
-            pois_response = await run_in_threadpool(
-                lambda: db.client.table("pois").select("*")
-                .order("rating", desc=True)
-                .limit(100)
-                .execute()
-            )
-        
-        if not pois_response.data:
+        )
+        pois = [
+            poi for poi in pois
+            if _as_float(poi.get("latitude") or poi.get("lat")) is not None
+            and _as_float(poi.get("longitude") or poi.get("lng") or poi.get("lon")) is not None
+        ]
+
+        if not pois:
             return []
-        
+
+        ranked = rank_recommendations(
+            pois,
+            group_prefs.get("aggregated_preferences") if group_prefs else {},
+            trip,
+            limit=limit,
+        )
+
         recommendations = []
-        for poi in pois_response.data[:limit]:
-            score, reason = calculate_poi_score(
-                poi,
-                group_prefs.get("aggregated_preferences") if group_prefs else {},
-                trip
-            )
-            
+        for poi, score, reason in ranked:
             recommendations.append(RecommendationResponse(
-                poi=POIResponse(
-                    id=poi["id"],
-                    name=poi.get("name", ""),
-                    type=poi.get("poi_type", ""),
-                    location=poi.get("location") or poi.get("formatted_address") or poi.get("city") or destination,
-                    description=poi.get("description"),
-                    rating=poi.get("rating"),
-                    price_level=poi.get("price_level"),
-                    image_url=poi.get("image_url"),
-                    coordinates=poi.get("coordinates"),
-                    tags=poi.get("tags", []),
-                    opening_hours=poi.get("opening_hours"),
-                    contact=poi.get("contact"),
-                    created_at=poi.get("created_at")
-                ),
+                poi=_recommendation_poi_response(poi, destination),
                 score=score,
                 reason=reason
             ))
-        
-        recommendations.sort(key=lambda x: x.score, reverse=True)
-        
+
         return recommendations
         
     except HTTPException:
@@ -1274,6 +1461,36 @@ async def mark_recommendations_selected(
 
 
 # ==================== Place Endpoints ====================
+
+@router.get("/{trip_id}/places")
+async def list_trip_places(
+    trip_id: str,
+    user_context: tuple[str, str] = Depends(get_current_user_context),
+):
+    """List all places added to a trip (members only)."""
+    user_id, token = user_context
+    await check_trip_access(trip_id, user_id, token=token, required_role="member")
+    db = SupabaseDB(admin=True)
+    res = await run_in_threadpool(
+        lambda: db.client.table("trip_places")
+        .select("*")
+        .eq("trip_id", trip_id)
+        .order("added_at", desc=False)
+        .execute()
+    )
+    rows = res.data or []
+    if not rows:
+        return []
+    adder_ids = list({r["added_by"] for r in rows if r.get("added_by")})
+    profiles_resp = await run_in_threadpool(
+        lambda: db.client.table("profiles").select("id, full_name, avatar_url").in_("id", adder_ids).execute()
+    )
+    by_id = {p["id"]: p for p in (profiles_resp.data or [])}
+    return [
+        {**r, "added_by_profile": by_id.get(r.get("added_by"))}
+        for r in rows
+    ]
+
 
 @router.post("/{trip_id}/places/check-duplicate")
 async def check_place_duplicate(
@@ -1440,7 +1657,7 @@ async def add_place_to_trip(
             "rating": rating,
             "user_ratings_total": user_ratings_total,
             "place_types": types,
-            "added_by": None,
+            "added_by": user_id,
             "added_at": datetime.utcnow().isoformat()
         }
         

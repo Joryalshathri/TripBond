@@ -92,6 +92,32 @@ class UserService {
     }
   }
 
+  // Get discoverable TripBond users for inviting/connecting
+  Future<List<Map<String, dynamic>>> getBonders({int limit = 100}) async {
+    try {
+      final token = await _authService.getAuthToken();
+      if (token == null) {
+        throw Exception('Not authenticated');
+      }
+
+      final response = await _apiService.get(
+        '${ApiConfig.usersPath}/bonders',
+        queryParams: {'limit': limit.toString()},
+        token: token,
+      );
+
+      if (response is List) {
+        return response
+            .whereType<Map>()
+            .map((item) => Map<String, dynamic>.from(item))
+            .toList();
+      }
+      return [];
+    } catch (e) {
+      throw Exception('Failed to get bonders: ${e.toString()}');
+    }
+  }
+
   // Update profile
   Future<Map<String, dynamic>> updateProfile(
       Map<String, dynamic> updates) async {
@@ -279,4 +305,5 @@ class UserService {
     } catch (e) {
       throw Exception('Failed to cancel bond request: ${e.toString()}');
     }
-  }}
+  }
+}

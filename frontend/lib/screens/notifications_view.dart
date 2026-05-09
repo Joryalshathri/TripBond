@@ -1,4 +1,9 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import '../services/notification_service.dart';
+import '../services/trip_service.dart';
+import 'trip_flow_screen.dart';
 
 class NotificationsView extends StatefulWidget {
   const NotificationsView({super.key});
@@ -9,6 +14,133 @@ class NotificationsView extends StatefulWidget {
 
 class _NotificationsViewState extends State<NotificationsView> {
   String _selectedTab = 'notifications'; // notifications, followers, requests
+  final _notificationService = NotificationService();
+  final _tripService = TripService();
+  List<Map<String, dynamic>> _notifications = [];
+  bool _loadingNotifications = true;
+  String? _notificationsError;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadNotifications();
+  }
+
+  Future<void> _loadNotifications() async {
+    setState(() {
+      _loadingNotifications = true;
+      _notificationsError = null;
+    });
+    try {
+      final list = await _notificationService.list();
+      if (!mounted) return;
+      setState(() {
+        _notifications = list;
+        _loadingNotifications = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _notificationsError = e.toString();
+        _loadingNotifications = false;
+      });
+    }
+  }
+
+  Future<void> _markAllRead() async {
+    try {
+      await _notificationService.markAllRead();
+      await _loadNotifications();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed: $e')),
+      );
+    }
+  }
+
+  Future<void> _onNotificationTap(Map<String, dynamic> n) async {
+    if (n['read_at'] == null) {
+      try {
+        await _notificationService.markRead(n['id'].toString());
+        if (!mounted) return;
+        setState(() {
+          n['read_at'] = DateTime.now().toIso8601String();
+        });
+      } catch (_) {}
+    }
+    final tripId = _tripIdFromPayload(n['payload']);
+    if (tripId == null || !mounted) return;
+
+    if (n['type']?.toString() == 'trip_invite') {
+      try {
+        await _tripService.acceptInvite(tripId);
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not accept invite: $e')),
+        );
+        return;
+      }
+    }
+
+    if (!mounted) return;
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => TripFlowScreen(tripId: tripId),
+    ));
+  }
+
+  String? _tripIdFromPayload(dynamic payload) {
+    if (payload is Map) {
+      return payload['trip_id']?.toString();
+    }
+    if (payload is String && payload.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(payload);
+        if (decoded is Map) return decoded['trip_id']?.toString();
+      } catch (_) {}
+    }
+    return null;
+  }
+
+  String _formatTimestamp(String? raw) {
+    if (raw == null) return '';
+    DateTime? dt;
+    try {
+      dt = DateTime.parse(raw).toLocal();
+    } catch (_) {
+      return '';
+    }
+    final diff = DateTime.now().difference(dt);
+    if (diff.inDays > 0) return '${diff.inDays}d ago';
+    if (diff.inHours > 0) return '${diff.inHours}h ago';
+    if (diff.inMinutes > 0) return '${diff.inMinutes}m ago';
+    return 'Just now';
+  }
+
+  ({IconData icon, Color color}) _iconForType(String? type) {
+    switch (type) {
+      case 'trip_invite':
+      case 'trip_invite_accepted':
+        return (icon: Icons.mail_outline, color: Colors.blue);
+      case 'voting_opened':
+      case 'voting_closed':
+        return (icon: Icons.how_to_vote, color: Colors.purple);
+      case 'itinerary_generated':
+        return (icon: Icons.auto_awesome, color: Colors.orange);
+      case 'trip_liked':
+        return (icon: Icons.favorite, color: Colors.red);
+      case 'trip_join_request':
+      case 'join_request_approved':
+      case 'join_request_rejected':
+        return (icon: Icons.group_add, color: Colors.teal);
+      case 'suggestion_approved':
+      case 'suggestion_rejected':
+        return (icon: Icons.recommend_outlined, color: Colors.green);
+      default:
+        return (icon: Icons.notifications_outlined, color: Colors.grey);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -18,6 +150,14 @@ class _NotificationsViewState extends State<NotificationsView> {
         title: const Text('Notifications'),
         backgroundColor: const Color(0xFF4675B8),
         elevation: 0,
+        actions: [
+          if (_selectedTab == 'notifications')
+            IconButton(
+              icon: const Icon(Icons.done_all),
+              tooltip: 'Mark all read',
+              onPressed: _notifications.isEmpty ? null : _markAllRead,
+            ),
+        ],
       ),
       body: Column(
         children: [
@@ -64,38 +204,95 @@ class _NotificationsViewState extends State<NotificationsView> {
   }
 
   Widget _buildNotifications() {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        _NotificationItem(
-          icon: Icons.favorite,
-          title: 'Someone liked your plan',
-          subtitle: 'John Doe liked your "Paris Trip"',
-          timestamp: '2 hours ago',
-          color: Colors.red,
+    if (_loadingNotifications) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_notificationsError != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text('Failed to load: $_notificationsError', textAlign: TextAlign.center),
+              TextButton(onPressed: _loadNotifications, child: const Text('Retry')),
+            ],
+          ),
         ),
-        _NotificationItem(
-          icon: Icons.people_outline,
-          title: 'New follower',
-          subtitle: 'Sarah followed you',
-          timestamp: '5 hours ago',
-          color: Colors.blue,
-        ),
-        _NotificationItem(
-          icon: Icons.comment_outlined,
-          title: 'New message',
-          subtitle: 'You have 3 unread messages',
-          timestamp: '1 day ago',
-          color: Colors.orange,
-        ),
-        _NotificationItem(
-          icon: Icons.share_outlined,
-          title: 'Someone shared with you',
-          subtitle: 'Mike shared "Italy Adventure" plan',
-          timestamp: '2 days ago',
-          color: Colors.purple,
-        ),
-      ],
+      );
+    }
+    if (_notifications.isEmpty) {
+      return const Center(child: Text('No notifications.'));
+    }
+    return RefreshIndicator(
+      onRefresh: _loadNotifications,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: _notifications.length,
+        itemBuilder: (context, index) {
+          final n = _notifications[index];
+          final iconInfo = _iconForType(n['type']?.toString());
+          final isUnread = n['read_at'] == null;
+          return GestureDetector(
+            onTap: () => _onNotificationTap(n),
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: isUnread ? const Color(0xFF4675B8).withOpacity(0.05) : null,
+                border: Border.all(color: Colors.grey[300]!),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 50,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: iconInfo.color.withOpacity(0.2),
+                    ),
+                    child: Icon(iconInfo.icon, color: iconInfo.color, size: 24),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          (n['title'] ?? 'Notification').toString(),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                        if ((n['body'] ?? '').toString().isNotEmpty)
+                          Text(
+                            n['body'].toString(),
+                            style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                          ),
+                        Text(
+                          _formatTimestamp(n['created_at']?.toString()),
+                          style: TextStyle(fontSize: 10, color: Colors.grey[500]),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (isUnread)
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Color(0xFF4675B8),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 

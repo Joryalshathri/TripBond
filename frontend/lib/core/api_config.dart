@@ -27,8 +27,12 @@ class ApiConfig {
     return 'http://localhost:8000';
   }
 
-  // Google API Key for Maps/Places/Geocoding
-  static const String googleApiKey = 'AIzaSyAAID68aVlsYvCbhKMa5YKGvigSL9_xYIc';
+  // Google API Key for Maps/Places/Geocoding.
+  // Pass it at build time:
+  //   flutter run --dart-define=GOOGLE_API_KEY=YOUR_KEY
+  // Never commit a real key here.
+  static const String googleApiKey =
+      String.fromEnvironment('GOOGLE_API_KEY', defaultValue: '');
 
   // API endpoints
   static const String authPath = '/api/auth';
@@ -44,6 +48,9 @@ class ApiConfig {
   static const String chatPath = '/api/chat';
   static const String aiPath = '/api/ai';
   static const String suggestionsPath = '/api/suggestions';
+  static const String votesPath = '/api/votes';
+  static const String feedPath = '/api/feed';
+  static const String notificationsPath = '/api/notifications';
 
   // Request timeout
   static const Duration requestTimeout = Duration(seconds: 30);

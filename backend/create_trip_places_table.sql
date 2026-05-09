@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS trip_places (
     rating NUMERIC(3, 1),
     user_ratings_total INTEGER,
     place_types JSONB DEFAULT '[]'::jsonb,  -- Array of place types/categories
+    image_url TEXT,
     
     -- Tracking
     added_by UUID NOT NULL REFERENCES auth.users(id),

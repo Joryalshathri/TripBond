@@ -38,61 +38,25 @@ ACTIVITY_SLOTS = {
 def _get_places_for_destination(destination: str) -> List[dict]:
     """
     Fetch real places from the AI backend dataset for the destination.
-    Falls back to sample data if AI dataset unavailable.
+    Falls back to configured external providers when the dataset is missing
+    or lacks usable coordinates. It never fabricates placeholder places.
     """
     try:
         from .ai_poi_service import get_pois_for_destination
-        places = get_pois_for_destination(destination, limit=15)
+        places = get_pois_for_destination(
+            destination,
+            limit=24,
+            require_coordinates=True,
+        )
         
         if places:
             logger.info(f"Loaded {len(places)} POIs from AI backend for {destination}")
             # Keep all place data for activities
             return places
-        else:
-            logger.info(f"No POIs found for {destination}, using fallback")
-            return _get_sample_places(destination)
     except Exception as e:
-        logger.warning(f"Failed to fetch places from AI backend: {e}, using samples")
-        return _get_sample_places(destination)
+        logger.warning(f"Failed to fetch real places for {destination}: {e}")
 
-
-def _get_sample_places(destination: str) -> List[dict]:
-    """Fallback sample places when API is unavailable."""
-    samples = {
-        "dammam": [
-            {"name": "Al Khobar Marina", "location": "Khobar", "type": "attraction", "rating": 4.5},
-            {"name": "King Saud Park", "location": "Dammam", "type": "park", "rating": 4.3},
-            {"name": "Coral Island", "location": "Khobar", "type": "beach", "rating": 4.4},
-            {"name": "Al Noor Mosque", "location": "Dammam", "type": "religious", "rating": 4.6},
-            {"name": "Blue Forest", "location": "Dhahran", "type": "park", "rating": 4.2},
-        ],
-        "riyadh": [
-            {"name": "Kingdom Centre", "location": "Riyadh", "type": "landmark", "rating": 4.7},
-            {"name": "Al Bujairi Stalls", "location": "Riyadh", "type": "market", "rating": 4.4},
-            {"name": "Diriyah", "location": "Diriyah", "type": "historical", "rating": 4.6},
-            {"name": "AlUla", "location": "AlUla", "type": "desert", "rating": 4.8},
-            {"name": "Red Sand Dunes", "location": "Riyadh", "type": "nature", "rating": 4.5},
-        ],
-        "jeddah": [
-            {"name": "Jeddah Corniche", "location": "Jeddah", "type": "beach", "rating": 4.5},
-            {"name": "Red Sea Mall", "location": "Jeddah", "type": "shopping", "rating": 4.3},
-            {"name": "Floating Mosque", "location": "Jeddah", "type": "religious", "rating": 4.7},
-            {"name": "Tayebat Museum", "location": "Jeddah", "type": "museum", "rating": 4.4},
-            {"name": "Sharʿ Al-Salalah", "location": "Jeddah", "type": "historic", "rating": 4.3},
-        ]
-    }
-    
-    dest_lower = destination.lower()
-    for key in samples:
-        if key in dest_lower:
-            return samples[key]
-    
-    # Default generic places
-    return [
-        {"name": "Local Attraction", "location": destination, "type": "attraction", "rating": 4.0},
-        {"name": "Popular Restaurant", "location": destination, "type": "restaurant", "rating": 4.2},
-        {"name": "Shopping District", "location": destination, "type": "shopping", "rating": 4.1},
-    ]
+    raise ValueError(f"No real places found for destination: {destination}")
 
 
 def generate_itinerary(
@@ -101,36 +65,46 @@ def generate_itinerary(
     use_ga: bool = False,
     max_budget: Optional[float] = None,
     pace: str = "moderate",
-    preferences: Optional[dict] = None
+    preferences: Optional[dict] = None,
+    voted_places: Optional[list] = None,
 ) -> tuple[dict, str]:
     """
-    Generate trip itinerary using appropriate strategy.
-    
-    Selects GA or heuristic based on availability of group preferences
-    and user request.
-    
-    Args:
-        trip: Trip data (destination, dates, type, etc.)
-        group_preferences: Aggregated preferences from group model (optional)
-        use_ga: Whether to attempt GA-based generation
-        max_budget: Maximum budget constraint
-        pace: Trip pace ("relaxed", "moderate", "fast")
-        preferences: Additional preference overrides
-    
+    Generate a trip itinerary.
+
+    Preferred path (when ``voted_places`` is provided): runs the smart
+    scheduler (distance + time-of-day + category aware) over the actual
+    voted trip places. This is the AI-driven flow described in the spec.
+
+    Fallback path: when no voted places are available, falls back to the
+    legacy destination-driven heuristic that pulls sample/AI POIs.
+
     Returns:
-        tuple: (itinerary_data dict, strategy_name str)
+        (itinerary_data dict, strategy_name str)
     """
+    from .smart_scheduler import build_smart_itinerary
+
+    if voted_places:
+        result = build_smart_itinerary(trip, voted_places, pace=pace)
+        return (
+            {
+                "days": result.days,
+                "total_cost": result.total_cost,
+                "fitness_score": result.fitness_score,
+            },
+            result.strategy,
+        )
+
     if use_ga and group_preferences:
         constraints = {
             "max_budget": max_budget,
             "pace": pace,
-            **(preferences or {})
+            **(preferences or {}),
         }
         itinerary_data = generate_itinerary_with_ga(trip, group_preferences, constraints)
         return itinerary_data, "genetic_algorithm"
-    else:
-        itinerary_data = generate_itinerary_heuristic(trip, pace, max_budget)
-        return itinerary_data, "heuristic"
+
+    itinerary_data = generate_itinerary_heuristic(trip, pace, max_budget)
+    return itinerary_data, "heuristic"
 
 
 def generate_itinerary_with_ga(

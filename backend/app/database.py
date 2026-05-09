@@ -1,4 +1,5 @@
 from supabase import create_client, Client
+from supabase.lib.client_options import ClientOptions
 from functools import lru_cache
 from .config import get_settings
 from fastapi import Header, HTTPException, status
@@ -48,10 +49,13 @@ def get_supabase_admin_client() -> Client:
 def get_supabase_anon_client() -> Client:
     """Base client for token validation and user-scoped requests."""
     settings = get_settings()
-    api_key = settings.supabase_service_role_key or settings.supabase_key
     return create_client(
         supabase_url=settings.supabase_url,
-        supabase_key=api_key
+        supabase_key=settings.supabase_anon_key,
+        options=ClientOptions(
+            auto_refresh_token=False,
+            persist_session=False,
+        ),
     )
 
 
@@ -63,16 +67,15 @@ def get_supabase_client_for_user(access_token: str) -> Client:
     apply correctly and operations are scoped to the authenticated user.
     """
     settings = get_settings()
-    api_key = settings.supabase_service_role_key or settings.supabase_key
     client = create_client(
         supabase_url=settings.supabase_url,
-        supabase_key=api_key
+        supabase_key=settings.supabase_anon_key,
+        options=ClientOptions(
+            auto_refresh_token=False,
+            persist_session=False,
+        ),
     )
-    
-    client.options.headers.update({
-        "apikey": api_key,
-        "Authorization": f"Bearer {access_token}",
-    })
+    client.postgrest.auth(access_token)
     
     return client
 

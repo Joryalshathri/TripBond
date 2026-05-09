@@ -15,6 +15,7 @@ class TripResponse(BaseModel):
     created_by: str
     title: str
     destination: str
+    phase: Optional[str] = "planning"
     location: Optional[str] = None
     start_date: Optional[str] = None
     end_date: Optional[str] = None
@@ -53,6 +54,7 @@ class TripSummaryResponse(BaseModel):
     trip_id: str
     title: str
     destination: str
+    phase: Optional[str] = "planning"
     member_count: int
     has_itinerary: bool
     itinerary_days: Optional[int] = 0
@@ -144,12 +146,24 @@ class POIResponse(BaseModel):
     id: str
     name: str
     type: str
+    category: Optional[str] = None
+    poi_type: Optional[str] = None
     location: str
+    address: Optional[str] = None
     description: Optional[str] = None
     rating: Optional[float] = None
+    review_count: Optional[int] = None
+    user_ratings_total: Optional[int] = None
     price_level: Optional[int] = None
     image_url: Optional[str] = None
     coordinates: Optional[dict] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    coordinates_inferred: Optional[bool] = None
+    external_place_id: Optional[str] = None
+    place_id: Optional[str] = None
+    types: Optional[List[str]] = []
+    province: Optional[str] = None
     tags: Optional[List[str]] = []
     opening_hours: Optional[dict] = None
     contact: Optional[dict] = None

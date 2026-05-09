@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 
 # Scoring weights (adjustable parameters)
 RATING_W = 0.2      # POI rating contribution
+POPULARITY_W = 0.15 # Review-volume contribution
 TYPE_W = 0.15       # Trip type alignment
 PREF_W = 0.1        # Activity preference matching
 BUDGET_W = 0.1      # Budget compatibility
@@ -54,10 +55,21 @@ def calculate_poi_score(
     if poi.get("rating"):
         rating_contribution = (poi["rating"] / 5.0) * RATING_W
         base_score += rating_contribution
+
+    review_count = poi.get("review_count") or poi.get("user_ratings_total")
+    if review_count:
+        try:
+            popularity = min(max(float(review_count), 0.0) / 15000.0, 1.0)
+        except (TypeError, ValueError):
+            popularity = 0.0
+        if popularity:
+            base_score += popularity * POPULARITY_W
+            if popularity >= 0.5:
+                reason_parts.append("popular with travelers")
     
     # Factor 2: Trip type alignment
-    trip_type = trip.get("trip_type", "").lower()
-    poi_type = poi.get("poi_type", "").lower()
+    trip_type = str(trip.get("trip_type") or "").lower()
+    poi_type = str(poi.get("poi_type") or poi.get("type") or "").lower()
     raw_tags = poi.get("tags") or []
     poi_tags = [str(t).lower() for t in raw_tags]
     

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'onboarding_screen.dart';
@@ -12,16 +14,21 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  Timer? _splashTimer;
+
   @override
   void initState() {
     super.initState();
-    _checkFirstTime();
+    _splashTimer = Timer(const Duration(seconds: 2), _checkFirstTime);
+  }
+
+  @override
+  void dispose() {
+    _splashTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _checkFirstTime() async {
-    // Simulate splash screen delay
-    await Future.delayed(const Duration(seconds: 2));
-
     // Check if onboarding has been completed
     final prefs = await SharedPreferences.getInstance();
     final hasCompletedOnboarding =

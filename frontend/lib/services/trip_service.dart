@@ -560,6 +560,81 @@ class TripService {
     }
   }
 
+  // List all places added to a trip
+  Future<List<Map<String, dynamic>>> listTripPlaces(String tripId) async {
+    final token = await _authService.getAuthToken();
+    if (token == null) {
+      throw Exception('Not authenticated');
+    }
+    final response = await _apiService.get(
+      '${ApiConfig.tripsPath}/$tripId/places',
+      token: token,
+    );
+    if (response is List) {
+      return response.cast<Map<String, dynamic>>();
+    }
+    return [];
+  }
+
+  // Get the current gated trip flow status
+  Future<Map<String, dynamic>> getTripFlowStatus(String tripId) async {
+    final token = await _authService.getAuthToken();
+    if (token == null) {
+      throw Exception('Not authenticated');
+    }
+    final response = await _apiService.get(
+      '${ApiConfig.tripsPath}/$tripId/flow-status',
+      token: token,
+    );
+    return response;
+  }
+
+  Future<Map<String, dynamic>> markPlacesComplete(String tripId) async {
+    final token = await _authService.getAuthToken();
+    if (token == null) {
+      throw Exception('Not authenticated');
+    }
+    return await _apiService.post(
+      '${ApiConfig.tripsPath}/$tripId/flow/places-complete',
+      {},
+      token: token,
+    );
+  }
+
+  Future<Map<String, dynamic>> reopenPlaces(String tripId) async {
+    final token = await _authService.getAuthToken();
+    if (token == null) {
+      throw Exception('Not authenticated');
+    }
+    return await _apiService.delete(
+      '${ApiConfig.tripsPath}/$tripId/flow/places-complete',
+      token: token,
+    );
+  }
+
+  Future<Map<String, dynamic>> markVotingComplete(String tripId) async {
+    final token = await _authService.getAuthToken();
+    if (token == null) {
+      throw Exception('Not authenticated');
+    }
+    return await _apiService.post(
+      '${ApiConfig.tripsPath}/$tripId/flow/voting-complete',
+      {},
+      token: token,
+    );
+  }
+
+  Future<Map<String, dynamic>> reopenVoting(String tripId) async {
+    final token = await _authService.getAuthToken();
+    if (token == null) {
+      throw Exception('Not authenticated');
+    }
+    return await _apiService.delete(
+      '${ApiConfig.tripsPath}/$tripId/flow/voting-complete',
+      token: token,
+    );
+  }
+
   // Check if a place already exists in the trip
   Future<Map<String, dynamic>> checkPlaceDuplicate(
     String tripId,

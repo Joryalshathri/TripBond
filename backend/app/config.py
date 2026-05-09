@@ -41,6 +41,10 @@ class Settings(BaseSettings):
     model_path: str = ""
     recommendation_top_k: int = 5
 
+    # External AI service (Flask)
+    ai_backend_url: str = "http://localhost:5000"
+    ai_backend_timeout: int = 30
+
     # API
     api_host: str = "0.0.0.0"
     api_port: int = 8000

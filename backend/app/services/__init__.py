@@ -22,6 +22,7 @@ from . import (
     password_reset_store,
     geoapify_service,
     email_service,
+    cities_service,
 )
 
 __all__ = [
@@ -40,4 +41,5 @@ __all__ = [
     "password_reset_store",
     "geoapify_service",
     "email_service",
+    "cities_service",
 ]

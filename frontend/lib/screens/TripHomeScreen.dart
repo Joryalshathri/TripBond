@@ -10,6 +10,8 @@ import 'group_suggested_itinerary.dart';
 import 'AI_Plan.dart';
 import 'Bonder.dart';
 import 'plans_list.dart';
+import 'voting_screen.dart';
+import 'trip_places_picker_screen.dart';
 
 class TripHomeScreen extends StatefulWidget {
   final String? tripId;
@@ -43,10 +45,6 @@ class _TripHomeScreenState extends State<TripHomeScreen>
     _loadTripPlaces();
   }
 
-  @override
-  void dispose() {
-    super.dispose();
-  }
 
   Future<void> _loadTripPlaces() async {
     try {
@@ -181,10 +179,141 @@ class _TripHomeScreenState extends State<TripHomeScreen>
   }
 
 
+  Future<void> _showAddToTripSheet(Map<String, dynamic> place) async {
+    if (widget.tripId == null || widget.tripId!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Open this from a trip to add places.')),
+      );
+      return;
+    }
+    final name = place['name']?.toString() ?? 'Place';
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(name,
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            ),
+            ListTile(
+              leading: const Icon(Icons.add_location_alt_outlined),
+              title: const Text('Add to my list'),
+              subtitle: const Text('Other members can vote on it'),
+              onTap: () async {
+                Navigator.of(sheetContext).pop();
+                await _addPlaceToMyList(place);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.how_to_vote_outlined),
+              title: const Text('Open voting'),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => VotingScreen(
+                    tripId: widget.tripId!,
+                    tripTitle: widget.tripTitle ?? 'Trip',
+                  ),
+                ));
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _addPlaceToMyList(Map<String, dynamic> place) async {
+    try {
+      final lat = (place['latitude'] ??
+              place['lat'] ??
+              place['geometry']?['location']?['lat'])
+          ?.toDouble();
+      final lng = (place['longitude'] ??
+              place['lng'] ??
+              place['geometry']?['location']?['lng'])
+          ?.toDouble();
+      if (lat == null || lng == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('This place is missing coordinates.')),
+        );
+        return;
+      }
+      final payload = <String, dynamic>{
+        'name': place['name'],
+        'address': place['address'] ?? place['formatted_address'] ?? '',
+        'latitude': lat,
+        'longitude': lng,
+        'rating': place['rating'],
+        'user_ratings_total': place['user_ratings_total'],
+        'types': place['types'] ?? place['place_types'] ?? [],
+        'image_url': place['image_url'],
+        'external_place_id': place['place_id'] ?? place['external_place_id'],
+      };
+      final result = await _tripService.addPlaceToTrip(widget.tripId!, payload);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result['message']?.toString() ?? 'Added')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to add: $e')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[50],
+      floatingActionButton: (widget.tripId != null && widget.tripId!.isNotEmpty)
+          ? Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                FloatingActionButton.extended(
+                  heroTag: 'fab-pick',
+                  backgroundColor: const Color(0xFFC4A44A),
+                  icon: const Icon(Icons.add_location_alt_outlined,
+                      color: Colors.white),
+                  label: const Text('Pick places',
+                      style: TextStyle(
+                          color: Colors.white, fontWeight: FontWeight.bold)),
+                  onPressed: () {
+                    Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) => TripPlacesPickerScreen(
+                        tripId: widget.tripId!,
+                        destination: widget.destination ?? '',
+                        tripTitle: widget.tripTitle ?? 'Trip',
+                        goToVotingAfter: false,
+                      ),
+                    ));
+                  },
+                ),
+                const SizedBox(height: 12),
+                FloatingActionButton.extended(
+                  heroTag: 'fab-vote',
+                  backgroundColor: const Color(0xFF4675B8),
+                  icon: const Icon(Icons.how_to_vote, color: Colors.white),
+                  label: const Text('Voting',
+                      style: TextStyle(
+                          color: Colors.white, fontWeight: FontWeight.bold)),
+                  onPressed: () {
+                    Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) => VotingScreen(
+                        tripId: widget.tripId!,
+                        tripTitle: widget.tripTitle ?? 'Trip',
+                      ),
+                    ));
+                  },
+                ),
+              ],
+            )
+          : null,
       body: Stack(
         children: [
           SafeArea(
@@ -263,9 +392,7 @@ class _TripHomeScreenState extends State<TripHomeScreen>
                       place['category'] as String? ?? 'Place';
 
     return GestureDetector(
-      onTap: () {
-        // Navigate to place details
-      },
+      onTap: () => _showAddToTripSheet(place),
       child: Card(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         elevation: 2,
