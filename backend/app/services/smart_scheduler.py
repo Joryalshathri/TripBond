@@ -317,6 +317,7 @@ def build_smart_itinerary(
                         "title": a.title,
                         "type": a.category,
                         "category": a.category,
+                        "location": a.notes or trip.get("destination") or "Unknown",
                         "start_time": a.start_time,
                         "end_time": a.end_time,
                         "latitude": a.latitude,
@@ -324,6 +325,7 @@ def build_smart_itinerary(
                         "rating": a.rating,
                         "score": round(a.score, 2),
                         "description": a.notes,
+                        "address": a.notes or None,
                     }
                     for a in scheduled
                 ],
