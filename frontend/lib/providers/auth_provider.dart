@@ -139,6 +139,7 @@ class AuthProvider with ChangeNotifier {
 
   // Logout
   Future<void> logout() async {
+    final previousStatus = _status;
     _status = AuthStatus.loading;
     notifyListeners();
 
@@ -150,7 +151,10 @@ class AuthProvider with ChangeNotifier {
       _status = AuthStatus.unauthenticated;
       _errorMessage = null;
     } catch (e) {
-      _errorMessage = e.toString();
+      _status = previousStatus;
+      _errorMessage = e.toString().replaceAll('Exception: ', '');
+      notifyListeners();
+      rethrow;
     }
 
     notifyListeners();

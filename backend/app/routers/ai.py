@@ -12,16 +12,19 @@ import asyncio
 from datetime import datetime
 import logging
 
+from ..config import get_settings
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# AI Backend configuration
-AI_BACKEND_URL = "http://localhost:5000"
+# AI Backend configuration (resolved from settings so it can be overridden via .env)
+AI_BACKEND_URL = get_settings().ai_backend_url
 AI_ENDPOINTS = {
     "health": f"{AI_BACKEND_URL}/health",
     "group_recommendations": f"{AI_BACKEND_URL}/recommend/group",
     "group_itinerary": f"{AI_BACKEND_URL}/itinerary/group",
+    "evaluate_place": f"{AI_BACKEND_URL}/evaluate/place",
 }
 
 # ============================================================================

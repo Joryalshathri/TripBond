@@ -82,7 +82,7 @@ async def check_trip_access(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Only trip creator can perform this action"
             )
-    elif required_role == "member":
+    elif required_role in ("member", "edit"):
         if not (is_creator or is_member):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,

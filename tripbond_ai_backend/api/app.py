@@ -379,6 +379,77 @@ def itinerary_group():
 # Error Handlers
 # ============================================================================
 
+@app.route('/evaluate/place', methods=['POST'])
+def evaluate_place():
+    """Lightweight evaluator used by FastAPI to score a single suggested place.
+
+    The model in this repo only operates over its own synthetic POI dataset,
+    so this endpoint does NOT call the model. It returns a deterministic
+    suitability score derived from the place's metadata so the suggestions
+    pipeline has something better than the previous fixed-0.75 stub.
+
+    Request body:
+    {
+        "name": str,
+        "rating": float | null,
+        "user_ratings_total": int | null,
+        "place_types": [str, ...],
+        "trip_destination": str | null
+    }
+
+    Response:
+    {
+        "success": true,
+        "ai_score": float (0..1),
+        "ai_reasoning": str
+    }
+    """
+    try:
+        data = request.get_json() or {}
+        name = data.get("name") or "Place"
+        rating = float(data.get("rating") or 0.0)
+        ratings_total = int(data.get("user_ratings_total") or 0)
+        place_types = [str(t).lower() for t in (data.get("place_types") or [])]
+
+        TRAVEL_FRIENDLY = {
+            "tourist_attraction", "landmark", "museum", "park", "beach",
+            "restaurant", "cafe", "shopping_mall", "art_gallery", "amusement_park",
+            "aquarium", "zoo", "natural_feature", "place_of_worship", "mosque",
+        }
+        DOWNWEIGHT = {"hospital", "doctor", "lawyer", "atm", "bank", "gas_station"}
+
+        score = 0.0
+        reasons = []
+
+        rating_part = max(0.0, min(rating / 5.0, 1.0)) * 0.55
+        score += rating_part
+        if rating > 0:
+            reasons.append(f"rating={rating:.1f}")
+
+        if ratings_total > 0:
+            popularity = min(1.0, ratings_total / 1500.0) * 0.20
+            score += popularity
+            reasons.append(f"reviews={ratings_total}")
+
+        type_set = set(place_types)
+        if type_set & TRAVEL_FRIENDLY:
+            score += 0.20
+            reasons.append("travel-friendly category")
+        if type_set & DOWNWEIGHT:
+            score -= 0.40
+            reasons.append("category not suitable")
+
+        score = max(0.0, min(1.0, score))
+
+        return jsonify({
+            "success": True,
+            "ai_score": round(score, 3),
+            "ai_reasoning": f"{name}: " + ", ".join(reasons) if reasons else f"{name}: limited info available",
+        }), 200
+    except Exception as exc:
+        return jsonify({"success": False, "error": str(exc)}), 500
+
+
 @app.errorhandler(404)
 def not_found(error):
     """Handle 404 errors."""
@@ -418,6 +489,7 @@ if __name__ == '__main__':
     print("  • GET  /health                 - Health check")
     print("  • POST /recommend/group        - Group POI recommendations")
     print("  • POST /itinerary/group        - Group itinerary generation")
+    print("  • POST /evaluate/place         - Score a suggested place (suitability)")
     print("\n" + "=" * 80)
     print("Starting server on http://127.0.0.1:5000")
     print("=" * 80 + "\n")

@@ -7,28 +7,81 @@ from fastapi import HTTPException, status
 from fastapi.concurrency import run_in_threadpool
 from typing import Optional, List
 from datetime import datetime
-from ..database import SupabaseDB, get_supabase_client_for_user
+from ..database import SupabaseDB
+from . import notification_service
 import logging
 
 logger = logging.getLogger(__name__)
 
 
+async def _are_friends(db: SupabaseDB, user_a: str, user_b: str) -> bool:
+    """Return true when either direction has an accepted friendship row."""
+    first = await run_in_threadpool(
+        lambda: db.client.table("friends")
+        .select("id")
+        .eq("user_id", user_a)
+        .eq("friend_id", user_b)
+        .eq("status", "accepted")
+        .limit(1)
+        .execute()
+    )
+    if first.data:
+        return True
+
+    second = await run_in_threadpool(
+        lambda: db.client.table("friends")
+        .select("id")
+        .eq("user_id", user_b)
+        .eq("friend_id", user_a)
+        .eq("status", "accepted")
+        .limit(1)
+        .execute()
+    )
+    return bool(second.data)
+
+
 # ==================== Trip CRUD Operations ====================
 
 async def get_user_trips(user_id: str, token: str) -> List[dict]:
-    """Get all trips created by user."""
+    """Get all trips the user created or joined."""
     # Use admin client since we're using custom JWT (not Supabase Auth)
     db = SupabaseDB(admin=True)
     
-    response = await run_in_threadpool(
+    created_response = await run_in_threadpool(
         lambda: db.client.table("trips")
         .select("*")
         .eq("created_by", user_id)
         .order("created_at", desc=True)
         .execute()
     )
-    
-    return response.data if response.data else []
+
+    trips: List[dict] = list(created_response.data or [])
+    existing_ids = {trip["id"] for trip in trips}
+
+    participant_response = await run_in_threadpool(
+        lambda: db.client.table("trip_participants")
+        .select("trip_id")
+        .eq("user_id", user_id)
+        .eq("status", "accepted")
+        .execute()
+    )
+
+    for participant in participant_response.data or []:
+        trip_id = participant.get("trip_id")
+        if not trip_id or trip_id in existing_ids:
+            continue
+        trip_response = await run_in_threadpool(
+            lambda trip_id=trip_id: db.client.table("trips")
+            .select("*")
+            .eq("id", trip_id)
+            .execute()
+        )
+        if trip_response.data:
+            trips.append(trip_response.data[0])
+            existing_ids.add(trip_id)
+
+    trips.sort(key=lambda trip: trip.get("created_at") or "", reverse=True)
+    return trips
 
 
 def get_user_trips_all(user_id: str) -> List[dict]:
@@ -44,7 +97,7 @@ def get_user_trips_all(user_id: str) -> List[dict]:
 
     participant = db.client.table("trip_participants").select(
         "trip_id"
-    ).eq("user_id", user_id).execute()
+    ).eq("user_id", user_id).eq("status", "accepted").execute()
 
     all_trips: List[dict] = list(created.data or [])
     existing_ids = {t["id"] for t in all_trips}
@@ -85,7 +138,7 @@ async def create_trip(user_id: str, token: str, trip_data: dict) -> dict:
 
 async def update_trip(trip_id: str, token: str, update_data: dict) -> dict:
     """Update trip details."""
-    client = get_supabase_client_for_user(token)
+    db = SupabaseDB(admin=True)
     
     # Filter out None values
     update_data = {k: v for k, v in update_data.items() if v is not None}
@@ -97,7 +150,7 @@ async def update_trip(trip_id: str, token: str, update_data: dict) -> dict:
         )
     
     response = await run_in_threadpool(
-        lambda: client.table("trips").update(update_data).eq("id", trip_id).execute()
+        lambda: db.client.table("trips").update(update_data).eq("id", trip_id).execute()
     )
     
     if not response.data:
@@ -122,9 +175,9 @@ async def delete_trip(trip_id: str, token: str) -> None:
 
 async def get_trip_members(trip_id: str, token: str, status_filter: Optional[str] = "accepted") -> List[dict]:
     """Get trip members by status."""
-    client = get_supabase_client_for_user(token)
+    db = SupabaseDB(admin=True)
     
-    query = client.table("trip_participants").select("*").eq("trip_id", trip_id)
+    query = db.client.table("trip_participants").select("*").eq("trip_id", trip_id)
     
     if status_filter:
         query = query.eq("status", status_filter)
@@ -136,10 +189,10 @@ async def get_trip_members(trip_id: str, token: str, status_filter: Optional[str
 
 async def get_trip_member_count(trip_id: str, token: str) -> int:
     """Count accepted trip members."""
-    client = get_supabase_client_for_user(token)
+    db = SupabaseDB(admin=True)
     
     response = await run_in_threadpool(
-        lambda: client.table("trip_participants")
+        lambda: db.client.table("trip_participants")
         .select("user_id", count="exact")
         .eq("trip_id", trip_id)
         .eq("status", "accepted")
@@ -151,17 +204,23 @@ async def get_trip_member_count(trip_id: str, token: str) -> int:
 
 async def invite_member(trip_id: str, inviter_id: str, invitee_id: str, token: str) -> dict:
     """Invite a member to trip."""
-    client = get_supabase_client_for_user(token)
+    db = SupabaseDB(admin=True)
     
     if invitee_id == inviter_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Creator cannot invite themselves"
         )
+
+    if not await _are_friends(db, inviter_id, invitee_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only invite friends to a trip"
+        )
     
     # Check if already exists
     existing = await run_in_threadpool(
-        lambda: client.table("trip_participants")
+        lambda: db.client.table("trip_participants")
         .select("status")
         .eq("trip_id", trip_id)
         .eq("user_id", invitee_id)
@@ -193,21 +252,36 @@ async def invite_member(trip_id: str, inviter_id: str, invitee_id: str, token: s
     }
     
     response = await run_in_threadpool(
-        lambda: client.table("trip_participants")
+        lambda: db.client.table("trip_participants")
         .upsert(payload, on_conflict="trip_id,user_id")
         .execute()
     )
-    
+
+    # Notify invitee
+    try:
+        admin = SupabaseDB(admin=True)
+        trip = admin.client.table("trips").select("title").eq("id", trip_id).execute()
+        trip_title = trip.data[0]["title"] if trip.data else "a trip"
+        notification_service.emit(
+            user_id=invitee_id,
+            notif_type="trip_invite",
+            title="You've been invited",
+            body=f"You have a new invite to '{trip_title}'.",
+            payload={"trip_id": trip_id, "invited_by": inviter_id},
+        )
+    except Exception:
+        logger.exception("Failed to notify invitee of trip invite")
+
     return response.data[0]
 
 
 async def accept_invite(trip_id: str, user_id: str, token: str) -> dict:
     """Accept a pending trip invite."""
-    client = get_supabase_client_for_user(token)
+    db = SupabaseDB(admin=True)
     
     # Check invite exists
     existing = await run_in_threadpool(
-        lambda: client.table("trip_participants")
+        lambda: db.client.table("trip_participants")
         .select("*")
         .eq("trip_id", trip_id)
         .eq("user_id", user_id)
@@ -237,23 +311,38 @@ async def accept_invite(trip_id: str, user_id: str, token: str) -> dict:
     }
     
     response = await run_in_threadpool(
-        lambda: client.table("trip_participants")
+        lambda: db.client.table("trip_participants")
         .update(update_data)
         .eq("trip_id", trip_id)
         .eq("user_id", user_id)
         .execute()
     )
-    
+
+    # Notify trip creator that someone accepted
+    try:
+        admin = SupabaseDB(admin=True)
+        trip = admin.client.table("trips").select("created_by, title").eq("id", trip_id).execute()
+        if trip.data:
+            notification_service.emit(
+                user_id=trip.data[0]["created_by"],
+                notif_type="trip_invite_accepted",
+                title="Invite accepted",
+                body=f"Someone joined '{trip.data[0]['title']}'.",
+                payload={"trip_id": trip_id, "user_id": user_id},
+            )
+    except Exception:
+        logger.exception("Failed to notify creator of accepted invite")
+
     return response.data[0]
 
 
 async def decline_invite(trip_id: str, user_id: str, token: str) -> None:
     """Decline a pending trip invite."""
-    client = get_supabase_client_for_user(token)
+    db = SupabaseDB(admin=True)
     
     # Check invite exists
     existing = await run_in_threadpool(
-        lambda: client.table("trip_participants")
+        lambda: db.client.table("trip_participants")
         .select("*")
         .eq("trip_id", trip_id)
         .eq("user_id", user_id)
@@ -282,7 +371,7 @@ async def decline_invite(trip_id: str, user_id: str, token: str) -> None:
     }
     
     await run_in_threadpool(
-        lambda: client.table("trip_participants")
+        lambda: db.client.table("trip_participants")
         .update(update_data)
         .eq("trip_id", trip_id)
         .eq("user_id", user_id)
@@ -314,10 +403,8 @@ async def leave_trip(trip_id: str, user_id: str, token: str) -> None:
         )
     
     # Check membership
-    client = get_supabase_client_for_user(token)
-    
     existing = await run_in_threadpool(
-        lambda: client.table("trip_participants")
+        lambda: db.client.table("trip_participants")
         .select("*")
         .eq("trip_id", trip_id)
         .eq("user_id", user_id)
@@ -344,7 +431,7 @@ async def leave_trip(trip_id: str, user_id: str, token: str) -> None:
     }
     
     await run_in_threadpool(
-        lambda: client.table("trip_participants")
+        lambda: db.client.table("trip_participants")
         .update(update_data)
         .eq("trip_id", trip_id)
         .eq("user_id", user_id)
@@ -354,11 +441,11 @@ async def leave_trip(trip_id: str, user_id: str, token: str) -> None:
 
 async def remove_member(trip_id: str, user_id_to_remove: str, token: str) -> None:
     """Remove a member or cancel invite (creator only)."""
-    client = get_supabase_client_for_user(token)
+    db = SupabaseDB(admin=True)
     
     # Check if member exists
     existing = await run_in_threadpool(
-        lambda: client.table("trip_participants")
+        lambda: db.client.table("trip_participants")
         .select("*")
         .eq("trip_id", trip_id)
         .eq("user_id", user_id_to_remove)
@@ -371,8 +458,7 @@ async def remove_member(trip_id: str, user_id_to_remove: str, token: str) -> Non
             detail="User not found in this trip (no membership or invite)"
         )
     
-    # Check if trying to remove creator (use admin client for validation check)
-    db = SupabaseDB(admin=True)
+    # Check if trying to remove creator
     trip_response = await run_in_threadpool(
         lambda: db.client.table("trips").select("created_by").eq("id", trip_id).execute()
     )
@@ -391,7 +477,7 @@ async def remove_member(trip_id: str, user_id_to_remove: str, token: str) -> Non
     }
     
     await run_in_threadpool(
-        lambda: client.table("trip_participants")
+        lambda: db.client.table("trip_participants")
         .update(update_data)
         .eq("trip_id", trip_id)
         .eq("user_id", user_id_to_remove)
@@ -403,11 +489,11 @@ async def remove_member(trip_id: str, user_id_to_remove: str, token: str) -> Non
 
 async def get_user_pending_invites(user_id: str, token: str) -> List[dict]:
     """Get all pending invites for a user with trip details."""
-    client = get_supabase_client_for_user(token)
+    db = SupabaseDB(admin=True)
     
     # Get pending invites
     response = await run_in_threadpool(
-        lambda: client.table("trip_participants")
+        lambda: db.client.table("trip_participants")
         .select("trip_id, status, invited_by, invited_at")
         .eq("user_id", user_id)
         .eq("status", "pending")
@@ -418,7 +504,6 @@ async def get_user_pending_invites(user_id: str, token: str) -> List[dict]:
         return []
     
     # Fetch trip details for each invite
-    db = SupabaseDB(admin=True)
     invites = []
     
     for invite in response.data:

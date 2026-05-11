@@ -4,16 +4,45 @@ Recommendation Service
 Handles POI (Point of Interest) scoring and recommendation logic.
 Uses preferences, trip context, and ratings to score locations.
 """
-from typing import Optional
+from typing import Any, Optional
 import logging
 
 logger = logging.getLogger(__name__)
 
 # Scoring weights (adjustable parameters)
 RATING_W = 0.2      # POI rating contribution
+POPULARITY_W = 0.15 # Review-volume contribution
 TYPE_W = 0.15       # Trip type alignment
 PREF_W = 0.1        # Activity preference matching
 BUDGET_W = 0.1      # Budget compatibility
+
+
+def _normalise_tokens(value: Any) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, dict):
+        return [str(key).lower() for key, enabled in value.items() if enabled]
+    if isinstance(value, (list, tuple, set)):
+        return [str(item).lower() for item in value if item]
+    if isinstance(value, str) and value.strip():
+        return [value.strip().lower()]
+    return []
+
+
+def _budget_to_price_level(value: Any) -> Optional[int]:
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return int(value)
+    budget = str(value).strip().lower()
+    return {
+        "low": 1,
+        "budget": 1,
+        "medium": 2,
+        "moderate": 2,
+        "high": 3,
+        "luxury": 4,
+    }.get(budget)
 
 
 def calculate_poi_score(
@@ -54,12 +83,24 @@ def calculate_poi_score(
     if poi.get("rating"):
         rating_contribution = (poi["rating"] / 5.0) * RATING_W
         base_score += rating_contribution
+
+    review_count = poi.get("review_count") or poi.get("user_ratings_total")
+    if review_count:
+        try:
+            popularity = min(max(float(review_count), 0.0) / 15000.0, 1.0)
+        except (TypeError, ValueError):
+            popularity = 0.0
+        if popularity:
+            base_score += popularity * POPULARITY_W
+            if popularity >= 0.5:
+                reason_parts.append("popular with travelers")
     
     # Factor 2: Trip type alignment
-    trip_type = trip.get("trip_type", "").lower()
-    poi_type = poi.get("poi_type", "").lower()
-    raw_tags = poi.get("tags") or []
-    poi_tags = [str(t).lower() for t in raw_tags]
+    trip_type = str(trip.get("trip_type") or "").lower()
+    poi_type = str(poi.get("poi_type") or poi.get("type") or "").lower()
+    poi_tags = _normalise_tokens(poi.get("tags") or poi.get("types"))
+    if poi.get("category"):
+        poi_tags.append(str(poi["category"]).lower())
     
     if trip_type in ["adventure", "outdoor"] and poi_type in ["activity", "attraction"]:
         base_score += TYPE_W
@@ -74,22 +115,51 @@ def calculate_poi_score(
     # Factor 3: Activity preferences matching
     if preferences:
         activity_prefs = preferences.get("activities", {})
-        for pref_key, pref_value in activity_prefs.items():
-            pref_key_l = str(pref_key).lower()
-            if pref_key_l in poi_tags or pref_key_l == poi_type:
-                # Safely convert and clamp preference value to 0.0-1.0 range
-                try:
-                    v = float(pref_value)
-                except (TypeError, ValueError):
-                    v = 0.0
-                v = max(0.0, min(v, 1.0))  # assume weights are 0..1
-                base_score += v * PREF_W
-                reason_parts.append(f"high preference for {pref_key}")
+        if isinstance(activity_prefs, dict):
+            for pref_key, pref_value in activity_prefs.items():
+                pref_key_l = str(pref_key).lower()
+                if pref_key_l in poi_tags or pref_key_l == poi_type:
+                    # Safely convert and clamp preference value to 0.0-1.0 range
+                    try:
+                        v = float(pref_value)
+                    except (TypeError, ValueError):
+                        v = 0.0
+                    v = max(0.0, min(v, 1.0))  # assume weights are 0..1
+                    base_score += v * PREF_W
+                    reason_parts.append(f"high preference for {pref_key}")
+
+        activity_tags = set(_normalise_tokens(
+            preferences.get("activity_tags")
+            or preferences.get("preferred_activities")
+            or preferences.get("interests")
+        ))
+        if activity_tags and (activity_tags & (set(poi_tags) | {poi_type})):
+            base_score += PREF_W
+            reason_parts.append("matches group activity preferences")
+
+        travel_style = str(preferences.get("travel_style") or "").lower()
+        if travel_style:
+            style_matches = {
+                "adventure": {"activity", "attraction", "park", "nature", "outdoor"},
+                "cultural": {"museum", "historical", "landmark", "art_gallery"},
+                "relaxing": {"restaurant", "cafe", "beach", "park", "garden"},
+                "family": {"park", "zoo", "aquarium", "amusement_park", "museum"},
+            }
+            matched_styles = style_matches.get(travel_style, set())
+            if matched_styles and (matched_styles & (set(poi_tags) | {poi_type})):
+                base_score += TYPE_W / 2
+                reason_parts.append(f"fits {travel_style} travel style")
     
     # Factor 4: Budget compatibility
-    if preferences.get("budget") and poi.get("price_level"):
-        budget_level = preferences["budget"]
-        if poi["price_level"] <= budget_level:
+    budget_level = _budget_to_price_level(
+        preferences.get("budget") or preferences.get("budget_level")
+    )
+    if budget_level and poi.get("price_level"):
+        try:
+            poi_price = int(float(poi["price_level"]))
+        except (TypeError, ValueError):
+            poi_price = None
+        if poi_price is not None and poi_price <= budget_level:
             base_score += BUDGET_W
             reason_parts.append("within budget")
     

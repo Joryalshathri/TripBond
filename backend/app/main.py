@@ -2,7 +2,24 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.concurrency import run_in_threadpool
 from .config import get_settings
-from .routers import auth, personality, preferences, trips, group, feedback, users, pois, favorites, places, chat, ai, suggestions
+from .routers import (
+    auth,
+    personality,
+    preferences,
+    trips,
+    group,
+    feedback,
+    users,
+    pois,
+    favorites,
+    places,
+    chat,
+    ai,
+    suggestions,
+    votes,
+    feed,
+    notifications,
+)
 import logging
 import os
 import time
@@ -82,6 +99,9 @@ app.include_router(places.router, prefix="/api/places", tags=["Google Places"])
 app.include_router(chat.router, prefix="/api/chat", tags=["Chat"])
 app.include_router(ai.router, prefix="/api/ai", tags=["AI Recommendations & Optimization"])
 app.include_router(suggestions.router, prefix="/api/suggestions", tags=["Place Suggestions & Voting"])
+app.include_router(votes.router, prefix="/api/votes", tags=["Voting"])
+app.include_router(feed.router, prefix="/api/feed", tags=["Social Feed"])
+app.include_router(notifications.router, prefix="/api/notifications", tags=["Notifications"])
 
 
 @app.get("/")

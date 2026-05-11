@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'TripInfo.dart';
+import '../state/trip_creation_state.dart';
 
 const List<String> _days = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 const List<String> _months = [
@@ -19,7 +20,11 @@ const List<String> _months = [
 ];
 
 class DatesPage extends StatefulWidget {
-  const DatesPage({super.key});
+  /// Optional destination override. Falls back to [selectedCityForTrip] when
+  /// not provided so existing call sites keep working.
+  final String? destination;
+
+  const DatesPage({super.key, this.destination});
 
   @override
   State<DatesPage> createState() => _DatesPageState();
@@ -206,6 +211,11 @@ class _DatesPageState extends State<DatesPage> {
                       range = "$_startDate $monthName";
                     }
 
+                    final dest = (widget.destination?.trim().isNotEmpty ?? false)
+                        ? widget.destination!.trim()
+                        : selectedCityForTrip;
+                    selectedCityForTrip = dest;
+
                     Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -213,6 +223,7 @@ class _DatesPageState extends State<DatesPage> {
                                   selectedDates: range,
                                   startDate: startDate,
                                   endDate: endDate,
+                                  destination: dest,
                                 )));
                   }
                 },

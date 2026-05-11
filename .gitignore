@@ -32,7 +32,14 @@ build/
 
 # Environment
 .env
-.env.local
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+backend/.env
+frontend/.env
+tripbond_ai_backend/.env
 
 # Android
 **/android/**/gradle-wrapper.jar
@@ -107,6 +114,11 @@ app.*.map.json
 *.temp
 ~*
 
+# Generated launcher scripts from start-full-stack.ps1
+start_backend_temp.ps1
+start_ai_temp.ps1
+start_frontend_temp.ps1
+
 # Duplicate/backup folders
 TripBond-Frontend/
 
@@ -118,3 +130,6 @@ tripbond_ai_backend/.env
 
 # Machine Learning Models (optional - uncomment if models are large)
 # tripbond_ai_backend/models/*.pkl
+.cursor/settings.json
+.venv/
+docs/

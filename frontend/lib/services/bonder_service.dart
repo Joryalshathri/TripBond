@@ -46,22 +46,36 @@ class BonderService {
   final _apiService = ApiService();
   final _authService = AuthService();
 
+  Future<List<BonderItem>> getFriends() async {
+    return _fetchBonders('${ApiConfig.usersPath}/me/friends');
+  }
+
+  Future<List<BonderItem>> getAllBonders({int limit = 100}) async {
+    return _fetchBonders(
+      '${ApiConfig.usersPath}/bonders',
+      queryParams: {'limit': '$limit'},
+    );
+  }
+
   Future<List<BonderItem>> getBonders({int limit = 50}) async {
+    return getFriends();
+  }
+
+  Future<List<BonderItem>> _fetchBonders(
+    String path, {
+    Map<String, String>? queryParams,
+  }) async {
     final token = await _authService.getAuthToken();
     if (token == null || token.isEmpty) {
       throw Exception('Not authenticated');
     }
 
     final currentUserId = await _authService.getUserId();
-    final currentUserName = (await _authService.getUserName())
-        ?.trim()
-        .toLowerCase();
+    final currentUserName =
+        (await _authService.getUserName())?.trim().toLowerCase();
 
-    final response = await _apiService.get(
-      '${ApiConfig.usersPath}/bonders',
-      queryParams: {'limit': '$limit'},
-      token: token,
-    );
+    final response =
+        await _apiService.get(path, queryParams: queryParams, token: token);
 
     if (response is! List) {
       throw Exception('Invalid response format for bonders');
@@ -84,7 +98,9 @@ class BonderService {
       }
 
       // Primary guard: current user should never appear in bonders.
-      if (currentUserId != null && currentUserId.isNotEmpty && id == currentUserId) {
+      if (currentUserId != null &&
+          currentUserId.isNotEmpty &&
+          id == currentUserId) {
         return false;
       }
 

@@ -1,5 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../core/constants/app_strings.dart';
+import '../providers/auth_provider.dart';
+import '../providers/trip_provider.dart';
+import '../providers/user_provider.dart';
 import '../services/user_service.dart';
+import 'login_screen.dart';
 
 class Settings extends StatefulWidget {
   const Settings({super.key});
@@ -14,6 +20,7 @@ class _SettingsScreenState extends State<Settings> {
   bool _securityEnabled = true;
   String _privacyMode = 'public';
   bool _isLoading = true;
+  bool _isSigningOut = false;
   String? _errorMessage;
 
   @override
@@ -34,7 +41,8 @@ class _SettingsScreenState extends State<Settings> {
       });
     } catch (e) {
       setState(() {
-        _errorMessage = 'Failed to load settings: ${e.toString().replaceFirst('Exception: ', '')}';
+        _errorMessage =
+            'Failed to load settings: ${e.toString().replaceFirst('Exception: ', '')}';
       });
     } finally {
       if (mounted) {
@@ -53,10 +61,12 @@ class _SettingsScreenState extends State<Settings> {
     } catch (e) {
       setState(() {
         _notificationsOn = !value;
-        _errorMessage = 'Failed to update notifications: ${e.toString().replaceFirst('Exception: ', '')}';
+        _errorMessage =
+            'Failed to update notifications: ${e.toString().replaceFirst('Exception: ', '')}';
       });
     }
   }
+
   Future<void> _updateSecurity(bool value) async {
     setState(() => _securityEnabled = value);
     try {
@@ -67,7 +77,8 @@ class _SettingsScreenState extends State<Settings> {
     } catch (e) {
       setState(() {
         _securityEnabled = !value;
-        _errorMessage = 'Failed to update security settings: ${e.toString().replaceFirst('Exception: ', '')}';
+        _errorMessage =
+            'Failed to update security settings: ${e.toString().replaceFirst('Exception: ', '')}';
       });
     }
   }
@@ -81,7 +92,55 @@ class _SettingsScreenState extends State<Settings> {
       setState(() => _errorMessage = null);
     } catch (e) {
       setState(() {
-        _errorMessage = 'Failed to update privacy settings: ${e.toString().replaceFirst('Exception: ', '')}';
+        _errorMessage =
+            'Failed to update privacy settings: ${e.toString().replaceFirst('Exception: ', '')}';
+      });
+    }
+  }
+
+  Future<void> _handleSignOut() async {
+    final shouldSignOut = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Sign out?'),
+        content: const Text('You will need to log in again to use TripBond.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text(AppStrings.cancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text(AppStrings.logout),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldSignOut != true || !mounted) return;
+
+    setState(() {
+      _isSigningOut = true;
+      _errorMessage = null;
+    });
+
+    try {
+      await context.read<AuthProvider>().logout();
+      if (!mounted) return;
+
+      context.read<UserProvider>().clearProfile();
+      context.read<TripProvider>().clearData();
+
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (route) => false,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isSigningOut = false;
+        _errorMessage =
+            'Failed to sign out: ${e.toString().replaceFirst('Exception: ', '')}';
       });
     }
   }
@@ -155,6 +214,8 @@ class _SettingsScreenState extends State<Settings> {
               _buildSectionTitle('Cache & cellular'),
               _buildArrowItem(Icons.inventory_2_outlined, 'Free up space'),
               _buildArrowItem(Icons.speed, 'Data Saver'),
+              const SizedBox(height: 24),
+              _buildSignOutButton(),
             ],
           ),
         ),
@@ -271,6 +332,41 @@ class _SettingsScreenState extends State<Settings> {
             child: const Icon(Icons.more_vert, size: 20),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSignOutButton() {
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: _isSigningOut ? null : _handleSignOut,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: const Color(0xFFEF5350),
+          side: const BorderSide(color: Color(0xFFEF5350)),
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        icon: _isSigningOut
+            ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Color(0xFFEF5350),
+                ),
+              )
+            : const Icon(Icons.logout, size: 20),
+        label: Text(
+          _isSigningOut ? AppStrings.processing : AppStrings.logout,
+          style: const TextStyle(
+            fontFamily: 'Poppins',
+            fontWeight: FontWeight.w600,
+            fontSize: 15,
+          ),
+        ),
       ),
     );
   }

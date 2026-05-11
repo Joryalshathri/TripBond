@@ -9,11 +9,22 @@ Exposes Google Places API endpoints consumed by the TripBond app:
 """
 
 from fastapi import APIRouter, Query
-from typing import Optional
+from typing import Optional, List, Dict, Any
 from ..schemas.places import PlacesSearchResponse, PlaceDetailsResponse
-from ..services import google_places_service
+from ..services import google_places_service, cities_service
 
 router = APIRouter()
+
+
+@router.get("/cities", response_model=List[Dict[str, Any]])
+async def list_destination_cities():
+    """
+    Curated list of trip destinations derived from the bundled POI dataset.
+
+    Each entry: name, count, province, country, lat, lng, image_asset, is_featured.
+    Used by the Flutter app to render the destination quick-pick grid.
+    """
+    return cities_service.list_cities()
 
 
 @router.get("/search", response_model=PlacesSearchResponse)

@@ -15,6 +15,7 @@ class TripResponse(BaseModel):
     created_by: str
     title: str
     destination: str
+    phase: Optional[str] = "planning"
     location: Optional[str] = None
     start_date: Optional[str] = None
     end_date: Optional[str] = None
@@ -53,6 +54,7 @@ class TripSummaryResponse(BaseModel):
     trip_id: str
     title: str
     destination: str
+    phase: Optional[str] = "planning"
     member_count: int
     has_itinerary: bool
     itinerary_days: Optional[int] = 0
@@ -144,12 +146,24 @@ class POIResponse(BaseModel):
     id: str
     name: str
     type: str
+    category: Optional[str] = None
+    poi_type: Optional[str] = None
     location: str
+    address: Optional[str] = None
     description: Optional[str] = None
     rating: Optional[float] = None
+    review_count: Optional[int] = None
+    user_ratings_total: Optional[int] = None
     price_level: Optional[int] = None
     image_url: Optional[str] = None
     coordinates: Optional[dict] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    coordinates_inferred: Optional[bool] = None
+    external_place_id: Optional[str] = None
+    place_id: Optional[str] = None
+    types: Optional[List[str]] = []
+    province: Optional[str] = None
     tags: Optional[List[str]] = []
     opening_hours: Optional[dict] = None
     contact: Optional[dict] = None
@@ -160,3 +174,24 @@ class RecommendationResponse(BaseModel):
     poi: POIResponse
     score: float
     reason: str
+
+
+class StarterPlanPlace(BaseModel):
+    poi: POIResponse
+    score: float
+    reason: str
+    day: Optional[int] = None
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
+
+
+class StarterPlanResponse(BaseModel):
+    trip_id: str
+    days: List[DayItinerary]
+    recommended_places: List[StarterPlanPlace]
+    total_cost: float
+    total_days: int
+    optimization_score: Optional[float] = None
+    generated_at: Optional[str] = None
+    strategy: Optional[str] = None
+    preferences_source: Optional[str] = None

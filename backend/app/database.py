@@ -1,5 +1,5 @@
 from supabase import create_client, Client
-from functools import lru_cache
+from supabase.lib.client_options import ClientOptions
 from .config import get_settings
 from fastapi import Header, HTTPException, status
 from fastapi.concurrency import run_in_threadpool
@@ -34,24 +34,36 @@ Current security status:
 logger = logging.getLogger(__name__)
 
 
-@lru_cache()
 def get_supabase_admin_client() -> Client:
-    """Admin client (SERVICE_ROLE): bypasses RLS. Use carefully for backend-admin tasks only."""
+    """
+    Admin client (SERVICE_ROLE): bypasses RLS. Use carefully for backend-admin tasks only.
+
+    Supabase 2.10 creates a PostgREST httpx client with HTTP/2 enabled and no way
+    to inject our own transport options. Keeping one process-wide client can reuse
+    a stale/shared connection across concurrent FastAPI requests, which shows up
+    as intermittent httpx.RemoteProtocolError: "Server disconnected".
+    """
     settings = get_settings()
     return create_client(
         supabase_url=settings.supabase_url,
-        supabase_key=settings.supabase_service_role_key
+        supabase_key=settings.supabase_service_role_key,
+        options=ClientOptions(
+            auto_refresh_token=False,
+            persist_session=False,
+        ),
     )
 
 
-@lru_cache()
 def get_supabase_anon_client() -> Client:
     """Base client for token validation and user-scoped requests."""
     settings = get_settings()
-    api_key = settings.supabase_service_role_key or settings.supabase_key
     return create_client(
         supabase_url=settings.supabase_url,
-        supabase_key=api_key
+        supabase_key=settings.supabase_anon_key,
+        options=ClientOptions(
+            auto_refresh_token=False,
+            persist_session=False,
+        ),
     )
 
 
@@ -63,16 +75,15 @@ def get_supabase_client_for_user(access_token: str) -> Client:
     apply correctly and operations are scoped to the authenticated user.
     """
     settings = get_settings()
-    api_key = settings.supabase_service_role_key or settings.supabase_key
     client = create_client(
         supabase_url=settings.supabase_url,
-        supabase_key=api_key
+        supabase_key=settings.supabase_anon_key,
+        options=ClientOptions(
+            auto_refresh_token=False,
+            persist_session=False,
+        ),
     )
-    
-    client.options.headers.update({
-        "apikey": api_key,
-        "Authorization": f"Bearer {access_token}",
-    })
+    client.postgrest.auth(access_token)
     
     return client
 

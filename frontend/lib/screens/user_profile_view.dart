@@ -21,25 +21,27 @@ class UserProfileView extends StatefulWidget {
 class _UserProfileViewState extends State<UserProfileView> {
   final UserService _userService = UserService();
   final TripService _tripService = TripService();
-  
+
   Map<String, dynamic>? _userProfile;
   List<Map<String, dynamic>> _userTrips = [];
-  
+
   bool _isFollowing = false;
   bool _isBonded = false;
   bool _bondRequestPending = false;
-  
+  String _bondRequestStatus = 'none';
+
   bool _isLoadingProfile = true;
   bool _isLoadingTrips = true;
   bool _isFollowLoading = false;
   bool _isBondLoading = false;
-  
+
   String? _error;
 
   @override
   void initState() {
     super.initState();
     _loadProfile();
+    _loadRelationship();
     _loadUserTrips();
   }
 
@@ -47,7 +49,7 @@ class _UserProfileViewState extends State<UserProfileView> {
     try {
       final profile = await _userService.getUserProfile(widget.userId);
       if (!mounted) return;
-      
+
       setState(() {
         _userProfile = profile;
         _isLoadingProfile = false;
@@ -66,7 +68,7 @@ class _UserProfileViewState extends State<UserProfileView> {
     try {
       final trips = await _tripService.getTripsByUser(widget.userId);
       if (!mounted) return;
-      
+
       setState(() {
         _userTrips = trips;
         _isLoadingTrips = false;
@@ -76,6 +78,23 @@ class _UserProfileViewState extends State<UserProfileView> {
       setState(() {
         _isLoadingTrips = false;
       });
+    }
+  }
+
+  Future<void> _loadRelationship() async {
+    try {
+      final relationship = await _userService.getRelationship(widget.userId);
+      if (!mounted) return;
+
+      final status = (relationship['bond_request_status'] ?? 'none').toString();
+      setState(() {
+        _isFollowing = relationship['is_following'] == true;
+        _isBonded = relationship['is_friend'] == true;
+        _bondRequestStatus = status;
+        _bondRequestPending = status == 'pending_sent';
+      });
+    } catch (_) {
+      // Relationship state is secondary to rendering the public profile.
     }
   }
 
@@ -109,7 +128,8 @@ class _UserProfileViewState extends State<UserProfileView> {
       setState(() => _isFollowLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error: ${e.toString().replaceFirst('Exception: ', '')}'),
+          content:
+              Text('Error: ${e.toString().replaceFirst('Exception: ', '')}'),
           backgroundColor: Colors.red,
         ),
       );
@@ -119,15 +139,25 @@ class _UserProfileViewState extends State<UserProfileView> {
   Future<void> _toggleBond() async {
     setState(() => _isBondLoading = true);
     try {
-      if (_bondRequestPending) {
+      if (_isBonded) {
+        setState(() => _isBondLoading = false);
+        return;
+      } else if (_bondRequestStatus == 'pending_received') {
+        await _userService.acceptBondRequest(widget.userId);
+      } else if (_bondRequestPending) {
         await _userService.cancelBondRequest(widget.userId);
       } else {
         await _userService.sendBondRequest(widget.userId);
       }
 
       if (!mounted) return;
+      final nextStatus = _bondRequestStatus == 'pending_received'
+          ? 'accepted'
+          : (_bondRequestPending ? 'none' : 'pending_sent');
       setState(() {
-        _bondRequestPending = !_bondRequestPending;
+        _isBonded = nextStatus == 'accepted';
+        _bondRequestStatus = nextStatus;
+        _bondRequestPending = nextStatus == 'pending_sent';
         _isBondLoading = false;
       });
 
@@ -136,7 +166,7 @@ class _UserProfileViewState extends State<UserProfileView> {
           content: Text(
             _bondRequestPending
                 ? 'Bond request sent to ${widget.userName}'
-                : 'Bond request cancelled',
+                : (_isBonded ? 'You are now bonded' : 'Bond request cancelled'),
           ),
           backgroundColor: const Color(0xFFC8A858),
         ),
@@ -146,7 +176,8 @@ class _UserProfileViewState extends State<UserProfileView> {
       setState(() => _isBondLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error: ${e.toString().replaceFirst('Exception: ', '')}'),
+          content:
+              Text('Error: ${e.toString().replaceFirst('Exception: ', '')}'),
           backgroundColor: Colors.red,
         ),
       );
@@ -168,9 +199,9 @@ class _UserProfileViewState extends State<UserProfileView> {
 
   String _getDisplayName() {
     if (_userProfile == null) return widget.userName;
-    return _userProfile?['full_name'] ?? 
-           _userProfile?['username'] ?? 
-           widget.userName;
+    return _userProfile?['full_name'] ??
+        _userProfile?['username'] ??
+        widget.userName;
   }
 
   @override
@@ -307,7 +338,9 @@ class _UserProfileViewState extends State<UserProfileView> {
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
                                     valueColor: AlwaysStoppedAnimation<Color>(
-                                      _isFollowing ? Colors.black : Colors.white,
+                                      _isFollowing
+                                          ? Colors.black
+                                          : Colors.white,
                                     ),
                                   ),
                                 )
@@ -327,9 +360,11 @@ class _UserProfileViewState extends State<UserProfileView> {
                       // Bond Button
                       Expanded(
                         child: ElevatedButton(
-                          onPressed: _isBondLoading ? null : _toggleBond,
+                          onPressed: (_isBondLoading || _isBonded)
+                              ? null
+                              : _toggleBond,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: _bondRequestPending
+                            backgroundColor: (_bondRequestPending || _isBonded)
                                 ? Colors.grey[300]
                                 : const Color(0xFFC8A858),
                             padding: const EdgeInsets.symmetric(vertical: 12),
@@ -344,20 +379,25 @@ class _UserProfileViewState extends State<UserProfileView> {
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
                                     valueColor: AlwaysStoppedAnimation<Color>(
-                                      _bondRequestPending
+                                      (_bondRequestPending || _isBonded)
                                           ? Colors.black
                                           : Colors.white,
                                     ),
                                   ),
                                 )
                               : Text(
-                                  _bondRequestPending
-                                      ? 'Pending'
-                                      : 'Bond',
+                                  _isBonded
+                                      ? 'Bonded'
+                                      : (_bondRequestStatus ==
+                                              'pending_received'
+                                          ? 'Accept Bond'
+                                          : (_bondRequestPending
+                                              ? 'Pending'
+                                              : 'Bond')),
                                   style: TextStyle(
                                     fontFamily: 'Poppins',
                                     fontWeight: FontWeight.w600,
-                                    color: _bondRequestPending
+                                    color: (_bondRequestPending || _isBonded)
                                         ? Colors.black
                                         : Colors.white,
                                   ),

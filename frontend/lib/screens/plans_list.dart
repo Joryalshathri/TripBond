@@ -4,14 +4,15 @@ import 'package:provider/provider.dart';
 import '../core/animations/animation_constants.dart';
 import '../providers/trip_provider.dart';
 import '../providers/user_provider.dart';
+import '../services/city_service.dart';
+import '../state/trip_creation_state.dart';
 import 'AI_Plan.dart';
 import 'bonder.dart';
 import 'DatesPage.dart';
 import 'DestinationLandingPage.dart';
 import 'profile.dart';
 import 'TripHomeScreen.dart';
-
-String selectedCityForTrip = "";
+import 'trip_flow_screen.dart';
 
 class Destination {
   final int id;
@@ -79,6 +80,11 @@ class _PlansListState extends State<PlansList> {
   bool futureOpen = true;
   bool pastOpen = true;
 
+  final _cityService = CityService();
+  List<CityInfo> _cities = [];
+  bool _loadingCities = true;
+  String? _citiesError;
+
   @override
   void initState() {
     super.initState();
@@ -86,6 +92,24 @@ class _PlansListState extends State<PlansList> {
       Provider.of<TripProvider>(context, listen: false).fetchMyTrips();
       Provider.of<UserProvider>(context, listen: false).fetchMyProfile();
     });
+    _loadCities();
+  }
+
+  Future<void> _loadCities() async {
+    try {
+      final cities = await _cityService.listCities();
+      if (!mounted) return;
+      setState(() {
+        _cities = cities;
+        _loadingCities = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _citiesError = e.toString();
+        _loadingCities = false;
+      });
+    }
   }
 
   List<Map<String, dynamic>> _filterTripsByDate(
@@ -312,8 +336,19 @@ class _PlansListState extends State<PlansList> {
               ),
             ),
           );
+        } else if (tripId != null) {
+          // From home/search - resume the gated trip flow.
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => TripFlowScreen(
+                tripId: tripId,
+                tripTitle: name,
+                destination: destination,
+              ),
+            ),
+          );
         } else {
-          // From home - navigate to TripHomeScreen for editing
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -480,20 +515,69 @@ class _PlansListState extends State<PlansList> {
   }
 
   Widget _buildDestinationCards(BuildContext context) {
+    if (_loadingCities) {
+      return const SizedBox(
+        height: 200,
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (_citiesError != null) {
+      return SizedBox(
+        height: 200,
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Failed to load destinations',
+                  style: TextStyle(color: Colors.grey[700]),
+                ),
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _loadingCities = true;
+                      _citiesError = null;
+                    });
+                    _loadCities();
+                  },
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+    if (_cities.isEmpty) {
+      return const SizedBox(
+        height: 200,
+        child: Center(child: Text('No destinations available.')),
+      );
+    }
     return SizedBox(
       height: 200,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 20),
-        itemCount: destinations.length,
+        itemCount: _cities.length,
         separatorBuilder: (_, __) => const SizedBox(width: 16),
-        itemBuilder: (context, index) => _DestinationCard(
-                destination: destinations[index],
-                onTap: () {
-                  selectedCityForTrip = destinations[index].name;
-                  Navigator.push(context,
-                      MaterialPageRoute(builder: (_) => const DatesPage()));
-                }),
+        itemBuilder: (context, index) {
+          final city = _cities[index];
+          return _CityCard(
+            city: city,
+            onTap: () {
+              selectedCityForTrip = city.name;
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => DatesPage(destination: city.name),
+                ),
+              );
+            },
+          );
+        },
       ),
     );
   }
@@ -604,6 +688,127 @@ class _PlansListState extends State<PlansList> {
   }
 }
 
+class _CityCard extends StatefulWidget {
+  final CityInfo city;
+  final VoidCallback onTap;
+  const _CityCard({required this.city, required this.onTap});
+
+  @override
+  State<_CityCard> createState() => _CityCardState();
+}
+
+class _CityCardState extends State<_CityCard>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _scaleController;
+  late Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _scaleController = AnimationController(vsync: this, duration: 150.ms);
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.95).animate(
+        CurvedAnimation(parent: _scaleController, curve: Curves.easeInOut));
+  }
+
+  @override
+  void dispose() {
+    _scaleController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final featured = widget.city.isFeatured;
+    final asset = widget.city.imageAsset;
+    return GestureDetector(
+      onTapDown: (_) => _scaleController.forward(),
+      onTapCancel: () => _scaleController.reverse(),
+      onTapUp: (_) {
+        _scaleController.reverse();
+        widget.onTap();
+      },
+      child: ScaleTransition(
+        scale: _scaleAnimation,
+        child: Container(
+          width: featured ? 170 : 150,
+          height: featured ? 200 : 180,
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(20)),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                if (asset != null)
+                  Image.asset(
+                    asset,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => _placeholder(),
+                  )
+                else
+                  _placeholder(),
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.bottomCenter,
+                      end: Alignment.center,
+                      colors: [
+                        Colors.black.withValues(alpha: 0.6),
+                        Colors.transparent,
+                      ],
+                    ),
+                  ),
+                ),
+                Positioned(
+                  bottom: 10,
+                  left: 8,
+                  right: 8,
+                  child: Column(
+                    children: [
+                      Text(
+                        widget.city.name,
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontFamily: 'Poppins',
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15,
+                          color: Colors.white,
+                        ),
+                      ),
+                      Text(
+                        '${widget.city.count} places',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontWeight: FontWeight.w500,
+                          fontSize: 11,
+                          color: Colors.white.withValues(alpha: 0.85),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _placeholder() {
+    final hue = (widget.city.name.hashCode % 360).abs().toDouble();
+    final color = HSLColor.fromAHSL(1.0, hue, 0.45, 0.55).toColor();
+    return Container(
+      color: color,
+      child: const Center(
+        child: Icon(Icons.location_city, color: Colors.white, size: 48),
+      ),
+    );
+  }
+}
+
 class _DestinationCard extends StatefulWidget {
   final Destination destination;
   final VoidCallback onTap;
@@ -674,28 +879,67 @@ class _DestinationCardState extends State<_DestinationCard>
 }
 
 class DestinationSearchDelegate extends SearchDelegate {
+  final _cityService = CityService();
+
   @override
   List<Widget>? buildActions(BuildContext context) =>
       [IconButton(icon: const Icon(Icons.clear), onPressed: () => query = '')];
+
   @override
   Widget? buildLeading(BuildContext context) => IconButton(
       icon: const Icon(Icons.arrow_back),
       onPressed: () => close(context, null));
+
   @override
-  Widget buildResults(BuildContext context) =>
-      Center(child: Text('Searching for "$query"...'));
+  Widget buildResults(BuildContext context) => _build(context);
+
   @override
-  Widget buildSuggestions(BuildContext context) {
-    final list = destinations
-        .where((city) => city.name.toLowerCase().contains(query.toLowerCase()))
-        .toList();
-    return ListView.builder(
-        itemCount: list.length,
-        itemBuilder: (context, i) => ListTile(
-            title: Text(list[i].name),
-            onTap: () {
-              query = list[i].name;
-              showResults(context);
-            }));
+  Widget buildSuggestions(BuildContext context) => _build(context);
+
+  Widget _build(BuildContext context) {
+    return FutureBuilder<List<CityInfo>>(
+      future: _cityService.listCities(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(child: Text('Error: ${snapshot.error}'));
+        }
+        final cities = snapshot.data ?? const <CityInfo>[];
+        final q = query.trim().toLowerCase();
+        final filtered = q.isEmpty
+            ? cities
+            : cities.where((c) =>
+                c.name.toLowerCase().contains(q) ||
+                c.province.toLowerCase().contains(q)).toList();
+        if (filtered.isEmpty) {
+          return const Center(child: Text('No cities match your search.'));
+        }
+        return ListView.separated(
+          itemCount: filtered.length,
+          separatorBuilder: (_, __) => const Divider(height: 1),
+          itemBuilder: (context, i) {
+            final city = filtered[i];
+            return ListTile(
+              leading: const Icon(Icons.location_city),
+              title: Text(city.name),
+              subtitle: Text(
+                  '${city.province.isNotEmpty ? '${city.province} · ' : ''}${city.count} places'),
+              onTap: () {
+                selectedCityForTrip = city.name;
+                close(context, null);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => DatesPage(destination: city.name),
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
   }
 }

@@ -11,10 +11,11 @@ import 'plans_list.dart';
 import 'chat_screen.dart';
 import 'poi_explorer_screen.dart';
 import 'TripHomeScreen.dart';
+import 'trip_flow_screen.dart';
 import '../services/favorites_service.dart';
+import '../services/feed_service.dart';
 import '../providers/trip_provider.dart';
-
-String selectedCityForTrip = "";
+import '../state/trip_creation_state.dart';
 
 class Destination {
   final int id;
@@ -108,10 +109,14 @@ class DestinationLandingPage extends StatefulWidget {
 
 class _DestinationLandingPageState extends State<DestinationLandingPage> {
   final FavoritesService _favoritesService = FavoritesService();
+  final FeedService _feedService = FeedService();
   final Map<String, Map<String, dynamic>> _favoriteByTitle = {};
   bool _isLoadingFavorites = true;
+  List<Map<String, dynamic>> _feed = [];
+  bool _isLoadingFeed = true;
+  String? _feedError;
+  final Set<String> _pendingJoinRequests = {};
 
-  // to calculate real-time differences
   String _getTimeAgo(DateTime dateTime) {
     final duration = DateTime.now().difference(dateTime);
     if (duration.inDays > 0) return '${duration.inDays}d ago';
@@ -124,10 +129,97 @@ class _DestinationLandingPageState extends State<DestinationLandingPage> {
   void initState() {
     super.initState();
     _loadFavorites();
-    // Fetch trips from provider
+    _loadFeed();
     Future.microtask(() {
       Provider.of<TripProvider>(context, listen: false).fetchMyTrips();
     });
+  }
+
+  Future<void> _loadFeed() async {
+    setState(() {
+      _isLoadingFeed = true;
+      _feedError = null;
+    });
+    try {
+      final feed = await _feedService.fetchFeed();
+      if (!mounted) return;
+      setState(() {
+        _feed = feed;
+        _isLoadingFeed = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _feedError = e.toString();
+        _isLoadingFeed = false;
+      });
+    }
+  }
+
+  Future<void> _toggleFeedLike(Map<String, dynamic> trip) async {
+    final tripId = trip['id']?.toString() ?? '';
+    if (tripId.isEmpty) return;
+    final wasLiked = trip['has_liked'] == true;
+    setState(() {
+      trip['has_liked'] = !wasLiked;
+      trip['likes_count'] =
+          (trip['likes_count'] as int? ?? 0) + (wasLiked ? -1 : 1);
+    });
+    try {
+      if (wasLiked) {
+        await _feedService.unlikeTrip(tripId);
+      } else {
+        await _feedService.likeTrip(tripId);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        trip['has_liked'] = wasLiked;
+        trip['likes_count'] =
+            (trip['likes_count'] as int? ?? 0) + (wasLiked ? 1 : -1);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed: $e')),
+      );
+    }
+  }
+
+  Future<void> _requestToJoin(Map<String, dynamic> trip) async {
+    final tripId = trip['id']?.toString() ?? '';
+    if (tripId.isEmpty) return;
+    setState(() => _pendingJoinRequests.add(tripId));
+    try {
+      await _feedService.requestToJoin(tripId);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Request sent.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _pendingJoinRequests.remove(tripId));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed: $e')),
+      );
+    }
+  }
+
+  void _openTripFlow(Map<String, dynamic> trip) {
+    final tripId = trip['id']?.toString() ?? '';
+    if (tripId.isEmpty) return;
+    final canOpen = trip['is_creator'] == true || trip['is_member'] == true;
+    if (!canOpen) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Request to join before opening this trip.')),
+      );
+      return;
+    }
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => TripFlowScreen(
+        tripId: tripId,
+        tripTitle: (trip['title'] ?? 'Trip').toString(),
+        destination: (trip['destination'] ?? '').toString(),
+      ),
+    ));
   }
 
   Future<void> _loadFavorites() async {
@@ -524,24 +616,55 @@ class _DestinationLandingPageState extends State<DestinationLandingPage> {
                   ),
                 ),
               ),
-              SliverPadding(
-                padding: const EdgeInsets.only(bottom: 100, top: 8),
-                sliver: SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) {
-                      posts.sort((a, b) => b.timestamp.compareTo(a.timestamp));
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: _buildPostCard(posts[index])
-                            .animate()
-                            .fadeIn(delay: (450 + (index * 100)).ms)
-                            .slideY(begin: 0.15, end: 0),
-                      );
-                    },
-                    childCount: posts.length,
+              if (_isLoadingFeed)
+                const SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.all(40),
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
+                )
+              else if (_feedError != null)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      children: [
+                        Text('Feed unavailable: $_feedError',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: Colors.grey[600])),
+                        TextButton(
+                          onPressed: _loadFeed,
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              else if (_feed.isEmpty)
+                const SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.all(40),
+                    child: Center(child: Text('No public trips yet.')),
+                  ),
+                )
+              else
+                SliverPadding(
+                  padding: const EdgeInsets.only(bottom: 100, top: 8),
+                  sliver: SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: _buildFeedTripCard(_feed[index])
+                              .animate()
+                              .fadeIn(delay: (450 + (index * 100)).ms)
+                              .slideY(begin: 0.15, end: 0),
+                        );
+                      },
+                      childCount: _feed.length,
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
           _buildBottomNav(context),
@@ -641,6 +764,181 @@ class _DestinationLandingPageState extends State<DestinationLandingPage> {
                   fontWeight: FontWeight.w600,
                   fontStyle: FontStyle.italic)),
         ],
+      ),
+    );
+  }
+
+  Widget _buildFeedTripCard(Map<String, dynamic> trip) {
+    final tripId = trip['id']?.toString() ?? '';
+    final hasLiked = trip['has_liked'] == true;
+    final likes = (trip['likes_count'] as int?) ?? 0;
+    final memberCount = (trip['member_count'] as int?) ?? 1;
+    final creator = (trip['creator'] as Map?) ?? {};
+    final creatorName =
+        (creator['full_name'] ?? creator['username'] ?? 'Traveler').toString();
+    final destination = (trip['destination'] ?? '').toString();
+    final title = (trip['title'] ?? 'Trip').toString();
+    final imageUrl = (trip['image_url'] ?? '').toString();
+    final pendingJoin = _pendingJoinRequests.contains(tripId);
+    final canOpen = trip['is_creator'] == true || trip['is_member'] == true;
+
+    DateTime? created;
+    final rawCreated = trip['created_at'];
+    if (rawCreated is String) {
+      try {
+        created = DateTime.parse(rawCreated).toLocal();
+      } catch (_) {}
+    }
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _openTripFlow(trip),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            boxShadow: [
+              BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2))
+            ]),
+        padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 18,
+                backgroundColor: const Color(0xFF4675B8),
+                backgroundImage: (creator['avatar_url'] != null &&
+                        creator['avatar_url'].toString().isNotEmpty)
+                    ? NetworkImage(creator['avatar_url'].toString())
+                    : null,
+                child: (creator['avatar_url'] == null ||
+                        creator['avatar_url'].toString().isEmpty)
+                    ? Text(
+                        creatorName.isNotEmpty
+                            ? creatorName[0].toUpperCase()
+                            : '?',
+                        style: const TextStyle(color: Colors.white),
+                      )
+                    : null,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(creatorName,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontWeight: FontWeight.w600)),
+                        ),
+                        if (created != null) ...[
+                          const SizedBox(width: 8),
+                          Text('• ${_getTimeAgo(created)}',
+                              style: const TextStyle(
+                                  fontSize: 11, color: Colors.grey)),
+                        ],
+                      ],
+                    ),
+                    if (destination.isNotEmpty)
+                      Row(children: [
+                        const Icon(Icons.location_on,
+                            size: 14, color: Color(0xFF6F7789)),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(destination,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  fontSize: 13, color: Color(0xFF6F7789))),
+                        ),
+                      ]),
+                  ],
+                ),
+              ),
+              GestureDetector(
+                onTap: () => _toggleFeedLike(trip),
+                child: Row(
+                  children: [
+                    Text('$likes',
+                        style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: hasLiked ? Colors.red : Colors.grey[600])),
+                    const SizedBox(width: 4),
+                    Icon(hasLiked ? Icons.favorite : Icons.favorite_border,
+                        size: 20,
+                        color: hasLiked ? Colors.red : Colors.grey[600]),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: imageUrl.isNotEmpty
+                ? Image.network(
+                    imageUrl,
+                    width: double.infinity,
+                    height: 180,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      width: double.infinity,
+                      height: 180,
+                      color: Colors.grey[200],
+                      child: const Icon(Icons.image_not_supported,
+                          color: Colors.grey),
+                    ),
+                  )
+                : Container(
+                    width: double.infinity,
+                    height: 180,
+                    color: Colors.grey[200],
+                    child:
+                        const Icon(Icons.airplanemode_active, color: Colors.grey),
+                  ),
+          ),
+          const SizedBox(height: 12),
+          Text(title,
+              style: const TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  fontStyle: FontStyle.italic)),
+          const SizedBox(height: 4),
+          Text('$memberCount members',
+              style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: canOpen
+                ? ElevatedButton.icon(
+                    onPressed: () => _openTripFlow(trip),
+                    icon: const Icon(Icons.open_in_new, size: 18),
+                    label: const Text('Open trip'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF4675B8),
+                      foregroundColor: Colors.white,
+                    ),
+                  )
+                : OutlinedButton.icon(
+                    onPressed: pendingJoin ? null : () => _requestToJoin(trip),
+                    icon: const Icon(Icons.group_add_outlined, size: 18),
+                    label: Text(pendingJoin ? 'Request sent' : 'Request to join'),
+            ),
+          ),
+        ],
+      ),
       ),
     );
   }
