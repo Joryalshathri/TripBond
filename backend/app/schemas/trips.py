@@ -174,3 +174,24 @@ class RecommendationResponse(BaseModel):
     poi: POIResponse
     score: float
     reason: str
+
+
+class StarterPlanPlace(BaseModel):
+    poi: POIResponse
+    score: float
+    reason: str
+    day: Optional[int] = None
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
+
+
+class StarterPlanResponse(BaseModel):
+    trip_id: str
+    days: List[DayItinerary]
+    recommended_places: List[StarterPlanPlace]
+    total_cost: float
+    total_days: int
+    optimization_score: Optional[float] = None
+    generated_at: Optional[str] = None
+    strategy: Optional[str] = None
+    preferences_source: Optional[str] = None

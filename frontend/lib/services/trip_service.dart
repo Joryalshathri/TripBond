@@ -274,6 +274,37 @@ class TripService {
     }
   }
 
+  // Generate a non-final starter plan used before place voting
+  Future<Map<String, dynamic>> getStarterPlan(
+    String tripId, {
+    int limit = 24,
+    String pace = 'moderate',
+  }) async {
+    try {
+      final token = await _authService.getAuthToken();
+      if (token == null) {
+        throw Exception('Not authenticated');
+      }
+
+      final response = await _apiService.get(
+        '${ApiConfig.tripsPath}/$tripId/starter-plan',
+        queryParams: {
+          'limit': limit.toString(),
+          'pace': pace,
+        },
+        token: token,
+      );
+
+      if (response is Map<String, dynamic>) {
+        return response;
+      }
+
+      return {};
+    } catch (e) {
+      throw Exception('Failed to get starter plan: ${e.toString()}');
+    }
+  }
+
   // Submit selected recommendations
   Future<Map<String, dynamic>> submitSelectedRecommendations(
       String tripId, List<String> selectedRecommendationIds) async {

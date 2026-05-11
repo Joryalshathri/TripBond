@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.concurrency import run_in_threadpool
 from typing import List
 from ..schemas.favorites import FavoriteResponse, AddFavoriteRequest
 from ..services import favorites_service
@@ -24,7 +25,7 @@ async def get_user_favorites(
     auth_user_id, _ = user_context
     _ensure_self(user_id, auth_user_id)
     try:
-        return favorites_service.get_user_favorites(user_id)
+        return await run_in_threadpool(favorites_service.get_user_favorites, user_id)
     except HTTPException:
         raise
     except Exception as e:
@@ -44,7 +45,7 @@ async def add_favorite(
     auth_user_id, _ = user_context
     _ensure_self(user_id, auth_user_id)
     try:
-        return favorites_service.add_favorite(user_id, favorite)
+        return await run_in_threadpool(favorites_service.add_favorite, user_id, favorite)
     except HTTPException:
         raise
     except Exception as e:
@@ -64,7 +65,7 @@ async def remove_favorite(
     auth_user_id, _ = user_context
     _ensure_self(user_id, auth_user_id)
     try:
-        favorites_service.remove_favorite(user_id, favorite_id)
+        await run_in_threadpool(favorites_service.remove_favorite, user_id, favorite_id)
         return {"message": "Favorite removed successfully"}
     except HTTPException:
         raise

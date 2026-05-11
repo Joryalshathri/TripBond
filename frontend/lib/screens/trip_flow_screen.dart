@@ -102,6 +102,7 @@ class _TripFlowScreenState extends State<TripFlowScreen> {
         tripTitle: _title,
         isCreator: _bool('is_creator'),
         goToVotingAfter: true,
+        useStarterPlan: true,
       ),
     ));
     await _load();
@@ -233,7 +234,8 @@ class _TripFlowScreenState extends State<TripFlowScreen> {
               _chip('${_int('member_count')} members', Icons.group_outlined),
               _chip('${_int('places_count')} places', Icons.place_outlined),
               if (_int('pending_invites_count') > 0)
-                _chip('${_int('pending_invites_count')} pending', Icons.mail_outline),
+                _chip('${_int('pending_invites_count')} pending',
+                    Icons.mail_outline),
             ],
           ),
         ],
@@ -267,10 +269,10 @@ class _TripFlowScreenState extends State<TripFlowScreen> {
       title: myComplete ? 'Waiting for places' : 'Choose your places',
       body: myComplete
           ? 'You marked your picks complete. Voting starts after everyone is done and the creator opens voting.'
-          : 'AI-ranked places are shown first. Pick the places you want in the shared voting pool, then mark complete.',
+          : 'Start with an AI-generated plan for the destination, adjust the places, then add them to the shared voting pool.',
       children: [
         if (!myComplete)
-          _primaryButton('Choose places', _openPlacePicker),
+          _primaryButton('Review AI starter plan', _openPlacePicker),
         if (!myComplete && _int('my_places_count') > 0)
           _secondaryButton('I am done adding places', _markPlacesComplete),
         if (_bool('is_creator')) ...[
@@ -333,7 +335,8 @@ class _TripFlowScreenState extends State<TripFlowScreen> {
     return _stageShell(
       icon: Icons.map_outlined,
       title: 'Plan is ready',
-      body: 'The AI itinerary has been generated. Open it to follow the trip plan.',
+      body:
+          'The AI itinerary has been generated. Open it to follow the trip plan.',
       children: [
         _primaryButton('View plan', _viewPlan),
       ],
@@ -355,8 +358,7 @@ class _TripFlowScreenState extends State<TripFlowScreen> {
           ),
           const SizedBox(height: 12),
           for (final row in rows)
-            if (row is Map)
-              _memberRow(Map<String, dynamic>.from(row)),
+            if (row is Map) _memberRow(Map<String, dynamic>.from(row)),
         ],
       ),
     );
@@ -444,13 +446,15 @@ class _TripFlowScreenState extends State<TripFlowScreen> {
           backgroundColor: const Color(0xFF4675B8),
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         ),
         child: _acting
             ? const SizedBox(
                 width: 18,
                 height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                child: CircularProgressIndicator(
+                    strokeWidth: 2, color: Colors.white),
               )
             : Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
       ),
@@ -465,7 +469,8 @@ class _TripFlowScreenState extends State<TripFlowScreen> {
         style: OutlinedButton.styleFrom(
           foregroundColor: const Color(0xFF4675B8),
           padding: const EdgeInsets.symmetric(vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         ),
         child: Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
       ),

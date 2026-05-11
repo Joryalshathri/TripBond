@@ -15,8 +15,9 @@ from ..services.itinerary_service import (
     delete_item,
     get_itinerary_with_items,
 )
+from ..services.smart_scheduler import build_smart_itinerary
 from ..services.recommendation_service import rank_recommendations
-from ..services import ai_poi_service, vote_service, notification_service
+from ..services import ai_poi_service, vote_service, notification_service, group_service
 from ..schemas.trips import (
     TripResponse,
     CreateTripRequest,
@@ -29,7 +30,8 @@ from ..schemas.trips import (
     ItineraryResponse,
     GenerateItineraryRequest,
     POIResponse,
-    RecommendationResponse
+    RecommendationResponse,
+    StarterPlanResponse,
 )
 import logging
 
@@ -1345,6 +1347,287 @@ def _recommendation_poi_response(poi: dict, destination: str) -> POIResponse:
         contact=poi.get("contact"),
         created_at=poi.get("created_at")
     )
+
+
+def _poi_identifier(poi: dict) -> str:
+    return str(
+        poi.get("id")
+        or poi.get("poi_id")
+        or poi.get("place_id")
+        or poi.get("external_place_id")
+        or poi.get("name")
+        or "unknown"
+    )
+
+
+def _starter_scheduler_place(poi: dict, score: float) -> dict:
+    place = dict(poi)
+    place_id = _poi_identifier(poi)
+    place["id"] = place_id
+    place["external_place_id"] = (
+        poi.get("external_place_id")
+        or poi.get("place_id")
+        or poi.get("poi_id")
+        or place_id
+    )
+    place["place_types"] = _as_tags(
+        poi.get("place_types")
+        or poi.get("types")
+        or poi.get("tags")
+        or poi.get("category")
+        or poi.get("poi_type")
+    )
+    place["vote_score"] = score
+    return place
+
+
+def _duration_minutes(start: str | None, end: str | None) -> int | None:
+    if not start or not end:
+        return None
+    try:
+        start_dt = datetime.strptime(start, "%H:%M")
+        end_dt = datetime.strptime(end, "%H:%M")
+        return int((end_dt - start_dt).total_seconds() / 60)
+    except ValueError:
+        return None
+
+
+def _build_group_preferences_from_members(db: SupabaseDB, trip: Dict[str, Any]) -> dict:
+    trip_id = trip["id"]
+    members = (
+        db.client.table("trip_participants")
+        .select("user_id")
+        .eq("trip_id", trip_id)
+        .eq("status", "accepted")
+        .execute()
+    )
+    member_ids = [row["user_id"] for row in (members.data or []) if row.get("user_id")]
+    creator_id = trip.get("created_by")
+    if creator_id and creator_id not in member_ids:
+        member_ids.insert(0, creator_id)
+
+    individual_preferences = []
+    for member_id in member_ids:
+        trip_prefs = (
+            db.client.table("trip_preferences")
+            .select("*")
+            .eq("trip_id", trip_id)
+            .eq("user_id", member_id)
+            .limit(1)
+            .execute()
+        )
+        profile = (
+            db.client.table("profiles")
+            .select(
+                "budget_level, travel_style, dietary_preferences, "
+                "preferred_accommodation, preferred_transport, openness, "
+                "conscientiousness, extraversion, agreeableness, neuroticism"
+            )
+            .eq("id", member_id)
+            .limit(1)
+            .execute()
+        )
+        profile_data = profile.data[0] if profile.data else {}
+        individual_preferences.append({
+            "user_id": member_id,
+            "weight": 1.0,
+            "trip_preferences": trip_prefs.data[0] if trip_prefs.data else {},
+            "general_preferences": profile_data,
+            "personality": profile_data,
+        })
+
+    if not individual_preferences:
+        return {}
+
+    aggregated = group_service.apply_aggregation_strategy(individual_preferences, "average")
+    conservative = group_service.apply_aggregation_strategy(individual_preferences, "least_misery")
+    for key in ("budget_level", "pace"):
+        if conservative.get(key) and not aggregated.get(key):
+            aggregated[key] = conservative[key]
+
+    travel_styles = [
+        prefs.get("general_preferences", {}).get("travel_style")
+        for prefs in individual_preferences
+        if prefs.get("general_preferences", {}).get("travel_style")
+    ]
+    if travel_styles and not aggregated.get("travel_style"):
+        aggregated["travel_style"] = max(set(travel_styles), key=travel_styles.count)
+
+    return aggregated
+
+
+@router.get("/{trip_id}/starter-plan", response_model=StarterPlanResponse)
+async def get_trip_starter_plan(
+    trip_id: str,
+    user_context: tuple[str, str] = Depends(get_current_user_context),
+    limit: int = Query(24, description="Maximum places to consider"),
+    pace: str = Query("moderate", description="relaxed, moderate, or fast"),
+):
+    """Generate a non-persisted AI starter plan for place selection.
+
+    This runs before voting and uses destination POIs plus the latest stored
+    group preference model when available. It does not create the final
+    itinerary; selected places still flow through voting first.
+    """
+    user_id, token = user_context
+
+    try:
+        trip = await check_trip_access(trip_id, user_id, token=token, required_role="member")
+        if _trip_phase(trip) != "planning":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Starter plans are only available while the trip is in place selection.",
+            )
+
+        destination = (trip.get("destination") or trip.get("location") or "").strip()
+        if not destination:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Trip destination is required before generating a starter plan.",
+            )
+
+        limit = max(1, min(limit, 60))
+        pace = pace if pace in {"relaxed", "moderate", "fast"} else "moderate"
+        db = SupabaseDB(admin=True)
+
+        group_prefs_response = await run_in_threadpool(
+            lambda: db.client.table("group_models")
+            .select("*")
+            .eq("trip_id", trip_id)
+            .order("created_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+        group_prefs = group_prefs_response.data[0] if group_prefs_response.data else None
+        preferences = group_prefs.get("aggregated_preferences") if group_prefs else {}
+        preferences_source = "group_model" if group_prefs else "trip_context"
+        if not preferences:
+            preferences = await run_in_threadpool(
+                lambda: _build_group_preferences_from_members(db, trip)
+            )
+            if preferences:
+                preferences_source = "member_preferences"
+
+        candidate_limit = max(limit * 3, 30)
+        pois = await run_in_threadpool(
+            lambda: ai_poi_service.get_pois_for_destination(
+                destination,
+                limit=candidate_limit,
+                require_coordinates=True,
+            )
+        )
+        pois = [
+            poi for poi in pois
+            if _as_float(poi.get("latitude") or poi.get("lat")) is not None
+            and _as_float(poi.get("longitude") or poi.get("lng") or poi.get("lon")) is not None
+        ]
+
+        if not pois:
+            return StarterPlanResponse(
+                trip_id=trip_id,
+                days=[],
+                recommended_places=[],
+                total_cost=0.0,
+                total_days=0,
+                optimization_score=0.0,
+                generated_at=datetime.now().isoformat(),
+                strategy="smart_scheduler",
+                preferences_source=preferences_source,
+            )
+
+        ranked = rank_recommendations(pois, preferences or {}, trip, limit=limit)
+        scheduler_places = [
+            _starter_scheduler_place(poi, score)
+            for poi, score, _reason in ranked
+        ]
+        generated = build_smart_itinerary(trip, scheduler_places, pace=pace)
+
+        poi_by_id = {_poi_identifier(poi): poi for poi, _score, _reason in ranked}
+        meta_by_id = {
+            _poi_identifier(poi): {"score": score, "reason": reason}
+            for poi, score, reason in ranked
+        }
+        scheduled_by_id: Dict[str, Dict[str, Any]] = {}
+        response_days = []
+
+        for day in generated.days:
+            activities = []
+            for activity in day.get("activities", []):
+                place_id = str(activity.get("id") or activity.get("name") or "")
+                poi = poi_by_id.get(place_id) or {}
+                meta = meta_by_id.get(place_id, {})
+                poi_response = _recommendation_poi_response(poi or activity, destination)
+                scheduled_by_id[place_id] = {
+                    "day": day.get("day"),
+                    "start_time": activity.get("start_time"),
+                    "end_time": activity.get("end_time"),
+                }
+                activities.append({
+                    "id": poi_response.id,
+                    "name": activity.get("name") or poi_response.name,
+                    "type": activity.get("type") or poi_response.type,
+                    "location": poi_response.location,
+                    "start_time": activity.get("start_time"),
+                    "end_time": activity.get("end_time"),
+                    "duration_minutes": _duration_minutes(
+                        activity.get("start_time"),
+                        activity.get("end_time"),
+                    ),
+                    "cost": 0.0,
+                    "description": meta.get("reason") or activity.get("description"),
+                    "priority": 1,
+                    "coordinates": poi_response.coordinates,
+                    "rating": poi_response.rating,
+                    "user_ratings_total": poi_response.user_ratings_total,
+                    "photo_url": poi_response.image_url,
+                    "fsq_id": poi.get("fsq_id"),
+                    "external_place_id": poi_response.external_place_id,
+                    "address": poi_response.address,
+                    "latitude": poi_response.latitude,
+                    "longitude": poi_response.longitude,
+                })
+
+            response_days.append({
+                "day": day.get("day"),
+                "date": str(day.get("date") or f"Day {day.get('day')}"),
+                "activities": activities,
+                "total_cost": day.get("total_cost", 0.0),
+                "total_duration_minutes": day.get("total_duration_minutes", 0),
+            })
+
+        recommended_places = []
+        for poi, score, reason in ranked:
+            place_id = _poi_identifier(poi)
+            schedule = scheduled_by_id.get(place_id, {})
+            recommended_places.append({
+                "poi": _recommendation_poi_response(poi, destination),
+                "score": score,
+                "reason": reason,
+                "day": schedule.get("day"),
+                "start_time": schedule.get("start_time"),
+                "end_time": schedule.get("end_time"),
+            })
+
+        return StarterPlanResponse(
+            trip_id=trip_id,
+            days=response_days,
+            recommended_places=recommended_places,
+            total_cost=generated.total_cost,
+            total_days=len(response_days),
+            optimization_score=generated.fitness_score,
+            generated_at=datetime.now().isoformat(),
+            strategy=generated.strategy,
+            preferences_source=preferences_source,
+        )
+
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Failed to generate starter plan")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to generate starter plan",
+        )
 
 
 @router.get("/{trip_id}/recommendations", response_model=List[RecommendationResponse])

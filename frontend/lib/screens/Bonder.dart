@@ -10,6 +10,7 @@ import '../core/animations/animation_constants.dart';
 import '../services/bonder_service.dart';
 import '../services/chat_service.dart';
 import '../services/auth_service.dart';
+import '../services/user_service.dart';
 
 class _BonderMeta {
   final int unreadCount;
@@ -26,10 +27,14 @@ class Bonders extends StatefulWidget {
 class _BondersState extends State<Bonders> {
   final BonderService _bonderService = BonderService();
   final ChatService _chatService = ChatService();
+  final UserService _userService = UserService();
   bool _isSearching = false;
   final TextEditingController _searchController = TextEditingController();
+  String _selectedList = 'friends';
+  List<BonderItem> _friends = [];
   List<BonderItem> _allBonders = [];
   List<BonderItem> _filteredBonders = [];
+  final Set<String> _pendingBondIds = {};
   Map<String, _BonderMeta> _bonderMeta = {};
   bool _isLoading = false;
   String? _error;
@@ -53,7 +58,10 @@ class _BondersState extends State<Bonders> {
     });
 
     try {
-      final bonders = await _bonderService.getBonders();
+      final results = await Future.wait([
+        _bonderService.getFriends(),
+        _bonderService.getAllBonders(limit: 200),
+      ]);
       final previews = await _chatService.getConversationPreviews();
       final previewByPartnerId = {
         for (final p in previews) p.partnerId: p,
@@ -63,7 +71,7 @@ class _BondersState extends State<Bonders> {
           p.partnerId: _BonderMeta(unreadCount: p.unreadCount),
       };
 
-      final merged = bonders.map((b) {
+      final friends = results[0].map((b) {
         final p = previewByPartnerId[b.id];
         if (p == null) {
           return b;
@@ -84,12 +92,19 @@ class _BondersState extends State<Bonders> {
           return aHasPreview ? -1 : 1;
         });
 
+      final allBonders = results[1]
+          .map((b) =>
+              b.copyWith(lastMsg: 'Tap to view profile or send a bond request'))
+          .toList()
+        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+
       if (!mounted) return;
 
       setState(() {
-        _allBonders = merged;
-        _filteredBonders = List.from(merged);
+        _friends = friends;
+        _allBonders = allBonders;
         _bonderMeta = metaByPartnerId;
+        _refreshFilteredBonders();
         _isLoading = false;
       });
     } catch (e) {
@@ -104,24 +119,41 @@ class _BondersState extends State<Bonders> {
 
   void _filterList(String query) {
     setState(() {
-      _filteredBonders = _allBonders
-          .where((bonder) =>
-              bonder.name.toLowerCase().contains(query.toLowerCase()))
-          .toList();
+      _refreshFilteredBonders(query: query);
     });
   }
 
+  void _refreshFilteredBonders({String? query}) {
+    final source = _selectedList == 'friends' ? _friends : _allBonders;
+    final normalizedQuery =
+        (query ?? _searchController.text).trim().toLowerCase();
+    _filteredBonders = source
+        .where((bonder) => bonder.name.toLowerCase().contains(normalizedQuery))
+        .toList();
+  }
+
+  Set<String> get _friendIds => _friends.map((b) => b.id).toSet();
+
+  String get _emptyMessage {
+    if (_selectedList == 'friends') {
+      return 'No friends yet. Open All Bonders to find people to bond with.';
+    }
+    return _searchController.text.trim().isEmpty
+        ? 'No bonders found'
+        : 'No matching bonders found';
+  }
+
   void _updateLastMessage(String bonderId, String message) {
-    final allIndex = _allBonders.indexWhere((b) => b.id == bonderId);
+    final allIndex = _friends.indexWhere((b) => b.id == bonderId);
     final filteredIndex = _filteredBonders.indexWhere((b) => b.id == bonderId);
 
     if (allIndex == -1) return;
 
-    final updated = _allBonders[allIndex].copyWith(lastMsg: message);
+    final updated = _friends[allIndex].copyWith(lastMsg: message);
 
     setState(() {
-      _allBonders.removeAt(allIndex);
-      _allBonders.insert(0, updated);
+      _friends.removeAt(allIndex);
+      _friends.insert(0, updated);
 
       if (filteredIndex != -1) {
         _filteredBonders.removeAt(filteredIndex);
@@ -139,6 +171,46 @@ class _BondersState extends State<Bonders> {
   void _clearUnreadForBonder(String bonderId) {
     setState(() {
       _bonderMeta[bonderId] = const _BonderMeta(unreadCount: 0);
+    });
+  }
+
+  Future<void> _sendBondRequest(BonderItem bonder) async {
+    if (_pendingBondIds.contains(bonder.id) || _friendIds.contains(bonder.id)) {
+      return;
+    }
+
+    setState(() => _pendingBondIds.add(bonder.id));
+    try {
+      final response = await _userService.sendBondRequest(bonder.id);
+      if (!mounted) return;
+      if (response['status']?.toString() == 'accepted') {
+        await _loadBonders();
+        if (!mounted) return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(response['status']?.toString() == 'accepted'
+              ? 'You are now bonded with ${bonder.name}'
+              : 'Bond request sent to ${bonder.name}'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _pendingBondIds.remove(bonder.id));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+              'Could not send request: ${e.toString().replaceAll('Exception: ', '')}'),
+        ),
+      );
+    }
+  }
+
+  void _selectList(String list) {
+    if (_selectedList == list) return;
+    setState(() {
+      _selectedList = list;
+      _refreshFilteredBonders();
     });
   }
 
@@ -185,7 +257,7 @@ class _BondersState extends State<Bonders> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text("Filter Conversations",
+              const Text("Sort Bonders",
                   style: TextStyle(
                       fontFamily: 'Poppins',
                       fontWeight: FontWeight.bold,
@@ -210,6 +282,7 @@ class _BondersState extends State<Bonders> {
                 onTap: () {
                   setState(() {
                     _filteredBonders = List.from(_allBonders);
+                    _refreshFilteredBonders();
                   });
                   Navigator.pop(context);
                 },
@@ -287,7 +360,7 @@ class _BondersState extends State<Bonders> {
                                   _isSearching = !_isSearching;
                                   if (!_isSearching) {
                                     _searchController.clear();
-                                    _filteredBonders = List.from(_allBonders);
+                                    _refreshFilteredBonders();
                                   }
                                 });
                               },
@@ -300,6 +373,8 @@ class _BondersState extends State<Bonders> {
                             ),
                           ],
                         ).animate().fadeIn().slideY(begin: -0.1, end: 0),
+                        const SizedBox(height: 18),
+                        _buildListTabs(),
                         const SizedBox(height: 24),
                         if (_isLoading)
                           const Padding(
@@ -330,11 +405,12 @@ class _BondersState extends State<Bonders> {
                         if (!_isLoading &&
                             _error == null &&
                             _filteredBonders.isEmpty)
-                          const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 40),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 40),
                             child: Text(
-                              'No bonders found',
-                              style: TextStyle(
+                              _emptyMessage,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
                                   fontFamily: 'Poppins', color: Colors.grey),
                             ),
                           ),
@@ -344,128 +420,131 @@ class _BondersState extends State<Bonders> {
 
                           // --- WRAPPED IN DISMISSIBLE FOR SWIPE-TO-DELETE ---
                           return Dismissible(
-                              key: Key(b.id),
-                              direction:
-                                  DismissDirection.endToStart, // Swipe left
-                              confirmDismiss: (direction) =>
-                                  _confirmDelete(b.name),
-                              onDismissed: (direction) {
-                                setState(() {
-                                  _allBonders.removeWhere(
-                                      (element) => element.id == b.id);
-                                  _filteredBonders.removeAt(index);
-                                });
-                              },
-                              background: Container(
-                                alignment: Alignment.centerRight,
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 20),
-                                margin: const EdgeInsets.only(bottom: 16),
-                                decoration: BoxDecoration(
-                                  color: Colors.red.shade400,
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                child: const Icon(Icons.delete,
-                                    color: Colors.white),
+                            key: Key(b.id),
+                            direction: _selectedList == 'friends'
+                                ? DismissDirection.endToStart
+                                : DismissDirection.none,
+                            confirmDismiss: (direction) =>
+                                _confirmDelete(b.name),
+                            onDismissed: (direction) {
+                              setState(() {
+                                _friends.removeWhere(
+                                    (element) => element.id == b.id);
+                                _filteredBonders.removeAt(index);
+                              });
+                            },
+                            background: Container(
+                              alignment: Alignment.centerRight,
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 20),
+                              margin: const EdgeInsets.only(bottom: 16),
+                              decoration: BoxDecoration(
+                                color: Colors.red.shade400,
+                                borderRadius: BorderRadius.circular(16),
                               ),
-                              child: GestureDetector(
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => UserProfileView(
-                                          userId: b.id,
-                                          userName: b.name,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                  child: Container(
-                                    margin: const EdgeInsets.only(bottom: 16),
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 16, vertical: 12),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.circular(16),
-                                      border: Border.all(
-                                          color: Colors.grey.shade200),
+                              child:
+                                  const Icon(Icons.delete, color: Colors.white),
+                            ),
+                            child: GestureDetector(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => UserProfileView(
+                                      userId: b.id,
+                                      userName: b.name,
                                     ),
-                                    child: Row(
-                                      children: [
-                                        _buildBonderAvatarButton(b),
-                                        const SizedBox(width: 16),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                b.name,
-                                                style: const TextStyle(
-                                                    fontFamily: 'Poppins',
-                                                    fontWeight: FontWeight.w700,
-                                                    fontSize: 18),
-                                              ),
-                                              Text(
-                                                b.lastMsg,
-                                                style: TextStyle(
-                                                    fontFamily: 'Poppins',
-                                                    color: Colors.grey.shade600,
-                                                    fontSize: 13),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        if ((_bonderMeta[b.id]?.unreadCount ??
-                                                0) >
-                                            0)
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                                horizontal: 8, vertical: 4),
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFF4675B8),
-                                              borderRadius:
-                                                  BorderRadius.circular(999),
-                                            ),
-                                            child: Text(
-                                              '${_bonderMeta[b.id]!.unreadCount}',
-                                              style: const TextStyle(
-                                                color: Colors.white,
-                                                fontFamily: 'Poppins',
-                                                fontWeight: FontWeight.w600,
-                                                fontSize: 11,
-                                              ),
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                  )
-                                      .animate()
-                                      .fadeIn(
-                                        delay: Duration(
-                                            milliseconds: 150 + (index * 80)),
-                                        duration: Duration(
-                                            milliseconds:
-                                                AnimationConstants.normal),
-                                        curve: AnimationConstants.cubicEaseOut,
-                                      )
-                                      .slideX(
-                                        delay: Duration(
-                                            milliseconds: 150 + (index * 80)),
-                                        begin: 0.2,
-                                        end: 0,
-                                        duration: Duration(
-                                            milliseconds:
-                                                AnimationConstants.normal),
-                                        curve: AnimationConstants.cubicEaseOut,
-                                      ),
                                   ),
-                            );
+                                );
+                              },
+                              child: Container(
+                                margin: const EdgeInsets.only(bottom: 16),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border:
+                                      Border.all(color: Colors.grey.shade200),
+                                ),
+                                child: Row(
+                                  children: [
+                                    _buildBonderAvatarButton(b),
+                                    const SizedBox(width: 16),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            b.name,
+                                            style: const TextStyle(
+                                                fontFamily: 'Poppins',
+                                                fontWeight: FontWeight.w700,
+                                                fontSize: 18),
+                                          ),
+                                          Text(
+                                            b.lastMsg,
+                                            style: TextStyle(
+                                                fontFamily: 'Poppins',
+                                                color: Colors.grey.shade600,
+                                                fontSize: 13),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    if (_selectedList == 'all')
+                                      _buildDiscoveryAction(b)
+                                    else if ((_bonderMeta[b.id]?.unreadCount ??
+                                            0) >
+                                        0)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF4675B8),
+                                          borderRadius:
+                                              BorderRadius.circular(999),
+                                        ),
+                                        child: Text(
+                                          '${_bonderMeta[b.id]!.unreadCount}',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontFamily: 'Poppins',
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 11,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              )
+                                  .animate()
+                                  .fadeIn(
+                                    delay: Duration(
+                                        milliseconds: 150 + (index * 80)),
+                                    duration: Duration(
+                                        milliseconds:
+                                            AnimationConstants.normal),
+                                    curve: AnimationConstants.cubicEaseOut,
+                                  )
+                                  .slideX(
+                                    delay: Duration(
+                                        milliseconds: 150 + (index * 80)),
+                                    begin: 0.2,
+                                    end: 0,
+                                    duration: Duration(
+                                        milliseconds:
+                                            AnimationConstants.normal),
+                                    curve: AnimationConstants.cubicEaseOut,
+                                  ),
+                            ),
+                          );
                         }),
-                    ],
-                  ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -473,6 +552,102 @@ class _BondersState extends State<Bonders> {
           ),
           _buildBottomNav(context),
         ],
+      ),
+    );
+  }
+
+  Widget _buildListTabs() {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Row(
+        children: [
+          _buildListTab(
+            label: 'Friends',
+            count: _friends.length,
+            active: _selectedList == 'friends',
+            onTap: () => _selectList('friends'),
+          ),
+          _buildListTab(
+            label: 'All Bonders',
+            count: _allBonders.length,
+            active: _selectedList == 'all',
+            onTap: () => _selectList('all'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildListTab({
+    required String label,
+    required int count,
+    required bool active,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: active ? const Color(0xFF4675B8) : Colors.transparent,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Text(
+            '$label ($count)',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontFamily: 'Poppins',
+              fontWeight: FontWeight.w600,
+              color: active ? Colors.white : const Color(0xFF334155),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDiscoveryAction(BonderItem bonder) {
+    final isFriend = _friendIds.contains(bonder.id);
+    final isPending = _pendingBondIds.contains(bonder.id);
+
+    if (isFriend) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: const Color(0xFFE8F3EE),
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: const Text(
+          'Friend',
+          style: TextStyle(
+            fontFamily: 'Poppins',
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF2E7D32),
+            fontSize: 12,
+          ),
+        ),
+      );
+    }
+
+    return TextButton(
+      onPressed: isPending ? null : () => _sendBondRequest(bonder),
+      style: TextButton.styleFrom(
+        foregroundColor: const Color(0xFF4675B8),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      ),
+      child: Text(
+        isPending ? 'Pending' : 'Add',
+        style: const TextStyle(
+          fontFamily: 'Poppins',
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }
@@ -526,25 +701,34 @@ class _BondersState extends State<Bonders> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            SizedBox(width: 50, child: _navIcon(Icons.home,
-                onTap: () => Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => const PlansList(source: 'home'))))),
-            SizedBox(width: 50, child: _navIcon(Icons.search,
-                onTap: () => Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => const PlansList(source: 'home'))))),
-            SizedBox(width: 50, child: _navIcon(Icons.airplanemode_active,
-                onTap: () => Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => const GroupSuggestedItinerary())))),
-            SizedBox(width: 50, child: _navIcon(Icons.group_outlined, active: true)),
-            SizedBox(width: 50, child: _navIcon(Icons.person_outline,
-                onTap: () => Navigator.pushReplacement(context,
-                    MaterialPageRoute(builder: (_) => const Profile())))),
+            SizedBox(
+                width: 50,
+                child: _navIcon(Icons.home,
+                    onTap: () => Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const PlansList(source: 'home'))))),
+            SizedBox(
+                width: 50,
+                child: _navIcon(Icons.search,
+                    onTap: () => Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const PlansList(source: 'home'))))),
+            SizedBox(
+                width: 50,
+                child: _navIcon(Icons.airplanemode_active,
+                    onTap: () => Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const GroupSuggestedItinerary())))),
+            SizedBox(
+                width: 50, child: _navIcon(Icons.group_outlined, active: true)),
+            SizedBox(
+                width: 50,
+                child: _navIcon(Icons.person_outline,
+                    onTap: () => Navigator.pushReplacement(context,
+                        MaterialPageRoute(builder: (_) => const Profile())))),
           ],
         ),
       ),

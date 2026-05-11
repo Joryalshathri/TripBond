@@ -22,6 +22,7 @@ class TripPlacesPickerScreen extends StatefulWidget {
   /// returns to the trip hub after marking place-picking complete.
   final bool goToVotingAfter;
   final bool goToPlanAfter;
+  final bool useStarterPlan;
 
   const TripPlacesPickerScreen({
     super.key,
@@ -31,6 +32,7 @@ class TripPlacesPickerScreen extends StatefulWidget {
     this.isCreator = false,
     this.goToVotingAfter = true,
     this.goToPlanAfter = false,
+    this.useStarterPlan = false,
   });
 
   @override
@@ -44,6 +46,8 @@ class _TripPlacesPickerScreenState extends State<TripPlacesPickerScreen> {
   bool _loading = true;
   String? _error;
   List<Map<String, dynamic>> _places = [];
+  List<Map<String, dynamic>> _starterDays = [];
+  String _starterPlanSource = '';
   final Set<String> _selected = {};
   bool _saving = false;
   String _destination = '';
@@ -122,7 +126,22 @@ class _TripPlacesPickerScreenState extends State<TripPlacesPickerScreen> {
         });
         return;
       }
-      var places = await _loadRankedRecommendations();
+      var starterDays = <Map<String, dynamic>>[];
+      var starterSource = '';
+      var selectedKeys = <String>{};
+      var places = <Map<String, dynamic>>[];
+
+      if (widget.useStarterPlan) {
+        final starter = await _loadStarterPlanPlaces();
+        places = starter['places'] as List<Map<String, dynamic>>;
+        starterDays = starter['days'] as List<Map<String, dynamic>>;
+        starterSource = starter['source'] as String;
+        selectedKeys = starter['selected'] as Set<String>;
+      }
+
+      if (places.isEmpty) {
+        places = await _loadRankedRecommendations();
+      }
       if (places.isEmpty) {
         places = await _poiService.searchPOIs(
           location: _destination,
@@ -132,6 +151,11 @@ class _TripPlacesPickerScreenState extends State<TripPlacesPickerScreen> {
       if (!mounted) return;
       setState(() {
         _places = places;
+        _starterDays = starterDays;
+        _starterPlanSource = starterSource;
+        _selected
+          ..clear()
+          ..addAll(selectedKeys);
         _loading = false;
       });
     } catch (e) {
@@ -143,35 +167,105 @@ class _TripPlacesPickerScreenState extends State<TripPlacesPickerScreen> {
     }
   }
 
+  Future<Map<String, dynamic>> _loadStarterPlanPlaces() async {
+    try {
+      final starter = await _tripService.getStarterPlan(widget.tripId);
+      final rawDays = starter['days'];
+      final days = rawDays is List
+          ? rawDays
+              .whereType<Map>()
+              .map((day) => Map<String, dynamic>.from(day))
+              .toList()
+          : <Map<String, dynamic>>[];
+
+      final byKey = <String, Map<String, dynamic>>{};
+      final selected = <String>{};
+      final rawPlaces = starter['recommended_places'];
+      if (rawPlaces is List) {
+        for (final item in rawPlaces) {
+          if (item is! Map) continue;
+          final itemMap = Map<String, dynamic>.from(item);
+          final poi = itemMap['poi'];
+          if (poi is! Map) continue;
+          final mapped = Map<String, dynamic>.from(poi);
+          mapped['ai_score'] = itemMap['score'];
+          mapped['ai_reason'] = itemMap['reason'];
+          mapped['starter_day'] = itemMap['day'];
+          mapped['starter_start_time'] = itemMap['start_time'];
+          mapped['starter_end_time'] = itemMap['end_time'];
+          mapped['id'] = mapped['id'] ??
+              mapped['poi_id'] ??
+              mapped['place_id'] ??
+              mapped['external_place_id'];
+          mapped['place_id'] = mapped['place_id'] ??
+              mapped['external_place_id'] ??
+              mapped['id'] ??
+              mapped['poi_id'];
+          mapped['type'] = mapped['type'] ?? mapped['poi_type'];
+
+          final lat = _placeLatitude(mapped);
+          final lng = _placeLongitude(mapped);
+          if (lat == null || lng == null) continue;
+          mapped['latitude'] = lat;
+          mapped['longitude'] = lng;
+
+          final key = _placeKey(mapped);
+          if (key.isEmpty) continue;
+          byKey[key] = mapped;
+          if (itemMap['day'] != null) {
+            selected.add(key);
+          }
+        }
+      }
+
+      return {
+        'places': byKey.values.toList(),
+        'days': days,
+        'source': (starter['preferences_source'] ?? '').toString(),
+        'selected': selected,
+      };
+    } catch (_) {
+      return {
+        'places': <Map<String, dynamic>>[],
+        'days': <Map<String, dynamic>>[],
+        'source': '',
+        'selected': <String>{},
+      };
+    }
+  }
+
   Future<List<Map<String, dynamic>>> _loadRankedRecommendations() async {
     try {
       final recommendations =
           await _tripService.getRecommendations(widget.tripId);
-      return recommendations.map((recommendation) {
-        final poi = recommendation['poi'];
-        final mapped = poi is Map
-            ? Map<String, dynamic>.from(poi)
-            : <String, dynamic>{};
-        mapped['ai_score'] = recommendation['score'];
-        mapped['ai_reason'] = recommendation['reason'];
-        mapped['id'] = mapped['id'] ??
-            mapped['poi_id'] ??
-            mapped['place_id'] ??
-            mapped['external_place_id'];
-        mapped['place_id'] = mapped['place_id'] ??
-            mapped['external_place_id'] ??
-            mapped['id'] ??
-            mapped['poi_id'];
-        mapped['type'] = mapped['type'] ?? mapped['poi_type'];
-        final lat = _placeLatitude(mapped);
-        final lng = _placeLongitude(mapped);
-        if (lat == null || lng == null) {
-          return null;
-        }
-        mapped['latitude'] = lat;
-        mapped['longitude'] = lng;
-        return mapped;
-      }).whereType<Map<String, dynamic>>().toList();
+      return recommendations
+          .map((recommendation) {
+            final poi = recommendation['poi'];
+            final mapped = poi is Map
+                ? Map<String, dynamic>.from(poi)
+                : <String, dynamic>{};
+            mapped['ai_score'] = recommendation['score'];
+            mapped['ai_reason'] = recommendation['reason'];
+            mapped['id'] = mapped['id'] ??
+                mapped['poi_id'] ??
+                mapped['place_id'] ??
+                mapped['external_place_id'];
+            mapped['place_id'] = mapped['place_id'] ??
+                mapped['external_place_id'] ??
+                mapped['id'] ??
+                mapped['poi_id'];
+            mapped['type'] = mapped['type'] ?? mapped['poi_type'];
+            final lat = _placeLatitude(mapped);
+            final lng = _placeLongitude(mapped);
+            if (lat == null || lng == null) {
+              return null;
+            }
+            mapped['latitude'] = lat;
+            mapped['longitude'] = lng;
+            return mapped;
+          })
+          .whereType<Map<String, dynamic>>()
+          .toList();
     } catch (_) {
       return [];
     }
@@ -291,7 +385,9 @@ class _TripPlacesPickerScreenState extends State<TripPlacesPickerScreen> {
             Text(
               _destination.isEmpty
                   ? 'Pick your places'
-                  : 'Pick your places · $_destination',
+                  : widget.useStarterPlan
+                      ? 'Review AI starter plan · $_destination'
+                      : 'Pick your places · $_destination',
               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w400),
             ),
           ],
@@ -359,19 +455,157 @@ class _TripPlacesPickerScreenState extends State<TripPlacesPickerScreen> {
                     )
                   : RefreshIndicator(
                       onRefresh: _load,
-                      child: GridView.builder(
-                        padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          mainAxisSpacing: 10,
-                          crossAxisSpacing: 10,
-                          childAspectRatio: 0.78,
-                        ),
-                        itemCount: _places.length,
-                        itemBuilder: (context, i) => _buildCard(_places[i]),
+                      child: CustomScrollView(
+                        slivers: [
+                          if (widget.useStarterPlan)
+                            SliverToBoxAdapter(
+                                child: _buildStarterPlanPreview()),
+                          SliverPadding(
+                            padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                            sliver: SliverGrid(
+                              gridDelegate:
+                                  const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 2,
+                                mainAxisSpacing: 10,
+                                crossAxisSpacing: 10,
+                                childAspectRatio: 0.78,
+                              ),
+                              delegate: SliverChildBuilderDelegate(
+                                (context, i) => _buildCard(_places[i]),
+                                childCount: _places.length,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
+    );
+  }
+
+  Widget _buildStarterPlanPreview() {
+    final sourceText = _starterPlanSource == 'group_model' ||
+            _starterPlanSource == 'member_preferences'
+        ? 'based on group preferences'
+        : 'based on the trip details and destination';
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: const Color(0xFF4675B8).withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+              color: const Color(0xFF4675B8).withValues(alpha: 0.18)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.auto_awesome, color: Color(0xFF4675B8)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'AI starter plan',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                Text(
+                  '${_selected.length} selected',
+                  style: const TextStyle(
+                    color: Color(0xFF4675B8),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _starterDays.isEmpty
+                  ? 'We could not build a day-by-day plan yet. Choose from the AI-ranked places below.'
+                  : 'We preselected a recommended plan $sourceText. Uncheck places to remove them, or select more places below.',
+              style: TextStyle(color: Colors.grey[700], height: 1.35),
+            ),
+            if (_starterDays.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              for (final day in _starterDays) _buildStarterDay(day),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStarterDay(Map<String, dynamic> day) {
+    final activities = day['activities'];
+    final rows = activities is List ? activities.whereType<Map>().toList() : [];
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Day ${day['day'] ?? ''}',
+            style: const TextStyle(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 6),
+          for (final row in rows)
+            _buildStarterActivity(Map<String, dynamic>.from(row)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStarterActivity(Map<String, dynamic> activity) {
+    final key = _placeKey(activity);
+    final selected = _selected.contains(key);
+    final name = (activity['name'] ?? activity['title'] ?? 'Place').toString();
+    final start = (activity['start_time'] ?? '').toString();
+    final end = (activity['end_time'] ?? '').toString();
+
+    return InkWell(
+      onTap: key.isEmpty
+          ? null
+          : () {
+              setState(() {
+                if (selected) {
+                  _selected.remove(key);
+                } else {
+                  _selected.add(key);
+                }
+              });
+            },
+      borderRadius: BorderRadius.circular(10),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          children: [
+            Icon(
+              selected ? Icons.check_circle : Icons.radio_button_unchecked,
+              color: selected ? const Color(0xFF4675B8) : Colors.grey,
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ),
+            if (start.isNotEmpty && end.isNotEmpty)
+              Text(
+                '$start-$end',
+                style: TextStyle(color: Colors.grey[600], fontSize: 12),
+              ),
+          ],
+        ),
+      ),
     );
   }
 

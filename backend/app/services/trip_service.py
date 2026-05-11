@@ -14,6 +14,32 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+async def _are_friends(db: SupabaseDB, user_a: str, user_b: str) -> bool:
+    """Return true when either direction has an accepted friendship row."""
+    first = await run_in_threadpool(
+        lambda: db.client.table("friends")
+        .select("id")
+        .eq("user_id", user_a)
+        .eq("friend_id", user_b)
+        .eq("status", "accepted")
+        .limit(1)
+        .execute()
+    )
+    if first.data:
+        return True
+
+    second = await run_in_threadpool(
+        lambda: db.client.table("friends")
+        .select("id")
+        .eq("user_id", user_b)
+        .eq("friend_id", user_a)
+        .eq("status", "accepted")
+        .limit(1)
+        .execute()
+    )
+    return bool(second.data)
+
+
 # ==================== Trip CRUD Operations ====================
 
 async def get_user_trips(user_id: str, token: str) -> List[dict]:
@@ -184,6 +210,12 @@ async def invite_member(trip_id: str, inviter_id: str, invitee_id: str, token: s
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Creator cannot invite themselves"
+        )
+
+    if not await _are_friends(db, inviter_id, invitee_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only invite friends to a trip"
         )
     
     # Check if already exists

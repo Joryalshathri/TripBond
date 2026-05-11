@@ -92,6 +92,79 @@ class UserService {
     }
   }
 
+  // Get current user's accepted bonders/friends
+  Future<List<Map<String, dynamic>>> getMyFriends() async {
+    try {
+      final token = await _authService.getAuthToken();
+      if (token == null) {
+        throw Exception('Not authenticated');
+      }
+
+      final response = await _apiService.get(
+        '${ApiConfig.usersPath}/me/friends',
+        token: token,
+      );
+
+      if (response is List) {
+        return response
+            .whereType<Map>()
+            .map((item) => Map<String, dynamic>.from(item))
+            .toList();
+      }
+      return [];
+    } catch (e) {
+      throw Exception('Failed to get friends: ${e.toString()}');
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getBondRequests({
+    String direction = 'incoming',
+  }) async {
+    try {
+      final token = await _authService.getAuthToken();
+      if (token == null) {
+        throw Exception('Not authenticated');
+      }
+
+      final response = await _apiService.get(
+        '${ApiConfig.usersPath}/me/bond-requests',
+        queryParams: {'direction': direction},
+        token: token,
+      );
+
+      if (response is List) {
+        return response
+            .whereType<Map>()
+            .map((item) => Map<String, dynamic>.from(item))
+            .toList();
+      }
+      return [];
+    } catch (e) {
+      throw Exception('Failed to get bond requests: ${e.toString()}');
+    }
+  }
+
+  Future<Map<String, dynamic>> getRelationship(String userId) async {
+    try {
+      final token = await _authService.getAuthToken();
+      if (token == null) {
+        throw Exception('Not authenticated');
+      }
+
+      final response = await _apiService.get(
+        '${ApiConfig.usersPath}/$userId/relationship',
+        token: token,
+      );
+
+      if (response is Map) {
+        return Map<String, dynamic>.from(response);
+      }
+      return {};
+    } catch (e) {
+      throw Exception('Failed to get relationship: ${e.toString()}');
+    }
+  }
+
   // Get discoverable TripBond users for inviting/connecting
   Future<List<Map<String, dynamic>>> getBonders({int limit = 100}) async {
     try {
@@ -304,6 +377,44 @@ class UserService {
       return response;
     } catch (e) {
       throw Exception('Failed to cancel bond request: ${e.toString()}');
+    }
+  }
+
+  Future<Map<String, dynamic>> acceptBondRequest(String userId) async {
+    try {
+      final token = await _authService.getAuthToken();
+      if (token == null) {
+        throw Exception('Not authenticated');
+      }
+
+      final response = await _apiService.post(
+        '${ApiConfig.usersPath}/$userId/bond-request/accept',
+        {},
+        token: token,
+      );
+
+      return response;
+    } catch (e) {
+      throw Exception('Failed to accept bond request: ${e.toString()}');
+    }
+  }
+
+  Future<Map<String, dynamic>> rejectBondRequest(String userId) async {
+    try {
+      final token = await _authService.getAuthToken();
+      if (token == null) {
+        throw Exception('Not authenticated');
+      }
+
+      final response = await _apiService.post(
+        '${ApiConfig.usersPath}/$userId/bond-request/reject',
+        {},
+        token: token,
+      );
+
+      return response;
+    } catch (e) {
+      throw Exception('Failed to reject bond request: ${e.toString()}');
     }
   }
 }

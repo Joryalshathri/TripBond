@@ -70,18 +70,12 @@ class _TripinfoState extends State<TripInfo> {
 
   Future<void> _loadInviteCandidates() async {
     try {
-      final results = await Future.wait([
-        _userService.getMyFollowing(),
-        _userService.getMyFollowers(),
-        _userService.getBonders(),
-      ]);
+      final friends = await _userService.getMyFriends();
       final byId = <String, Map<String, dynamic>>{};
-      for (final list in results) {
-        for (final user in list) {
-          final id = (user['id'] ?? '').toString();
-          if (id.isEmpty) continue;
-          byId[id] = user;
-        }
+      for (final user in friends) {
+        final id = (user['id'] ?? '').toString();
+        if (id.isEmpty) continue;
+        byId[id] = user;
       }
       if (!mounted) return;
       setState(() {
@@ -584,7 +578,7 @@ class _TripinfoState extends State<TripInfo> {
             )
           else if (_inviteCandidates.isEmpty)
             const Text(
-              'No friends found yet. You can still create the trip and invite from the trip page later.',
+              'No friends found yet. Bond with people first, then invite them to a trip.',
               style: TextStyle(
                 fontFamily: 'Poppins',
                 fontSize: 12,

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../services/notification_service.dart';
 import '../services/trip_service.dart';
+import '../services/user_service.dart';
 import 'trip_flow_screen.dart';
 
 class NotificationsView extends StatefulWidget {
@@ -16,14 +17,20 @@ class _NotificationsViewState extends State<NotificationsView> {
   String _selectedTab = 'notifications'; // notifications, followers, requests
   final _notificationService = NotificationService();
   final _tripService = TripService();
+  final _userService = UserService();
   List<Map<String, dynamic>> _notifications = [];
+  List<Map<String, dynamic>> _followers = [];
+  List<Map<String, dynamic>> _bondRequests = [];
   bool _loadingNotifications = true;
+  bool _loadingSocial = true;
   String? _notificationsError;
+  String? _socialError;
 
   @override
   void initState() {
     super.initState();
     _loadNotifications();
+    _loadSocialTabs();
   }
 
   Future<void> _loadNotifications() async {
@@ -59,6 +66,69 @@ class _NotificationsViewState extends State<NotificationsView> {
     }
   }
 
+  Future<void> _loadSocialTabs() async {
+    setState(() {
+      _loadingSocial = true;
+      _socialError = null;
+    });
+    try {
+      final results = await Future.wait([
+        _userService.getMyFollowers(),
+        _userService.getBondRequests(),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _followers = results[0];
+        _bondRequests = results[1];
+        _loadingSocial = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _socialError = e.toString().replaceFirst('Exception: ', '');
+        _loadingSocial = false;
+      });
+    }
+  }
+
+  Future<void> _acceptBondRequest(Map<String, dynamic> request) async {
+    final userId = (request['user_id'] ?? '').toString();
+    if (userId.isEmpty) return;
+    try {
+      await _userService.acceptBondRequest(userId);
+      await _loadSocialTabs();
+      await _loadNotifications();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Bond request accepted')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not accept request: $e')),
+      );
+    }
+  }
+
+  Future<void> _rejectBondRequest(Map<String, dynamic> request) async {
+    final userId = (request['user_id'] ?? '').toString();
+    if (userId.isEmpty) return;
+    try {
+      await _userService.rejectBondRequest(userId);
+      await _loadSocialTabs();
+      await _loadNotifications();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Bond request declined')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not decline request: $e')),
+      );
+    }
+  }
+
   Future<void> _onNotificationTap(Map<String, dynamic> n) async {
     if (n['read_at'] == null) {
       try {
@@ -69,10 +139,17 @@ class _NotificationsViewState extends State<NotificationsView> {
         });
       } catch (_) {}
     }
+    final type = n['type']?.toString();
+    if (type == 'bond_request') {
+      setState(() => _selectedTab = 'requests');
+      await _loadSocialTabs();
+      return;
+    }
+
     final tripId = _tripIdFromPayload(n['payload']);
     if (tripId == null || !mounted) return;
 
-    if (n['type']?.toString() == 'trip_invite') {
+    if (type == 'trip_invite') {
       try {
         await _tripService.acceptInvite(tripId);
       } catch (e) {
@@ -134,6 +211,10 @@ class _NotificationsViewState extends State<NotificationsView> {
       case 'join_request_approved':
       case 'join_request_rejected':
         return (icon: Icons.group_add, color: Colors.teal);
+      case 'bond_request':
+      case 'bond_request_accepted':
+      case 'bond_request_rejected':
+        return (icon: Icons.handshake_outlined, color: Color(0xFFC8A858));
       case 'suggestion_approved':
       case 'suggestion_rejected':
         return (icon: Icons.recommend_outlined, color: Colors.green);
@@ -214,8 +295,10 @@ class _NotificationsViewState extends State<NotificationsView> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text('Failed to load: $_notificationsError', textAlign: TextAlign.center),
-              TextButton(onPressed: _loadNotifications, child: const Text('Retry')),
+              Text('Failed to load: $_notificationsError',
+                  textAlign: TextAlign.center),
+              TextButton(
+                  onPressed: _loadNotifications, child: const Text('Retry')),
             ],
           ),
         ),
@@ -239,7 +322,8 @@ class _NotificationsViewState extends State<NotificationsView> {
               margin: const EdgeInsets.only(bottom: 12),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: isUnread ? const Color(0xFF4675B8).withOpacity(0.05) : null,
+                color:
+                    isUnread ? const Color(0xFF4675B8).withOpacity(0.05) : null,
                 border: Border.all(color: Colors.grey[300]!),
                 borderRadius: BorderRadius.circular(8),
               ),
@@ -269,11 +353,13 @@ class _NotificationsViewState extends State<NotificationsView> {
                         if ((n['body'] ?? '').toString().isNotEmpty)
                           Text(
                             n['body'].toString(),
-                            style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                            style: TextStyle(
+                                fontSize: 12, color: Colors.grey[700]),
                           ),
                         Text(
                           _formatTimestamp(n['created_at']?.toString()),
-                          style: TextStyle(fontSize: 10, color: Colors.grey[500]),
+                          style:
+                              TextStyle(fontSize: 10, color: Colors.grey[500]),
                         ),
                       ],
                     ),
@@ -297,18 +383,39 @@ class _NotificationsViewState extends State<NotificationsView> {
   }
 
   Widget _buildFollowers() {
-    final followers = [
-      {'name': 'Alex Johnson', 'mutualFollowers': 12},
-      {'name': 'Emma Wilson', 'mutualFollowers': 8},
-      {'name': 'David Brown', 'mutualFollowers': 5},
-      {'name': 'Sarah Davis', 'mutualFollowers': 15},
-    ];
+    if (_loadingSocial) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_socialError != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text('Failed to load: $_socialError',
+                  textAlign: TextAlign.center),
+              TextButton(
+                  onPressed: _loadSocialTabs, child: const Text('Retry')),
+            ],
+          ),
+        ),
+      );
+    }
+    if (_followers.isEmpty) {
+      return const Center(child: Text('No followers yet.'));
+    }
 
     return ListView.builder(
       padding: const EdgeInsets.all(16),
-      itemCount: followers.length,
+      itemCount: _followers.length,
       itemBuilder: (context, index) {
-        final follower = followers[index];
+        final follower = _followers[index];
+        final name = (follower['name'] ??
+                follower['full_name'] ??
+                follower['username'] ??
+                'TripBond User')
+            .toString();
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
           padding: const EdgeInsets.all(12),
@@ -322,7 +429,7 @@ class _NotificationsViewState extends State<NotificationsView> {
                 radius: 24,
                 backgroundColor: const Color(0xFF4675B8).withOpacity(0.2),
                 child: Text(
-                  follower['name'].toString()[0].toUpperCase(),
+                  name.trim().isEmpty ? '?' : name.trim()[0].toUpperCase(),
                   style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -336,14 +443,14 @@ class _NotificationsViewState extends State<NotificationsView> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      follower['name'].toString(),
+                      name,
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
                       ),
                     ),
                     Text(
-                      '${follower['mutualFollowers']} mutual followers',
+                      'Follower',
                       style: TextStyle(
                         fontSize: 12,
                         color: Colors.grey[600],
@@ -351,14 +458,6 @@ class _NotificationsViewState extends State<NotificationsView> {
                     ),
                   ],
                 ),
-              ),
-              ElevatedButton(
-                onPressed: () {},
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF4675B8),
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                ),
-                child: const Text('Follow Back'),
               ),
             ],
           ),
@@ -368,17 +467,39 @@ class _NotificationsViewState extends State<NotificationsView> {
   }
 
   Widget _buildRequests() {
-    final requests = [
-      {'name': 'Tom Anderson', 'mutualFriends': 3},
-      {'name': 'Lisa Chen', 'mutualFriends': 1},
-      {'name': 'Mark Taylor', 'mutualFriends': 5},
-    ];
+    if (_loadingSocial) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_socialError != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text('Failed to load: $_socialError',
+                  textAlign: TextAlign.center),
+              TextButton(
+                  onPressed: _loadSocialTabs, child: const Text('Retry')),
+            ],
+          ),
+        ),
+      );
+    }
+    if (_bondRequests.isEmpty) {
+      return const Center(child: Text('No pending bond requests.'));
+    }
 
     return ListView.builder(
       padding: const EdgeInsets.all(16),
-      itemCount: requests.length,
+      itemCount: _bondRequests.length,
       itemBuilder: (context, index) {
-        final request = requests[index];
+        final request = _bondRequests[index];
+        final name = (request['name'] ??
+                request['full_name'] ??
+                request['username'] ??
+                'TripBond User')
+            .toString();
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
           padding: const EdgeInsets.all(12),
@@ -392,7 +513,7 @@ class _NotificationsViewState extends State<NotificationsView> {
                 radius: 24,
                 backgroundColor: const Color(0xFF4675B8).withOpacity(0.2),
                 child: Text(
-                  request['name'].toString()[0].toUpperCase(),
+                  name.trim().isEmpty ? '?' : name.trim()[0].toUpperCase(),
                   style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -406,14 +527,14 @@ class _NotificationsViewState extends State<NotificationsView> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      request['name'].toString(),
+                      name,
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
                       ),
                     ),
                     Text(
-                      '${request['mutualFriends']} mutual friends',
+                      'Wants to bond with you',
                       style: TextStyle(
                         fontSize: 12,
                         color: Colors.grey[600],
@@ -425,10 +546,11 @@ class _NotificationsViewState extends State<NotificationsView> {
               Row(
                 children: [
                   ElevatedButton(
-                    onPressed: () {},
+                    onPressed: () => _acceptBondRequest(request),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF4675B8),
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 12),
                     ),
                     child: const Text(
                       'Accept',
@@ -437,10 +559,11 @@ class _NotificationsViewState extends State<NotificationsView> {
                   ),
                   const SizedBox(width: 8),
                   OutlinedButton(
-                    onPressed: () {},
+                    onPressed: () => _rejectBondRequest(request),
                     style: OutlinedButton.styleFrom(
                       side: const BorderSide(color: Color(0xFF4675B8)),
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 12),
                     ),
                     child: const Text('Decline'),
                   ),
