@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/poi_service.dart';
 import '../services/trip_service.dart';
+import '../widgets/place_image_carousel.dart';
 import 'group_suggested_itinerary.dart';
 
 /// Place-picker shown to every trip member during the planning phase.
@@ -61,6 +62,23 @@ class _TripPlacesPickerScreenState extends State<TripPlacesPickerScreen> {
 
   String _placeKey(Map<String, dynamic> p) =>
       (p['id'] ?? p['poi_id'] ?? p['place_id'] ?? p['name'] ?? '').toString();
+
+  List<Map<String, dynamic>> _mergeUniquePlaces(
+    List<Map<String, dynamic>> primary,
+    List<Map<String, dynamic>> secondary,
+  ) {
+    final seen = <String>{};
+    final merged = <Map<String, dynamic>>[];
+
+    for (final place in [...primary, ...secondary]) {
+      final key = _placeKey(place).trim().toLowerCase();
+      if (key.isEmpty || seen.contains(key)) continue;
+      seen.add(key);
+      merged.add(place);
+    }
+
+    return merged;
+  }
 
   double? _toDouble(dynamic value) {
     if (value == null) return null;
@@ -137,6 +155,16 @@ class _TripPlacesPickerScreenState extends State<TripPlacesPickerScreen> {
         starterDays = starter['days'] as List<Map<String, dynamic>>;
         starterSource = starter['source'] as String;
         selectedKeys = starter['selected'] as Set<String>;
+
+        try {
+          final cityPlaces = await _poiService.searchPOIs(
+            location: _destination,
+            limit: 200,
+          );
+          places = _mergeUniquePlaces(places, cityPlaces);
+        } catch (_) {
+          // Keep the AI starter choices usable even if the broader city list fails.
+        }
       }
 
       if (places.isEmpty) {
@@ -216,6 +244,15 @@ class _TripPlacesPickerScreenState extends State<TripPlacesPickerScreen> {
             selected.add(key);
           }
         }
+      }
+
+      if (selected.isEmpty && byKey.isNotEmpty) {
+        final scheduledCount = days.fold<int>(0, (count, day) {
+          final activities = day['activities'];
+          return count + (activities is List ? activities.length : 0);
+        });
+        final fallbackCount = scheduledCount > 0 ? scheduledCount : 12;
+        selected.addAll(byKey.keys.take(fallbackCount));
       }
 
       return {
@@ -305,6 +342,8 @@ class _TripPlacesPickerScreenState extends State<TripPlacesPickerScreen> {
           'types':
               place['types'] ?? (place['type'] != null ? [place['type']] : []),
           'image_url': place['image_url'],
+          'photo_url': place['image_url'],
+          'images': place['images'] ?? [],
           'external_place_id': place['place_id'] ??
               place['external_place_id'] ??
               place['id'] ??
@@ -527,7 +566,7 @@ class _TripPlacesPickerScreenState extends State<TripPlacesPickerScreen> {
             Text(
               _starterDays.isEmpty
                   ? 'We could not build a day-by-day plan yet. Choose from the AI-ranked places below.'
-                  : 'We preselected a recommended plan $sourceText. Uncheck places to remove them, or select more places below.',
+                  : 'We preselected a recommended plan $sourceText. Uncheck places to remove them, or pick any other city place below.',
               style: TextStyle(color: Colors.grey[700], height: 1.35),
             ),
             if (_starterDays.isNotEmpty) ...[
@@ -612,7 +651,7 @@ class _TripPlacesPickerScreenState extends State<TripPlacesPickerScreen> {
   Widget _buildCard(Map<String, dynamic> place) {
     final key = _placeKey(place);
     final isSelected = _selected.contains(key);
-    final image = (place['image_url'] ?? '').toString();
+    final images = placeImagesFromMap(place);
     final name = (place['name'] ?? 'Place').toString();
     final address = (place['address'] ?? place['location'] ?? '').toString();
     final rating = place['rating'];
@@ -656,13 +695,11 @@ class _TripPlacesPickerScreenState extends State<TripPlacesPickerScreen> {
                 children: [
                   AspectRatio(
                     aspectRatio: 16 / 10,
-                    child: image.isNotEmpty
-                        ? Image.network(
-                            image,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => _imagePlaceholder(),
-                          )
-                        : _imagePlaceholder(),
+                    child: PlaceImageCarousel(
+                      images: images,
+                      height: 160,
+                      showAttribution: images.isNotEmpty,
+                    ),
                   ),
                   if (isSelected)
                     Positioned(
@@ -769,15 +806,6 @@ class _TripPlacesPickerScreenState extends State<TripPlacesPickerScreen> {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _imagePlaceholder() {
-    return Container(
-      color: Colors.grey[200],
-      child: const Center(
-        child: Icon(Icons.location_on, color: Colors.grey, size: 32),
       ),
     );
   }

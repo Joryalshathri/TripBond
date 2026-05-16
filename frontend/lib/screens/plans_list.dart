@@ -6,6 +6,7 @@ import '../providers/trip_provider.dart';
 import '../providers/user_provider.dart';
 import '../services/city_service.dart';
 import '../state/trip_creation_state.dart';
+import '../widgets/app_bottom_nav.dart';
 import 'AI_Plan.dart';
 import 'bonder.dart';
 import 'DatesPage.dart';
@@ -239,8 +240,8 @@ class _PlansListState extends State<PlansList> {
       padding: const EdgeInsets.fromLTRB(20, 50, 20, 12),
       child: Consumer<UserProvider>(
         builder: (context, userProvider, child) {
-          final userName = userProvider.currentProfile?['first_name'] ?? 
-              userProvider.currentProfile?['full_name'] ?? 
+          final userName = userProvider.currentProfile?['first_name'] ??
+              userProvider.currentProfile?['full_name'] ??
               'User';
           return Row(
             children: [
@@ -507,7 +508,8 @@ class _PlansListState extends State<PlansList> {
                   fontSize: 22)),
           IconButton(
               onPressed: () => showSearch(
-                  context: context, delegate: DestinationSearchDelegate()),
+                  context: context,
+                  delegate: DestinationSearchDelegate(initialCities: _cities)),
               icon: const Icon(Icons.search, size: 28)),
         ],
       ),
@@ -625,66 +627,7 @@ class _PlansListState extends State<PlansList> {
   }
 
   Widget _buildBottomNav(BuildContext context) {
-    return Positioned(
-      bottom: 0,
-      left: 0,
-      right: 0,
-      child: Container(
-        height: 70,
-        decoration: const BoxDecoration(
-          color: Color(0xFF4675B8),
-          borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(25), topRight: Radius.circular(25)),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 0),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            SizedBox(width: 50, child: _navIcon(Icons.home,
-                onTap: () => Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => const DestinationLandingPage())))),
-            SizedBox(width: 50, child: _navIcon(Icons.search, active: true,
-                onTap: () => Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => const PlansList(source: 'home'))))),
-            SizedBox(width: 50, child: _navIcon(Icons.airplanemode_active,
-                onTap: () => Navigator.pushReplacement(context,
-                    MaterialPageRoute(builder: (_) => const AI_Plan())))),
-            SizedBox(width: 50, child: _navIcon(Icons.group_outlined,
-                onTap: () => Navigator.pushReplacement(context,
-                    MaterialPageRoute(builder: (_) => const Bonders())))),
-            SizedBox(width: 50, child: _navIcon(Icons.person_outline,
-                onTap: () => Navigator.push(context,
-                    MaterialPageRoute(builder: (_) => const Profile())))),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _navIcon(IconData icon, {VoidCallback? onTap, bool active = false}) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 24, color: Colors.white),
-          if (active) ...[
-            const SizedBox(height: 4),
-            Container(
-                width: 20,
-                height: 2,
-                decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(1))),
-          ],
-        ],
-      ),
-    );
+    return const AppBottomNav(currentTab: AppNavTab.search);
   }
 }
 
@@ -720,6 +663,10 @@ class _CityCardState extends State<_CityCard>
   Widget build(BuildContext context) {
     final featured = widget.city.isFeatured;
     final asset = widget.city.imageAsset;
+    final imageUrl = widget.city.imageUrl ??
+        (widget.city.images.isNotEmpty
+            ? widget.city.images.first['url']?.toString()
+            : null);
     return GestureDetector(
       onTapDown: (_) => _scaleController.forward(),
       onTapCancel: () => _scaleController.reverse(),
@@ -741,6 +688,12 @@ class _CityCardState extends State<_CityCard>
                 if (asset != null)
                   Image.asset(
                     asset,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => _placeholder(),
+                  )
+                else if (imageUrl != null && imageUrl.isNotEmpty)
+                  Image.network(
+                    imageUrl,
                     fit: BoxFit.cover,
                     errorBuilder: (_, __, ___) => _placeholder(),
                   )
@@ -880,6 +833,14 @@ class _DestinationCardState extends State<_DestinationCard>
 
 class DestinationSearchDelegate extends SearchDelegate {
   final _cityService = CityService();
+  final List<CityInfo>? initialCities;
+  late final Future<List<CityInfo>> _citiesFuture;
+
+  DestinationSearchDelegate({this.initialCities}) {
+    _citiesFuture = initialCities != null && initialCities!.isNotEmpty
+        ? Future.value(initialCities)
+        : _cityService.listCities();
+  }
 
   @override
   List<Widget>? buildActions(BuildContext context) =>
@@ -898,7 +859,7 @@ class DestinationSearchDelegate extends SearchDelegate {
 
   Widget _build(BuildContext context) {
     return FutureBuilder<List<CityInfo>>(
-      future: _cityService.listCities(),
+      future: _citiesFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
@@ -910,9 +871,11 @@ class DestinationSearchDelegate extends SearchDelegate {
         final q = query.trim().toLowerCase();
         final filtered = q.isEmpty
             ? cities
-            : cities.where((c) =>
-                c.name.toLowerCase().contains(q) ||
-                c.province.toLowerCase().contains(q)).toList();
+            : cities
+                .where((c) =>
+                    c.name.toLowerCase().contains(q) ||
+                    c.province.toLowerCase().contains(q))
+                .toList();
         if (filtered.isEmpty) {
           return const Center(child: Text('No cities match your search.'));
         }

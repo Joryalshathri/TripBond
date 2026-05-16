@@ -425,11 +425,22 @@ def get_pois_for_destination(
     if require_coordinates:
         matching_with_coordinates = matching[matching.apply(_row_has_coordinates, axis=1)]
         if matching_with_coordinates.empty:
-            logger.warning(f"AI POIs for {destination} lack coordinates; trying external search")
-            external_pois = _get_external_pois_for_destination(destination, limit=limit)
-            if external_pois:
-                return external_pois
-            use_city_center_fallback = True
+            if _city_center_for_destination(destination) is not None:
+                logger.warning(
+                    "AI POIs for %s lack coordinates; using city-center fallback",
+                    destination,
+                )
+                use_city_center_fallback = True
+            else:
+                logger.warning(
+                    "AI POIs for %s lack coordinates and no city center is known; "
+                    "trying external search",
+                    destination,
+                )
+                external_pois = _get_external_pois_for_destination(destination, limit=limit)
+                if external_pois:
+                    return external_pois
+                use_city_center_fallback = True
         else:
             matching = matching_with_coordinates
 

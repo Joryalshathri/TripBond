@@ -10,6 +10,7 @@ Requires GOOGLE_MAPS_API_KEY to be set in the environment / .env file.
 import httpx
 import logging
 from fastapi import HTTPException, status
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from ..config import get_settings
 from ..schemas.places import (
@@ -20,11 +21,27 @@ from ..schemas.places import (
     PlaceGeometry,
     PlacePhoto,
     PlaceOpeningHours,
+    CachedPlaceImage,
 )
 
 logger = logging.getLogger(__name__)
 
-PLACES_BASE_URL = "https://maps.googleapis.com/maps/api/place"
+PLACES_BASE_URL = "https://places.googleapis.com/v1"
+SEARCH_FIELD_MASK = (
+    "places.id,places.displayName,places.formattedAddress,places.shortFormattedAddress,"
+    "places.location,places.rating,places.userRatingCount,places.priceLevel,places.types,"
+    "places.currentOpeningHours,places.photos,places.businessStatus,nextPageToken"
+)
+DETAILS_FIELD_MASK = (
+    "id,displayName,formattedAddress,nationalPhoneNumber,internationalPhoneNumber,"
+    "websiteUri,location,rating,userRatingCount,priceLevel,types,regularOpeningHours,"
+    "photos,googleMapsUri,editorialSummary,businessStatus"
+)
+
+
+def _cache_expiry_iso() -> str:
+    days = max(1, get_settings().place_cache_days)
+    return (datetime.now(timezone.utc) + timedelta(days=days)).isoformat()
 
 
 def _get_api_key() -> str:
@@ -38,46 +55,136 @@ def _get_api_key() -> str:
     return key
 
 
-def _parse_place_result(place: dict) -> PlaceResult:
-    """Convert a raw Google Places result dict into a PlaceResult schema."""
-    geo = place.get("geometry", {}).get("location")
-    geometry = PlaceGeometry(lat=geo["lat"], lng=geo["lng"]) if geo else None
+def _headers(field_mask: str) -> dict:
+    return {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": _get_api_key(),
+        "X-Goog-FieldMask": field_mask,
+    }
 
-    photos = [
-        PlacePhoto(
-            photo_reference=p["photo_reference"],
-            height=p.get("height", 0),
-            width=p.get("width", 0),
+
+def _google_error_message(response: httpx.Response) -> str:
+    try:
+        data = response.json()
+    except ValueError:
+        return response.text
+    error = data.get("error")
+    if isinstance(error, dict):
+        return error.get("message") or error.get("status") or str(error)
+    return data.get("error_message") or data.get("status") or str(data)
+
+
+def _raise_google_http_error(exc: httpx.HTTPStatusError, operation: str) -> None:
+    message = _google_error_message(exc.response)
+    logger.error("Google Places %s failed: %s", operation, message)
+    raise HTTPException(
+        status_code=status.HTTP_502_BAD_GATEWAY,
+        detail=f"Google Places API request failed: {message}",
+    )
+
+
+def _localized_text(value: Optional[dict]) -> Optional[str]:
+    if not isinstance(value, dict):
+        return None
+    return value.get("text")
+
+
+def _parse_price_level(value) -> Optional[int]:
+    if isinstance(value, int):
+        return value
+    mapping = {
+        "PRICE_LEVEL_FREE": 0,
+        "PRICE_LEVEL_INEXPENSIVE": 1,
+        "PRICE_LEVEL_MODERATE": 2,
+        "PRICE_LEVEL_EXPENSIVE": 3,
+        "PRICE_LEVEL_VERY_EXPENSIVE": 4,
+    }
+    return mapping.get(value or "")
+
+
+def _parse_location(place: dict) -> Optional[PlaceGeometry]:
+    location = place.get("location") or {}
+    lat = location.get("latitude")
+    lng = location.get("longitude")
+    if lat is None or lng is None:
+        return None
+    return PlaceGeometry(lat=lat, lng=lng)
+
+
+def _parse_opening_hours(place: dict) -> Optional[PlaceOpeningHours]:
+    opening = place.get("currentOpeningHours") or place.get("regularOpeningHours")
+    if not isinstance(opening, dict):
+        return None
+    return PlaceOpeningHours(open_now=opening.get("openNow"))
+
+
+def _parse_photo(photo: dict, sort_order: int = 0, max_width: int = 1200) -> PlacePhoto:
+    reference = photo.get("name") or photo.get("photo_reference", "")
+    attributions = []
+    for attribution in photo.get("authorAttributions", []) or []:
+        if isinstance(attribution, dict):
+            display_name = attribution.get("displayName")
+            uri = attribution.get("uri")
+            if display_name and uri:
+                attributions.append(f'<a href="{uri}">{display_name}</a>')
+            elif display_name:
+                attributions.append(display_name)
+    attributions.extend(photo.get("html_attributions", []) or [])
+    image_url = get_photo_url(reference, max_width=max_width) if reference else None
+    return PlacePhoto(
+        photo_reference=reference,
+        height=photo.get("heightPx", photo.get("height", 0)),
+        width=photo.get("widthPx", photo.get("width", 0)),
+        html_attributions=attributions,
+        image_url=image_url,
+    )
+
+
+def photos_to_cached_images(photos: list[PlacePhoto], expires_at: Optional[str] = None) -> list[CachedPlaceImage]:
+    """Build ordered app image entries from Google Places photo metadata."""
+    expiry = expires_at or _cache_expiry_iso()
+    images: list[CachedPlaceImage] = []
+    seen: set[str] = set()
+    for index, photo in enumerate(photos):
+        if not photo.photo_reference or photo.photo_reference in seen:
+            continue
+        seen.add(photo.photo_reference)
+        url = photo.image_url or get_photo_url(photo.photo_reference, max_width=1200)
+        images.append(
+            CachedPlaceImage(
+                url=url,
+                width=photo.width,
+                height=photo.height,
+                source="google_places",
+                attributions=photo.html_attributions,
+                expires_at=expiry,
+                sort_order=index,
+                photo_reference=photo.photo_reference,
+            )
         )
-        for p in place.get("photos", [])
-    ]
+    return images
 
-    opening = place.get("opening_hours")
-    opening_hours = PlaceOpeningHours(open_now=opening.get("open_now")) if opening else None
-
-    # Construct image_url from first photo if available
-    image_url = None
-    if photos:
-        try:
-            image_url = get_photo_url(photos[0].photo_reference, max_width=800)
-        except Exception as e:
-            logger.debug(f"Could not construct photo URL: {e}")
+def _parse_place_result(place: dict) -> PlaceResult:
+    """Convert a Places API (New) place dict into a PlaceResult schema."""
+    photos = [_parse_photo(p, sort_order=index) for index, p in enumerate(place.get("photos", []))]
+    images = photos_to_cached_images(photos)
 
     return PlaceResult(
-        place_id=place["place_id"],
-        name=place.get("name", ""),
-        formatted_address=place.get("formatted_address"),
-        vicinity=place.get("vicinity"),
-        geometry=geometry,
+        place_id=place["id"],
+        name=_localized_text(place.get("displayName")) or "",
+        formatted_address=place.get("formattedAddress"),
+        vicinity=place.get("shortFormattedAddress"),
+        geometry=_parse_location(place),
         rating=place.get("rating"),
-        user_ratings_total=place.get("user_ratings_total"),
-        price_level=place.get("price_level"),
+        user_ratings_total=place.get("userRatingCount"),
+        price_level=_parse_price_level(place.get("priceLevel")),
         types=place.get("types", []),
-        opening_hours=opening_hours,
+        opening_hours=_parse_opening_hours(place),
         photos=photos,
-        image_url=image_url,
-        icon=place.get("icon"),
-        business_status=place.get("business_status"),
+        images=images,
+        image_url=images[0].url if images else None,
+        icon=None,
+        business_status=place.get("businessStatus"),
     )
 
 
@@ -98,20 +205,25 @@ def text_search_places(
     Returns:
         PlacesSearchResponse with up to 20 results per page.
     """
-    api_key = _get_api_key()
-    params: dict = {
-        "query": query,
-        "language": language,
-        "key": api_key,
+    body: dict = {
+        "textQuery": query,
+        "languageCode": language,
+        "maxResultCount": 20,
     }
     if next_page_token:
-        params["pagetoken"] = next_page_token
+        body["pageToken"] = next_page_token
 
     try:
         with httpx.Client(timeout=10.0) as client:
-            resp = client.get(f"{PLACES_BASE_URL}/textsearch/json", params=params)
+            resp = client.post(
+                f"{PLACES_BASE_URL}/places:searchText",
+                json=body,
+                headers=_headers(SEARCH_FIELD_MASK),
+            )
             resp.raise_for_status()
             data = resp.json()
+    except httpx.HTTPStatusError as exc:
+        _raise_google_http_error(exc, "text search")
     except httpx.HTTPError as exc:
         logger.error("Google Places text search failed: %s", exc)
         raise HTTPException(
@@ -119,18 +231,12 @@ def text_search_places(
             detail=f"Google Places API request failed: {exc}",
         )
 
-    google_status = data.get("status", "UNKNOWN_ERROR")
-    if google_status not in ("OK", "ZERO_RESULTS"):
-        logger.warning("Google Places API returned status: %s", google_status)
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Google Places API error: {google_status}",
-        )
+    places = data.get("places", [])
 
     return PlacesSearchResponse(
-        results=[_parse_place_result(p) for p in data.get("results", [])],
-        next_page_token=data.get("next_page_token"),
-        status=google_status,
+        results=[_parse_place_result(p) for p in places],
+        next_page_token=data.get("nextPageToken"),
+        status="OK" if places else "ZERO_RESULTS",
     )
 
 
@@ -159,25 +265,48 @@ def nearby_search_places(
     Returns:
         PlacesSearchResponse with up to 20 results per page.
     """
-    api_key = _get_api_key()
-    params: dict = {
-        "location": f"{lat},{lng}",
-        "radius": min(radius, 50000),
-        "language": language,
-        "key": api_key,
+    body: dict = {
+        "maxResultCount": 20,
+        "languageCode": language,
+        "locationRestriction": {
+            "circle": {
+                "center": {
+                    "latitude": lat,
+                    "longitude": lng,
+                },
+                "radius": min(radius, 50000),
+            }
+        },
     }
     if place_type:
-        params["type"] = place_type
+        body["includedTypes"] = [place_type]
     if keyword:
-        params["keyword"] = keyword
+        # Nearby Search (New) has no keyword parameter; use Text Search with a
+        # location bias when we need a named place near coordinates.
+        text_body = {
+            "textQuery": keyword,
+            "languageCode": language,
+            "maxResultCount": 20,
+            "locationBias": body["locationRestriction"],
+        }
+        if place_type:
+            text_body["includedType"] = place_type
+        body = text_body
     if next_page_token:
-        params["pagetoken"] = next_page_token
+        body["pageToken"] = next_page_token
 
     try:
         with httpx.Client(timeout=10.0) as client:
-            resp = client.get(f"{PLACES_BASE_URL}/nearbysearch/json", params=params)
+            endpoint = "places:searchText" if keyword else "places:searchNearby"
+            resp = client.post(
+                f"{PLACES_BASE_URL}/{endpoint}",
+                json=body,
+                headers=_headers(SEARCH_FIELD_MASK),
+            )
             resp.raise_for_status()
             data = resp.json()
+    except httpx.HTTPStatusError as exc:
+        _raise_google_http_error(exc, "nearby search")
     except httpx.HTTPError as exc:
         logger.error("Google Places nearby search failed: %s", exc)
         raise HTTPException(
@@ -185,18 +314,12 @@ def nearby_search_places(
             detail=f"Google Places API request failed: {exc}",
         )
 
-    google_status = data.get("status", "UNKNOWN_ERROR")
-    if google_status not in ("OK", "ZERO_RESULTS"):
-        logger.warning("Google Places API returned status: %s", google_status)
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Google Places API error: {google_status}",
-        )
+    places = data.get("places", [])
 
     return PlacesSearchResponse(
-        results=[_parse_place_result(p) for p in data.get("results", [])],
-        next_page_token=data.get("next_page_token"),
-        status=google_status,
+        results=[_parse_place_result(p) for p in places],
+        next_page_token=data.get("nextPageToken"),
+        status="OK" if places else "ZERO_RESULTS",
     )
 
 
@@ -211,25 +334,27 @@ def get_place_details(place_id: str, language: str = "en") -> PlaceDetailsRespon
     Returns:
         PlaceDetailsResponse with comprehensive place information.
     """
-    api_key = _get_api_key()
-    fields = (
-        "place_id,name,formatted_address,formatted_phone_number,"
-        "international_phone_number,website,geometry,rating,"
-        "user_ratings_total,price_level,types,opening_hours,photos,"
-        "url,editorial_summary"
-    )
     params: dict = {
-        "place_id": place_id,
-        "fields": fields,
-        "language": language,
-        "key": api_key,
+        "languageCode": language,
     }
 
     try:
         with httpx.Client(timeout=10.0) as client:
-            resp = client.get(f"{PLACES_BASE_URL}/details/json", params=params)
+            resp = client.get(
+                f"{PLACES_BASE_URL}/places/{place_id}",
+                params=params,
+                headers=_headers(DETAILS_FIELD_MASK),
+            )
             resp.raise_for_status()
             data = resp.json()
+    except httpx.HTTPStatusError as exc:
+        if exc.response.status_code == 404:
+            detail = _google_error_message(exc.response)
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Google Places API error: {detail}",
+            )
+        _raise_google_http_error(exc, "details")
     except httpx.HTTPError as exc:
         logger.error("Google Places details request failed: %s", exc)
         raise HTTPException(
@@ -237,76 +362,65 @@ def get_place_details(place_id: str, language: str = "en") -> PlaceDetailsRespon
             detail=f"Google Places API request failed: {exc}",
         )
 
-    google_status = data.get("status", "UNKNOWN_ERROR")
-    if google_status != "OK":
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND if google_status == "NOT_FOUND" else status.HTTP_502_BAD_GATEWAY,
-            detail=f"Google Places API error: {google_status}",
-        )
+    photos = [_parse_photo(p, sort_order=index) for index, p in enumerate(data.get("photos", []))]
+    images = photos_to_cached_images(photos)
 
-    place = data.get("result", {})
-    geo = place.get("geometry", {}).get("location")
-    geometry = PlaceGeometry(lat=geo["lat"], lng=geo["lng"]) if geo else None
-
-    photos = [
-        PlacePhoto(
-            photo_reference=p["photo_reference"],
-            height=p.get("height", 0),
-            width=p.get("width", 0),
-        )
-        for p in place.get("photos", [])
-    ]
-
-    editorial = place.get("editorial_summary", {})
-
-    # Construct image_url from first photo if available
-    image_url = None
-    if photos:
-        try:
-            image_url = get_photo_url(photos[0].photo_reference, max_width=800)
-        except Exception as e:
-            logger.debug(f"Could not construct photo URL: {e}")
+    editorial_summary = _localized_text(data.get("editorialSummary"))
 
     result = PlaceDetailsResult(
-        place_id=place.get("place_id", place_id),
-        name=place.get("name", ""),
-        formatted_address=place.get("formatted_address"),
-        formatted_phone_number=place.get("formatted_phone_number"),
-        international_phone_number=place.get("international_phone_number"),
-        website=place.get("website"),
-        geometry=geometry,
-        rating=place.get("rating"),
-        user_ratings_total=place.get("user_ratings_total"),
-        price_level=place.get("price_level"),
-        types=place.get("types", []),
-        opening_hours=place.get("opening_hours"),
+        place_id=data.get("id", place_id),
+        name=_localized_text(data.get("displayName")) or "",
+        formatted_address=data.get("formattedAddress"),
+        formatted_phone_number=data.get("nationalPhoneNumber"),
+        international_phone_number=data.get("internationalPhoneNumber"),
+        website=data.get("websiteUri"),
+        geometry=_parse_location(data),
+        rating=data.get("rating"),
+        user_ratings_total=data.get("userRatingCount"),
+        price_level=_parse_price_level(data.get("priceLevel")),
+        types=data.get("types", []),
+        opening_hours=data.get("regularOpeningHours"),
         photos=photos,
-        image_url=image_url,
-        url=place.get("url"),
-        editorial_summary=editorial.get("overview") if isinstance(editorial, dict) else None,
+        images=images,
+        image_url=images[0].url if images else None,
+        url=data.get("googleMapsUri"),
+        editorial_summary=editorial_summary,
     )
 
-    return PlaceDetailsResponse(result=result, status=google_status)
+    return PlaceDetailsResponse(result=result, status="OK")
 
 
 def get_photo_url(photo_reference: str, max_width: int = 800) -> str:
     """
-    Build a direct URL to fetch a place photo from Google.
+    Resolve a Places API (New) photo resource into a displayable image URI.
 
     Args:
-        photo_reference: The photo_reference string from a PlacePhoto.
+        photo_reference: The photo resource name from a PlacePhoto.
         max_width: Maximum width of the returned image in pixels.
 
     Returns:
-        A URL string that resolves to the photo image.
+        A URL string that resolves to the photo image, without exposing the API key.
     """
-    api_key = _get_api_key()
-    return (
-        f"{PLACES_BASE_URL}/photo"
-        f"?maxwidth={max_width}"
-        f"&photo_reference={photo_reference}"
-        f"&key={api_key}"
-    )
+    if not photo_reference:
+        return ""
+
+    params = {
+        "maxWidthPx": max_width,
+        "skipHttpRedirect": "true",
+        "key": _get_api_key(),
+    }
+    try:
+        with httpx.Client(timeout=10.0) as client:
+            resp = client.get(f"{PLACES_BASE_URL}/{photo_reference}/media", params=params)
+            resp.raise_for_status()
+            data = resp.json()
+            return data.get("photoUri") or str(resp.url)
+    except httpx.HTTPStatusError as exc:
+        logger.debug("Google Places photo lookup failed: %s", _google_error_message(exc.response))
+    except httpx.HTTPError as exc:
+        logger.debug("Google Places photo lookup failed: %s", exc)
+
+    return ""
 
 
 def get_image_url_for_place(place_name: str, lat: Optional[float] = None, lng: Optional[float] = None, language: str = "en") -> Optional[str]:

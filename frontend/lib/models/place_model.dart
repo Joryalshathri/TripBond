@@ -22,11 +22,15 @@ class PlacePhoto {
   final String photoReference;
   final int height;
   final int width;
+  final List<String> htmlAttributions;
+  final String? imageUrl;
 
   PlacePhoto({
     required this.photoReference,
     required this.height,
     required this.width,
+    this.htmlAttributions = const [],
+    this.imageUrl,
   });
 
   factory PlacePhoto.fromJson(Map<String, dynamic> json) {
@@ -34,6 +38,11 @@ class PlacePhoto {
       photoReference: json['photo_reference'] ?? '',
       height: json['height'] ?? 0,
       width: json['width'] ?? 0,
+      htmlAttributions: (json['html_attributions'] as List<dynamic>?)
+              ?.map((value) => value.toString())
+              .toList() ??
+          const [],
+      imageUrl: json['image_url'],
     );
   }
 
@@ -41,6 +50,53 @@ class PlacePhoto {
         'photo_reference': photoReference,
         'height': height,
         'width': width,
+        'html_attributions': htmlAttributions,
+        'image_url': imageUrl,
+      };
+}
+
+class CachedPlaceImage {
+  final String url;
+  final int? height;
+  final int? width;
+  final String source;
+  final List<String> attributions;
+  final String? expiresAt;
+  final int sortOrder;
+
+  CachedPlaceImage({
+    required this.url,
+    this.height,
+    this.width,
+    this.source = 'google_places',
+    this.attributions = const [],
+    this.expiresAt,
+    this.sortOrder = 0,
+  });
+
+  factory CachedPlaceImage.fromJson(Map<String, dynamic> json) {
+    return CachedPlaceImage(
+      url: (json['url'] ?? '').toString(),
+      height: (json['height'] as num?)?.toInt(),
+      width: (json['width'] as num?)?.toInt(),
+      source: (json['source'] ?? 'google_places').toString(),
+      attributions: (json['attributions'] as List<dynamic>?)
+              ?.map((value) => value.toString())
+              .toList() ??
+          const [],
+      expiresAt: json['expires_at']?.toString(),
+      sortOrder: (json['sort_order'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'url': url,
+        'height': height,
+        'width': width,
+        'source': source,
+        'attributions': attributions,
+        'expires_at': expiresAt,
+        'sort_order': sortOrder,
       };
 }
 
@@ -72,6 +128,7 @@ class PlaceResult {
   final List<String> types;
   final PlaceOpeningHours? openingHours;
   final List<PlacePhoto> photos;
+  final List<CachedPlaceImage> images;
   final String? imageUrl;
   final String? icon;
   final String? businessStatus;
@@ -88,6 +145,7 @@ class PlaceResult {
     this.types = const [],
     this.openingHours,
     this.photos = const [],
+    this.images = const [],
     this.imageUrl,
     this.icon,
     this.businessStatus,
@@ -114,6 +172,11 @@ class PlaceResult {
               ?.map((p) => PlacePhoto.fromJson(p as Map<String, dynamic>))
               .toList() ??
           [],
+      images: (json['images'] as List<dynamic>?)
+              ?.map((p) => CachedPlaceImage.fromJson(p as Map<String, dynamic>))
+              .where((image) => image.url.isNotEmpty)
+              .toList() ??
+          [],
       imageUrl: json['image_url'],
       icon: json['icon'],
       businessStatus: json['business_status'],
@@ -132,6 +195,7 @@ class PlaceResult {
         'types': types,
         'opening_hours': openingHours?.toJson(),
         'photos': photos.map((p) => p.toJson()).toList(),
+        'images': images.map((p) => p.toJson()).toList(),
         'image_url': imageUrl,
         'icon': icon,
         'business_status': businessStatus,
@@ -181,6 +245,7 @@ class PlaceDetailsResult {
   final List<String> types;
   final dynamic openingHours;
   final List<PlacePhoto> photos;
+  final List<CachedPlaceImage> images;
   final String? imageUrl;
   final String? url;
   final String? editorialSummary;
@@ -199,6 +264,7 @@ class PlaceDetailsResult {
     this.types = const [],
     this.openingHours,
     this.photos = const [],
+    this.images = const [],
     this.imageUrl,
     this.url,
     this.editorialSummary,
@@ -225,6 +291,11 @@ class PlaceDetailsResult {
               ?.map((p) => PlacePhoto.fromJson(p as Map<String, dynamic>))
               .toList() ??
           [],
+      images: (json['images'] as List<dynamic>?)
+              ?.map((p) => CachedPlaceImage.fromJson(p as Map<String, dynamic>))
+              .where((image) => image.url.isNotEmpty)
+              .toList() ??
+          [],
       imageUrl: json['image_url'],
       url: json['url'],
       editorialSummary: json['editorial_summary'],
@@ -245,6 +316,7 @@ class PlaceDetailsResult {
         'types': types,
         'opening_hours': openingHours,
         'photos': photos.map((p) => p.toJson()).toList(),
+        'images': images.map((p) => p.toJson()).toList(),
         'image_url': imageUrl,
         'url': url,
         'editorial_summary': editorialSummary,

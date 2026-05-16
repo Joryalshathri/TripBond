@@ -274,11 +274,11 @@ def create_itinerary(
     return response.data[0]
 
 
-def get_latest_itinerary(trip_id: str) -> _Optional[dict]:
+def get_latest_itinerary(trip_id: str, client=None) -> _Optional[dict]:
     """Get the latest itinerary record for a trip."""
-    db = _SupabaseDB(admin=True)
+    db_client = client or _SupabaseDB(admin=True).client
     response = (
-        db.client.table("itineraries")
+        db_client.table("itineraries")
         .select("*")
         .eq("trip_id", trip_id)
         .order("created_at", desc=True)
@@ -288,11 +288,11 @@ def get_latest_itinerary(trip_id: str) -> _Optional[dict]:
     return response.data[0] if response.data else None
 
 
-def list_items(itinerary_id: str) -> _List[dict]:
+def list_items(itinerary_id: str, client=None) -> _List[dict]:
     """List all items for an itinerary, ordered by day and time."""
-    db = _SupabaseDB(admin=True)
+    db_client = client or _SupabaseDB(admin=True).client
     response = (
-        db.client.table("itinerary_items")
+        db_client.table("itinerary_items")
         .select("*")
         .eq("itinerary_id", itinerary_id)
         .order("day_index")

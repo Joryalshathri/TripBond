@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/trip_service.dart';
 import '../services/vote_service.dart';
 import '../services/auth_service.dart';
+import '../widgets/place_image_carousel.dart';
 
 class VotingScreen extends StatefulWidget {
   final String tripId;
@@ -235,6 +236,7 @@ class _VotingScreenState extends State<VotingScreen> {
     final myVote = voteRow != null ? voteRow['my_vote'] as int? : null;
     final voteCount = voteRow != null ? (voteRow['votes_count'] ?? 0) as int : 0;
     final avg = voteRow != null ? (voteRow['avg_value'] ?? 0).toDouble() : 0.0;
+    final images = placeImagesFromMap(place);
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -245,19 +247,15 @@ class _VotingScreenState extends State<VotingScreen> {
           children: [
             Row(
               children: [
-                if ((place['image_url'] ?? '').toString().isNotEmpty)
-                  ClipRRect(
+                SizedBox(
+                  width: 60,
+                  child: PlaceImageCarousel(
+                    images: images,
+                    height: 60,
                     borderRadius: BorderRadius.circular(8),
-                    child: Image.network(
-                      place['image_url'].toString(),
-                      width: 60,
-                      height: 60,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const Icon(Icons.place, size: 40),
-                    ),
-                  )
-                else
-                  const Icon(Icons.place, size: 40),
+                    showAttribution: false,
+                  ),
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(

@@ -60,6 +60,13 @@ async def suggest_place(
         
         db = SupabaseDB(admin=True)
         
+        image_url = place_data.get("image_url") or place_data.get("photo_url")
+        if not image_url and isinstance(place_data.get("images"), list):
+            for image in place_data["images"]:
+                if isinstance(image, dict) and image.get("url"):
+                    image_url = image["url"]
+                    break
+
         # Prepare suggestion record
         suggestion_record = {
             "trip_id": trip_id,
@@ -70,7 +77,7 @@ async def suggest_place(
             "rating": place_data.get("rating"),
             "user_ratings_total": place_data.get("user_ratings_total"),
             "place_types": place_data.get("types", []),
-            "image_url": place_data.get("image_url"),
+            "image_url": image_url,
             "external_place_id": place_data.get("external_place_id"),
             "suggested_by": user_id,
             "status": "pending"

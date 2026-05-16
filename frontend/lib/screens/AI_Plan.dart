@@ -8,6 +8,8 @@ import 'plans_list.dart';
 import 'BondersSuggestions.dart';
 import '../services/trip_service.dart';
 import '../providers/user_provider.dart';
+import '../widgets/place_image_carousel.dart';
+import '../widgets/app_bottom_nav.dart';
 
 class Place {
   final String name;
@@ -19,6 +21,7 @@ class Place {
   final String? externalPlaceId;
   final String? fsqId; // Foursquare ID for detail lookups
   final String? photoUrl; // Direct photo URL from Foursquare
+  final List<PlaceImageData> images;
 
   const Place({
     required this.name,
@@ -30,6 +33,7 @@ class Place {
     this.externalPlaceId,
     this.fsqId,
     this.photoUrl,
+    this.images = const [],
   });
 }
 
@@ -116,6 +120,7 @@ class _AI_PlanState extends State<AI_Plan> {
   bool isEditMode = false;
   bool hasNotification = false;
   bool _isLoadingData = false;
+  String? _resolvedTripId;
 
   late List<Map<String, dynamic>> _itinerary;
   late String _activeDestination;
@@ -153,50 +158,112 @@ class _AI_PlanState extends State<AI_Plan> {
     _activeDestination = widget.destination ?? 'Khobar';
     _activeTitle = widget.tripTitle ??
         'Wonderful ${_activeDestination.isEmpty ? 'Trip' : _activeDestination}';
+    _resolvedTripId = widget.tripId;
+    _bootstrap();
+  }
+
+  Future<void> _bootstrap() async {
+    if (_resolvedTripId == null || _resolvedTripId!.isEmpty) {
+      _resolvedTripId = await _resolveCurrentTrip();
+      if (_resolvedTripId != null && mounted) {
+        // Update destination/title from the resolved trip
+        try {
+          final trip = await _tripService.getTripDetails(_resolvedTripId!);
+          if (!mounted) return;
+          final dest = (trip['destination'] ?? '').toString();
+          final title = (trip['title'] ?? '').toString();
+          setState(() {
+            if (dest.isNotEmpty) _activeDestination = dest;
+            if (title.isNotEmpty) _activeTitle = title;
+          });
+        } catch (_) {}
+      }
+    }
     _loadTripData();
   }
 
-  Future<void> _loadTripData() async {
-    if (widget.tripId == null || widget.tripId!.isEmpty) return;
+  Future<String?> _resolveCurrentTrip() async {
+    try {
+      final trips = await _tripService.getMyTrips();
+      if (trips.isEmpty) return null;
+      final now = DateTime.now();
 
+      for (final trip in trips) {
+        final start = trip['start_date'] != null
+            ? DateTime.tryParse(trip['start_date'])
+            : null;
+        final end = trip['end_date'] != null
+            ? DateTime.tryParse(trip['end_date'])
+            : null;
+        if (start != null && end != null && start.isBefore(now) && end.isAfter(now)) {
+          return trip['id']?.toString();
+        }
+      }
+
+      final upcoming = trips.where((trip) {
+        final start = trip['start_date'] != null
+            ? DateTime.tryParse(trip['start_date'])
+            : null;
+        return start != null && start.isAfter(now);
+      }).toList();
+      upcoming.sort((a, b) {
+        final aStart = DateTime.parse(a['start_date']);
+        final bStart = DateTime.parse(b['start_date']);
+        return aStart.compareTo(bStart);
+      });
+      if (upcoming.isNotEmpty) return upcoming.first['id']?.toString();
+
+      return trips.first['id']?.toString();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _loadTripData() async {
+    if (_resolvedTripId == null || _resolvedTripId!.isEmpty) return;
+
+    if (!mounted) return;
     setState(() => _isLoadingData = true);
     try {
       final itineraryData =
-          await _tripService.getLatestItinerary(widget.tripId!);
+          await _tripService.getLatestItinerary(_resolvedTripId!);
       final mapped = _mapItineraryFromApi(itineraryData);
 
-      final recommendations =
-          await _tripService.getRecommendations(widget.tripId!);
-      final mappedSuggestions =
-          _mapSuggestionsFromRecommendations(recommendations);
-
-      // Load actual place suggestions from database
-      final placeSuggestions =
-          await _tripService.getPlaceSuggestions(widget.tripId!);
-      print('DEBUG AI_Plan: Loaded ${placeSuggestions.length} place suggestions');
-      for (var ps in placeSuggestions) {
-        print('DEBUG: Suggestion - ${ps['name']}, suggested_by: ${ps['suggested_by']}');
+      if (!mounted) return;
+      if (mapped.isNotEmpty) {
+        setState(() {
+          _itinerary = mapped;
+        });
       }
-      
-      final currentUserId =
-          Provider.of<UserProvider>(context, listen: false).currentProfile?['id'];
-      print('DEBUG AI_Plan: Current user ID = $currentUserId');
-      
-      final mappedPlaceSuggestions =
-          _mapPlaceSuggestions(placeSuggestions, currentUserId);
+
+      // Load recommendations and suggestions separately so failures don't
+      // prevent the itinerary from displaying.
+      List<Map<String, dynamic>> mappedSuggestions = [];
+      List<Map<String, dynamic>> mappedPlaceSuggestions = [];
+      try {
+        final recommendations =
+            await _tripService.getRecommendations(_resolvedTripId!);
+        mappedSuggestions = _mapSuggestionsFromRecommendations(recommendations);
+      } catch (_) {}
+
+      try {
+        final placeSuggestions =
+            await _tripService.getPlaceSuggestions(_resolvedTripId!);
+        final currentUserId =
+            Provider.of<UserProvider>(context, listen: false)
+                .currentProfile?['id'];
+        mappedPlaceSuggestions =
+            _mapPlaceSuggestions(placeSuggestions, currentUserId);
+      } catch (_) {}
 
       if (!mounted) return;
-      setState(() {
-        if (mapped.isNotEmpty) {
-          _itinerary = mapped;
-        }
-        // Combine AI recommendations and user-added suggestions
-        var allSuggestions = [...mappedSuggestions, ...mappedPlaceSuggestions];
-        if (allSuggestions.isNotEmpty) {
+      final allSuggestions = [...mappedSuggestions, ...mappedPlaceSuggestions];
+      if (allSuggestions.isNotEmpty) {
+        setState(() {
           suggestions = allSuggestions;
           hasNotification = true;
-        }
-      });
+        });
+      }
     } catch (_) {
     } finally {
       if (mounted) {
@@ -222,10 +289,13 @@ class _AI_PlanState extends State<AI_Plan> {
         for (final item in activities) {
           if (item is! Map<String, dynamic>) continue;
 
-          final photoUrl = item['photo_url'];
+          final images = placeImagesFromMap(item);
+          final photoUrl = item['photo_url'] ?? item['image_url'];
           final imageToUse =
               (photoUrl != null && photoUrl.toString().isNotEmpty)
                   ? photoUrl.toString()
+                  : images.isNotEmpty
+                      ? images.first.url
                   : 'assets/images/places/Ithra.png';
 
           places.add(
@@ -242,6 +312,7 @@ class _AI_PlanState extends State<AI_Plan> {
                       .toString(),
               photoUrl: photoUrl != null ? photoUrl.toString() : null,
               fsqId: item['fsq_id']?.toString(),
+              images: images,
             ),
           );
         }
@@ -367,7 +438,7 @@ class _AI_PlanState extends State<AI_Plan> {
                       // Reload suggestions before opening the page
                       try {
                         final placeSuggestions =
-                            await _tripService.getPlaceSuggestions(widget.tripId!);
+                            await _tripService.getPlaceSuggestions(_resolvedTripId!);
                         final currentUserId =
                             Provider.of<UserProvider>(context, listen: false)
                                 .currentProfile?['id'];
@@ -465,7 +536,7 @@ class _AI_PlanState extends State<AI_Plan> {
                 context,
                 MaterialPageRoute(
                   builder: (_) => GroupSuggestedItinerary(
-                    tripId: widget.tripId,
+                    tripId: _resolvedTripId ?? widget.tripId,
                     tripTitle: widget.tripTitle,
                     destination: widget.destination,
                   ),
@@ -664,70 +735,12 @@ class _AI_PlanState extends State<AI_Plan> {
   }
 
   Widget _buildBottomNav(BuildContext context) {
-    return Positioned(
-      bottom: 0,
-      left: 0,
-      right: 0,
-      child: Container(
-        height: 70,
-        decoration: const BoxDecoration(
-          color: Color(0xFF4675B8),
-          borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(25), topRight: Radius.circular(25)),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 0),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            SizedBox(width: 50, child: _navIcon(Icons.home,
-                onTap: () => Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => const PlansList(source: 'home'))))),
-            SizedBox(width: 50, child: _navIcon(Icons.search,
-                onTap: () => Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => const DestinationLandingPage())))),
-            SizedBox(width: 50, child: _navIcon(
-              Icons.airplanemode_active,
-              active: true,
-              onTap: () => Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => AI_Plan(
-                    tripId: widget.tripId,
-                    tripTitle: widget.tripTitle,
-                    destination: widget.destination,
-                  ),
-                ),
-              ),
-            )),
-            SizedBox(width: 50, child: _navIcon(Icons.group_outlined,
-                onTap: () => Navigator.pushReplacement(context,
-                    MaterialPageRoute(builder: (_) => const Bonders())))),
-            SizedBox(width: 50, child: _navIcon(Icons.person_outline,
-                onTap: () => Navigator.pushReplacement(context,
-                    MaterialPageRoute(builder: (_) => const Profile())))),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _navIcon(IconData icon, {VoidCallback? onTap, bool active = false}) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 24, color: Colors.white),
-          if (active) ...[
-            const SizedBox(height: 4),
-            Container(width: 20, height: 2, color: Colors.white),
-          ],
-        ],
+    return AppBottomNav(
+      currentTab: AppNavTab.plan,
+      planBuilder: (_) => AI_Plan(
+        tripId: _resolvedTripId ?? widget.tripId,
+        tripTitle: widget.tripTitle,
+        destination: widget.destination,
       ),
     );
   }
@@ -855,16 +868,29 @@ class _PlaceCard extends StatelessWidget {
   }
 
   Widget _buildPlaceImage(Place place, double width, double height) {
-    final isNetworkUrl =
-        place.photoUrl != null && place.photoUrl!.startsWith('http');
+    final images = place.images.isNotEmpty
+        ? place.images
+        : (place.photoUrl != null && place.photoUrl!.startsWith('http')
+            ? [PlaceImageData(url: place.photoUrl!)]
+            : <PlaceImageData>[]);
 
-    if (isNetworkUrl) {
+    if (images.isNotEmpty) {
+      return SizedBox(
+        width: width,
+        child: PlaceImageCarousel(
+          images: images,
+          height: height,
+          showAttribution: images.isNotEmpty,
+        ),
+      );
+    } else if (place.image.startsWith('http')) {
       return Image.network(
-        place.photoUrl!,
+        place.image,
         width: width,
         height: height,
         fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) => _buildPlaceholderImage(width, height),
+        errorBuilder: (context, error, stackTrace) =>
+            _buildPlaceholderImage(width, height),
       );
     } else {
       return Image.asset(
@@ -872,7 +898,8 @@ class _PlaceCard extends StatelessWidget {
         width: width,
         height: height,
         fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) => _buildPlaceholderImage(width, height),
+        errorBuilder: (context, error, stackTrace) =>
+            _buildPlaceholderImage(width, height),
       );
     }
   }

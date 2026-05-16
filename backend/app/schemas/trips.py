@@ -95,6 +95,7 @@ class TripMember(BaseModel):
 
 class ItineraryActivity(BaseModel):
     id: Optional[str] = None
+    day: Optional[int] = None
     name: str
     type: str
     location: str

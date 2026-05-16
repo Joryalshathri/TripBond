@@ -23,6 +23,7 @@ from . import (
     geoapify_service,
     email_service,
     cities_service,
+    place_enrichment_service,
 )
 
 __all__ = [
@@ -42,4 +43,5 @@ __all__ = [
     "geoapify_service",
     "email_service",
     "cities_service",
+    "place_enrichment_service",
 ]

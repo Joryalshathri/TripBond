@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../models/place_model.dart';
 import '../services/places_service.dart';
 import '../services/trip_service.dart';
 import '../services/auth_service.dart';
+import '../widgets/place_image_carousel.dart';
 
 class PlaceDetailsPage extends StatefulWidget {
   final String? placeId; // External place ID from Geoapify
@@ -276,6 +278,8 @@ class _PlaceDetailsPageState extends State<PlaceDetailsPage>
         'user_ratings_total': result.userRatingsTotal,
         'types': result.types,
         'image_url': result.imageUrl,
+        'photo_url': result.imageUrl,
+        'images': result.images.map((image) => image.toJson()).toList(),
       };
 
       print('[PlaceDetailsPage] Payload: $payload');
@@ -599,44 +603,66 @@ class _PlaceDetailsPageState extends State<PlaceDetailsPage>
   }
 
   Widget _buildHeaderImage(PlaceDetailsResult place) {
-    return Container(
-      color: Colors.grey[200],
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          if (place.imageUrl != null && place.imageUrl!.isNotEmpty)
-            Image.network(
-              place.imageUrl!,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) {
-                return _buildPlaceholderImage();
-              },
-            )
-          else
-            _buildPlaceholderImage(),
-          // Gradient overlay
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.transparent,
-                  Colors.black.withOpacity(0.3),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
+    final images = _detailsImages(place);
+    return PlaceImageCarousel(
+      images: images,
+      height: 280,
+      autoPlay: images.length > 1,
+      showAttribution: images.isNotEmpty,
     );
   }
 
-  Widget _buildPlaceholderImage() {
-    return Container(
-      color: Colors.grey[300],
-      child: const Center(
-        child: Icon(Icons.location_on, size: 64, color: Colors.grey),
+  List<PlaceImageData> _detailsImages(PlaceDetailsResult place) {
+    final images = place.images
+        .where((image) => image.url.isNotEmpty)
+        .map(
+          (image) => PlaceImageData(
+            url: image.url,
+            attributions: image.attributions,
+          ),
+        )
+        .toList();
+
+    for (final photo in place.photos) {
+      final url = photo.imageUrl ?? photo.photoReference;
+      if (url.isNotEmpty && !images.any((image) => image.url == url)) {
+        images.add(
+          PlaceImageData(
+            url: url,
+            attributions: photo.htmlAttributions,
+          ),
+        );
+      }
+    }
+
+    if (place.imageUrl != null &&
+        place.imageUrl!.isNotEmpty &&
+        !images.any((image) => image.url == place.imageUrl)) {
+      images.insert(0, PlaceImageData(url: place.imageUrl!));
+    }
+
+    return images;
+  }
+
+  Future<void> _openExternalUrl(String? url) async {
+    if (url == null || url.isEmpty) return;
+    final uri = Uri.tryParse(url);
+    if (uri == null) return;
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  Widget _buildLinkButton({
+    required IconData icon,
+    required String label,
+    required String? url,
+  }) {
+    if (url == null || url.isEmpty) return const SizedBox.shrink();
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: () => _openExternalUrl(url),
+        icon: Icon(icon),
+        label: Text(label),
       ),
     );
   }
@@ -676,6 +702,11 @@ class _PlaceDetailsPageState extends State<PlaceDetailsPage>
         children: [
           _buildInfoSection('Address', place.formattedAddress),
           const SizedBox(height: 24),
+          if (place.editorialSummary != null &&
+              place.editorialSummary!.isNotEmpty) ...[
+            _buildInfoSection('Description', place.editorialSummary),
+            const SizedBox(height: 24),
+          ],
           if (place.types.isNotEmpty) ...[
             _buildInfoSection(
               'Categories',
@@ -690,6 +721,21 @@ class _PlaceDetailsPageState extends State<PlaceDetailsPage>
             ),
             const SizedBox(height: 24),
           ],
+          _buildLinkButton(
+            icon: Icons.map_outlined,
+            label: 'Open in Google Maps',
+            url: place.url,
+          ),
+          if (place.url != null && place.url!.isNotEmpty)
+            const SizedBox(height: 8),
+          _buildLinkButton(
+            icon: Icons.language,
+            label: 'Open Website',
+            url: place.website,
+          ),
+          if ((place.url != null && place.url!.isNotEmpty) ||
+              (place.website != null && place.website!.isNotEmpty))
+            const SizedBox(height: 24),
           // Add to plan button
           SizedBox(
             width: double.infinity,
@@ -769,7 +815,8 @@ class _PlaceDetailsPageState extends State<PlaceDetailsPage>
   }
 
   Widget _buildPhotosTab(PlaceDetailsResult place) {
-    if (place.photos.isEmpty) {
+    final images = _detailsImages(place);
+    if (images.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -792,20 +839,13 @@ class _PlaceDetailsPageState extends State<PlaceDetailsPage>
         crossAxisSpacing: 16,
         mainAxisSpacing: 16,
       ),
-      itemCount: place.photos.length,
+      itemCount: images.length,
       itemBuilder: (context, index) {
-        return ClipRRect(
+        return PlaceImageCarousel(
+          images: [images[index]],
+          height: 160,
           borderRadius: BorderRadius.circular(12),
-          child: Image.network(
-            place.photos[index].photoReference,
-            fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) {
-              return Container(
-                color: Colors.grey[300],
-                child: const Icon(Icons.broken_image),
-              );
-            },
-          ),
+          showAttribution: true,
         );
       },
     );
@@ -852,6 +892,14 @@ class _PlaceDetailsPageState extends State<PlaceDetailsPage>
               fontSize: 12,
             ),
           ),
+          if (place.url != null && place.url!.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: () => _openExternalUrl(place.url),
+              icon: const Icon(Icons.map_outlined),
+              label: const Text('Open in Google Maps'),
+            ),
+          ],
         ],
       ),
     );

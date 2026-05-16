@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../services/trip_service.dart';
 import '../services/auth_service.dart';
 import '../services/poi_service.dart';
@@ -12,6 +13,8 @@ import 'Bonder.dart';
 import 'plans_list.dart';
 import 'voting_screen.dart';
 import 'trip_places_picker_screen.dart';
+import '../widgets/place_image_carousel.dart';
+import '../widgets/app_bottom_nav.dart';
 
 class TripHomeScreen extends StatefulWidget {
   final String? tripId;
@@ -90,61 +93,12 @@ class _TripHomeScreenState extends State<TripHomeScreen>
   }
 
   Widget _buildBottomNav(BuildContext context) {
-    return Positioned(
-      bottom: 0,
-      left: 0,
-      right: 0,
-      child: Container(
-        height: 70,
-        decoration: const BoxDecoration(
-          color: Color(0xFF4675B8),
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(25),
-            topRight: Radius.circular(25),
-          ),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 0),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            SizedBox(width: 50, child: _navIcon(Icons.home)),
-            SizedBox(width: 50, child: _navIcon(Icons.search, active: true,
-                onTap: () => Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => const DestinationLandingPage())))),
-            SizedBox(width: 50, child: _navIcon(Icons.airplanemode_active,
-                onTap: () => Navigator.pushReplacement(context,
-                    MaterialPageRoute(builder: (_) => GroupSuggestedItinerary(
-                      tripId: widget.tripId,
-                      destination: widget.destination,
-                      tripTitle: widget.tripTitle,
-                    ))))),
-            SizedBox(width: 50, child: _navIcon(Icons.group_outlined,
-                onTap: () => Navigator.pushReplacement(context,
-                    MaterialPageRoute(builder: (_) => const Bonders())))),
-            SizedBox(width: 50, child: _navIcon(Icons.person_outline,
-                onTap: () => Navigator.pushReplacement(context,
-                    MaterialPageRoute(builder: (_) => const Profile())))),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _navIcon(IconData icon, {VoidCallback? onTap, bool active = false}) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 24, color: Colors.white),
-          if (active) ...[
-            const SizedBox(height: 4),
-            Container(width: 20, height: 2, color: Colors.white),
-          ]
-        ],
+    return AppBottomNav(
+      currentTab: AppNavTab.search,
+      planBuilder: (_) => GroupSuggestedItinerary(
+        tripId: widget.tripId,
+        destination: widget.destination,
+        tripTitle: widget.tripTitle,
       ),
     );
   }
@@ -251,6 +205,8 @@ class _TripHomeScreenState extends State<TripHomeScreen>
         'user_ratings_total': place['user_ratings_total'],
         'types': place['types'] ?? place['place_types'] ?? [],
         'image_url': place['image_url'],
+        'photo_url': place['image_url'],
+        'images': place['images'] ?? [],
         'external_place_id': place['place_id'] ?? place['external_place_id'],
       };
       final result = await _tripService.addPlaceToTrip(widget.tripId!, payload);
@@ -378,9 +334,7 @@ class _TripHomeScreenState extends State<TripHomeScreen>
 
   Widget _buildPlaceCard(Map<String, dynamic> place) {
     // Handle multiple possible field names from different APIs
-    final imageUrl = place['image_url'] as String? ?? 
-                     place['photo'] as String? ??
-                     place['photos']?[0] as String?;
+    final images = placeImagesFromMap(place);
     final name = place['name'] as String? ?? 'Unknown';
     final rating = place['rating'] as num? ?? 0;
     final description = place['description'] as String? ?? 
@@ -390,6 +344,7 @@ class _TripHomeScreenState extends State<TripHomeScreen>
                     place['vicinity'] as String? ?? '';
     final placeType = place['type'] as String? ?? 
                       place['category'] as String? ?? 'Place';
+    final googleMapsUrl = (place['google_maps_url'] ?? place['url'] ?? '').toString();
 
     return GestureDetector(
       onTap: () => _showAddToTripSheet(place),
@@ -399,33 +354,14 @@ class _TripHomeScreenState extends State<TripHomeScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Image
-            Container(
+            PlaceImageCarousel(
+              images: images,
               height: 80,
-              decoration: BoxDecoration(
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(12),
-                  topRight: Radius.circular(12),
-                ),
-                color: Colors.grey[200],
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(12),
+                topRight: Radius.circular(12),
               ),
-              child: imageUrl != null && imageUrl.isNotEmpty
-                  ? Image.network(
-                      imageUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          color: Colors.grey[300],
-                          child: const Icon(Icons.location_on,
-                              color: Colors.grey, size: 40),
-                        );
-                      },
-                    )
-                  : Container(
-                      color: Colors.grey[300],
-                      child: const Icon(Icons.location_on,
-                          color: Colors.grey, size: 40),
-                    ),
+              showAttribution: images.isNotEmpty,
             ),
             // Details
             Expanded(
@@ -506,21 +442,36 @@ class _TripHomeScreenState extends State<TripHomeScreen>
                             ),
                           ],
                         ),
-                        ElevatedButton(
-                          onPressed: () => _addPlaceToItinerary(place),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF4675B8),
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            minimumSize: const Size(0, 32),
-                          ),
-                          child: const Text(
-                            'Add',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
+                        Row(
+                          children: [
+                            if (googleMapsUrl.isNotEmpty)
+                              IconButton(
+                                onPressed: () => _openExternalUrl(googleMapsUrl),
+                                icon: const Icon(Icons.map_outlined, size: 18),
+                                color: const Color(0xFF4675B8),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(
+                                  minWidth: 28,
+                                  minHeight: 28,
+                                ),
+                              ),
+                            ElevatedButton(
+                              onPressed: () => _addPlaceToItinerary(place),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF4675B8),
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                minimumSize: const Size(0, 32),
+                              ),
+                              child: const Text(
+                                'Add',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                             ),
-                          ),
+                          ],
                         ),
                       ],
                     ),
@@ -532,6 +483,12 @@ class _TripHomeScreenState extends State<TripHomeScreen>
         ),
       ),
     );
+  }
+
+  Future<void> _openExternalUrl(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return;
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
   bool _hasValidCoordinates(Map<String, dynamic> place) {
@@ -599,6 +556,8 @@ class _TripHomeScreenState extends State<TripHomeScreen>
         'user_ratings_total': userRatingsTotal,
         'types': [placeType],  // Convert single type to list
         'image_url': place['image_url'] ?? '',
+        'photo_url': place['image_url'] ?? '',
+        'images': place['images'] ?? [],
       };
 
       // Suggest place to Bonders Suggestions (AI will evaluate)
