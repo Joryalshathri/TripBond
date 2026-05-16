@@ -1,165 +1,125 @@
 # TripBond ✈️
 
-> **Tired of endless group chats, conflicting plans, and the classic "I don't mind" friend?**
+Tired of endless group chats, conflicting plans, and the classic "I don't mind" friend?
 
 ## One Plan. Every Preference.
 
-After a year of development, meet **TripBond** — an AI-powered social travel app that makes group trip planning smarter, fairer, and more enjoyable.
+**After a year of development, meet TripBond** — an AI-powered social travel app that makes group trip planning smarter, fairer, and more enjoyable.
 
-No more compromise chaos. No more decision paralysis. Just seamless trip planning powered by machine learning.
-
----
-
-## 🎯 Why TripBond?
-
-**The Problem:** Group travel planning is broken. Too many opinions. Too many platforms. Too many "I don't cares" that lead nowhere.
-
-**The Solution:** TripBond learns everyone's preferences and creates travel plans that balance what everyone actually wants — not just what the loudest voice demands.
+Plan smarter. Decide together. Travel better.
 
 ---
 
-## ✨ Core Features
+## Why TripBond?
 
-### 🤖 AI-Powered Planning
-- **Personalized Recommendations** — Machine learning algorithms understand each traveler's unique preferences
-- **Smart Itinerary Generation** — Automatically creates optimal day-by-day plans based on group interests
-- **Balanced Group Preferences** — Ensures every group member's preferences are fairly represented
+Planning group trips shouldn't be chaotic:
+- ❌ Everyone has different preferences
+- ❌ Too many disconnected tools
+- ❌ No fair way to make decisions
 
-### 🌍 Real-Time Intelligence
-- **Real-time Travel Suggestions** — Get the best local spots, timings, and routes updated live
-- **Collaborative Trip Planning** — Plan together, but smarter—with AI mediation to prevent endless debates
+**✅ TripBond solves all of this**
 
-### 🎭 Social Experience
-- Make trip planning social and fun, not stressful
-- Transparent preference voting and decision-making
-- In-app chat and real-time notifications
+## What TripBond Offers
 
-### 🎨 Seamless UX
-- Cross-platform (iOS, Android, Web, Desktop)
-- Smooth animations and intuitive design
+✨ **Personalized Recommendations** - AI learns your travel style and preferences
+
+✨ **Smart Itinerary Generation** - Optimized plans that actually make sense
+
+✨ **Balanced Group Preferences** - Everyone's voice is heard fairly
+
+✨ **Real-time Travel Suggestions** - Adapt to weather, time, and mood
+
+✨ **Collaborative Trip Planning** - One platform for everything
+
+**Powered by machine learning**, TripBond creates travel plans tailored to everyone's preferences, turning trip planning into a social and seamless experience.
+
+---
+
+## The AI Advantage
+
+TripBond combines AI + collaboration to:
+- Understand each traveler's personality and preferences
+- Balance group decisions fairly
+- Generate optimized itineraries using advanced algorithms
+- Adapt to real-time context (weather, time, location)
+
+All in ONE platform. All voices heard.
+
+---
+
+## Features
+
+### AI-Powered Planning
+- Personalized recommendations (Decision Tree + Random Forest)
+- Group preference aggregation (fairness-aware)
+- Itinerary optimization (Genetic Algorithm)
+
+### Group Travel Made Easy
+- Create trips and invite members
+- Voting system for decisions
+- Balanced recommendations (no user ignored)
+
+### Explore & Discover
 - POI explorer with photos and details
+- Nearby attractions and smart suggestions
+- Save favorites
+
+### Social Experience
+- In-app chat and conversations
+- Notifications and updates
+- Feedback and ratings
+
+### Seamless UX
+- Cross-platform (iOS, Android, Web, Desktop)
+- Smooth animations
+- Responsive design
 
 ---
 
-## 🚀 How It Works
+## Why TripBond?
 
-1. **Create Your Trip** — Set destination, dates, and group members
-2. **Share Preferences** — Add what you love (food, adventure, culture, budget, activity level)
-3. **Let AI Work** — TripBond's ML engine learns and balances everyone's preferences
-4. **Review & Customize** — Explore AI-generated itinerary and make tweaks as needed
-5. **Travel Together** — Access your plan in real-time with built-in guidance and updates
-
----
-
-## 💡 What Makes TripBond Different?
-
-| Aspect | Traditional Apps | TripBond |
-|--------|------------------|----------|
+| Feature | Traditional Apps | TripBond |
+|---------|------------------|----------|
 | Group Planning | ❌ | ✅ |
 | Fair Decision Making | ❌ | ✅ |
-| AI Personalization | Limited | ✅ Advanced |
+| AI Personalization | Limited | ✅ |
 | Real-time Adaptation | ❌ | ✅ |
-| Balanced Recommendations | ❌ | ✅ No one ignored |
 | All-in-one Platform | ❌ | ✅ |
 
 ---
 
-## 🏆 Results
+## How It Works
 
-- **ML Accuracy**: 83.63%
-- **ROC-AUC Score**: 85.88%
-- Strong predictive performance for preference balancing
-
----
-
-## 🏗️ Tech Stack
-
-### Frontend
-- **Flutter** — Cross-platform mobile & web (iOS, Android, Web, Desktop)
-- **Riverpod** — State management
-
-### Backend
-- **Python + FastAPI** — Fast, scalable REST API
-- **SQLAlchemy** — Database ORM
-- **JWT Auth** — Secure authentication
-- **PostgreSQL** — Reliable data storage
-
-### AI & ML
-- **Random Forest** — Preference prediction
-- **Genetic Algorithm** — Itinerary optimization
-- **Collaborative Filtering** — Smart recommendations
-- **Decision Trees** — User profiling
+1. **User Profiling** - Personality + preferences (Big Five + behavior)
+2. **Group Modeling** - Combine users using fairness strategies
+3. **Context Awareness** - Adjust using weather, time, and location
+4. **Itinerary Generation** - Optimized plans using AI models
+5. **Continuous Learning** - Improves using feedback
 
 ---
 
-## 📦 Project Structure
+## Performance
 
-```
-tripbond-app/
-├── frontend/                  # Flutter mobile & web app
-├── backend/                   # FastAPI server & API
-├── ai/                        # ML models & AI engine
-├── tripbond_ai_backend/       # AI backend services
-└── models/                    # Data & training models
-```
+- **Accuracy**: 83.63%
+- **ROC-AUC**: 85.88%
+
+Strong predictive performance and effective group recommendation quality.
 
 ---
 
-## 🛠️ Getting Started
+## What Makes TripBond Unique?
 
-### Prerequisites
-- Python 3.9+
-- Flutter 3.x+
-- PostgreSQL
-
-### Quick Start
-
-**Backend:**
-```bash
-cd backend
-pip install -r requirements.txt
-python run.py
-```
-
-**Frontend:**
-```bash
-cd frontend
-flutter pub get
-flutter run
-```
-
-**AI Services:**
-```bash
-cd tripbond_ai_backend
-pip install -r requirements.txt
-python run_ai.py
-```
-
-For detailed setup instructions, see individual folder READMEs.
+- Combines AI personalization + group fairness
+- Uses hybrid models (RF + GA + CF)
+- Supports real-time adaptive itineraries
+- Designed for collaborative decision-making
 
 ---
 
-## 🤝 Contributing
+## Tech Stack
 
-We love contributions! Whether it's features, bug fixes, or improvements—feel free to fork, branch, and submit a PR.
-
----
-
-## 📄 License
-
-This project is licensed under the MIT License — see the LICENSE file for details.
-
----
-
-## 🎉 The Future of Group Travel Planning
-
-**TripBond** isn't just another travel app. It's the end of group travel chaos.
-
-Start planning smarter trips today. ✈️
-
----
-
-*Built with ❤️ for travelers who actually enjoy planning together.*
+**Backend**: FastAPI, SQLAlchemy, JWT Auth
+**Frontend**: Flutter, Riverpod, Cross-platform
 **Database**: Supabase (PostgreSQL with RLS)
 
 ### AI
