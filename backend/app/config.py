@@ -27,6 +27,10 @@ class Settings(BaseSettings):
 
     # Google Maps / Places API
     google_maps_api_key: Optional[str] = None
+    place_cache_days: int = 27
+    place_cache_max_photos: int = 6
+    place_cache_upload_images: bool = True
+    place_cache_storage_bucket: str = "place-images"
 
     # Geoapify Places API
     geoapify_api_key: Optional[str] = None

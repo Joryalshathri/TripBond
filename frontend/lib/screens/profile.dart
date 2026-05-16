@@ -19,6 +19,7 @@ import '../services/favorites_service.dart';
 import '../services/user_service.dart';
 import '../models/profile_model.dart';
 import '../models.dart';
+import '../widgets/app_bottom_nav.dart';
 
 const List<String> _tabs = ['Posted Trips', 'Liked Trips'];
 
@@ -753,59 +754,7 @@ class _ProfileState extends State<Profile> {
   }
 
   Widget _buildBottomNav(BuildContext context) {
-    return Positioned(
-      bottom: 0,
-      left: 0,
-      right: 0,
-      child: Container(
-        height: 70,
-        decoration: const BoxDecoration(
-            color: Color(0xFF4675B8),
-            borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(25), topRight: Radius.circular(25))),
-        padding: const EdgeInsets.symmetric(horizontal: 0),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            SizedBox(width: 50, child: _navIcon(Icons.home,
-                onTap: () => Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => const PlansList(source: 'home'))))),
-            SizedBox(width: 50, child: _navIcon(Icons.search,
-                onTap: () => Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => const DestinationLandingPage())))),
-            SizedBox(width: 50, child: _navIcon(Icons.airplanemode_active,
-                onTap: () => Navigator.pushReplacement(context,
-                    MaterialPageRoute(builder: (_) => const AI_Plan())))),
-            SizedBox(width: 50, child: _navIcon(Icons.group_outlined,
-                onTap: () => Navigator.pushReplacement(context,
-                    MaterialPageRoute(builder: (_) => const Bonders())))),
-            SizedBox(width: 50, child: _navIcon(Icons.person_outline, active: true)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _navIcon(IconData icon, {VoidCallback? onTap, bool active = false}) {
-    return GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Icon(icon, size: 24, color: Colors.white),
-          if (active) ...[
-            const SizedBox(height: 4),
-            Container(
-                width: 20,
-                height: 2,
-                decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(1)))
-          ]
-        ]));
+    return const AppBottomNav(currentTab: AppNavTab.profile);
   }
 
   Widget _buildFollowersModal() {

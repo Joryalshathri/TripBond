@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, status, Query
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 from ..schemas.pois import POIResponse
-from ..services import poi_service, ai_poi_service
+from ..services import poi_service, ai_poi_service, place_enrichment_service
 
 router = APIRouter()
 
@@ -46,6 +46,7 @@ async def search_pois(
     try:
         if location:
             pois = ai_poi_service.get_pois_for_destination(location, limit=limit)
+            pois = place_enrichment_service.merge_pois_with_cached_enrichments(pois, location)
             if type and pois:
                 pois = [p for p in pois if _poi_matches_type(p, type)]
             if min_rating is not None and pois:
@@ -76,11 +77,21 @@ async def search_pois(
         )
 
 
-@router.get("/{poi_id}", response_model=POIResponse)
+@router.get("/{poi_id}", response_model=Dict[str, Any])
 async def get_poi_detail(poi_id: str):
     """Get detailed information about a specific POI."""
     try:
-        return poi_service.get_poi_by_id(poi_id)
+        cached = place_enrichment_service.get_cached_place_by_id(poi_id)
+        if cached:
+            return place_enrichment_service.merge_place_with_enrichment(
+                {
+                    "id": cached.get("dataset_poi_id") or cached.get("source_place_id") or poi_id,
+                    "name": cached.get("name"),
+                    "location": cached.get("city") or "",
+                },
+                cached,
+            )
+        return poi_service.get_poi_by_id(poi_id).model_dump()
     except HTTPException:
         raise
     except Exception as e:

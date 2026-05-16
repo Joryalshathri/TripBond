@@ -11,6 +11,7 @@ import '../services/bonder_service.dart';
 import '../services/chat_service.dart';
 import '../services/auth_service.dart';
 import '../services/user_service.dart';
+import '../widgets/app_bottom_nav.dart';
 
 class _BonderMeta {
   final int unreadCount;
@@ -686,74 +687,9 @@ class _BondersState extends State<Bonders> {
   }
 
   Widget _buildBottomNav(BuildContext context) {
-    return Positioned(
-      bottom: 0,
-      left: 0,
-      right: 0,
-      child: Container(
-        height: 70,
-        decoration: const BoxDecoration(
-          color: Color(0xFF4675B8),
-          borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(25), topRight: Radius.circular(25)),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 0),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            SizedBox(
-                width: 50,
-                child: _navIcon(Icons.home,
-                    onTap: () => Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => const PlansList(source: 'home'))))),
-            SizedBox(
-                width: 50,
-                child: _navIcon(Icons.search,
-                    onTap: () => Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => const PlansList(source: 'home'))))),
-            SizedBox(
-                width: 50,
-                child: _navIcon(Icons.airplanemode_active,
-                    onTap: () => Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => const GroupSuggestedItinerary())))),
-            SizedBox(
-                width: 50, child: _navIcon(Icons.group_outlined, active: true)),
-            SizedBox(
-                width: 50,
-                child: _navIcon(Icons.person_outline,
-                    onTap: () => Navigator.pushReplacement(context,
-                        MaterialPageRoute(builder: (_) => const Profile())))),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _navIcon(IconData icon, {VoidCallback? onTap, bool active = false}) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 24, color: Colors.white),
-          if (active) ...[
-            const SizedBox(height: 4),
-            Container(
-                width: 20,
-                height: 2,
-                decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(1))),
-          ],
-        ],
-      ),
+    return AppBottomNav(
+      currentTab: AppNavTab.bonders,
+      planBuilder: (_) => const GroupSuggestedItinerary(),
     );
   }
 }

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../services/poi_service.dart';
 import '../services/ai_service.dart';
 import '../services/auth_service.dart';
+import '../widgets/place_image_carousel.dart';
 
 class POIExplorerScreen extends StatefulWidget {
   const POIExplorerScreen({super.key});
@@ -242,43 +244,19 @@ class _POICard extends StatelessWidget {
     final rating = poi['rating'] as num?;
     final reviews = poi['user_ratings_total'] as int? ?? 0;
     final address = poi['address'] ?? 'No address';
-    final imageUrl = poi['image_url'] as String?;
+    final images = placeImagesFromMap(poi);
+    final googleMapsUrl = (poi['google_maps_url'] ?? poi['url'] ?? '').toString();
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Image section
-          if (imageUrl != null && imageUrl.isNotEmpty)
-            Container(
-              width: double.infinity,
-              height: 180,
-              decoration: BoxDecoration(
-                color: Colors.grey[200],
-              ),
-              child: Image.network(
-                imageUrl,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    color: Colors.grey[300],
-                    child: const Center(
-                      child: Icon(Icons.location_on, size: 48, color: Colors.grey),
-                    ),
-                  );
-                },
-              ),
-            )
-          else
-            Container(
-              width: double.infinity,
-              height: 180,
-              color: Colors.grey[300],
-              child: const Center(
-                child: Icon(Icons.location_on, size: 48, color: Colors.grey),
-              ),
-            ),
+          PlaceImageCarousel(
+            images: images,
+            height: 180,
+            showAttribution: images.isNotEmpty,
+          ),
           Padding(
             padding: const EdgeInsets.all(12),
             child: Column(
@@ -374,6 +352,19 @@ class _POICard extends StatelessWidget {
                       fontSize: 12,
                       color: Colors.grey[500],
                     ),
+                  ),
+                ],
+                if (googleMapsUrl.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: () async {
+                      final uri = Uri.tryParse(googleMapsUrl);
+                      if (uri != null) {
+                        await launchUrl(uri, mode: LaunchMode.externalApplication);
+                      }
+                    },
+                    icon: const Icon(Icons.map_outlined, size: 16),
+                    label: const Text('Open in Google Maps'),
                   ),
                 ],
               ],

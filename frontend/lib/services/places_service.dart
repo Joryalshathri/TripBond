@@ -17,7 +17,7 @@ class PlacesService {
   }) async {
     try {
       final queryParams = {
-        'query': query,
+        'q': query,
         'language': language,
       };
 
@@ -49,6 +49,19 @@ class PlacesService {
     }
   }
 
+  // Get place details from TripBond's saved enrichment cache only.
+  Future<PlaceDetailsResponse> getCachedPlaceDetails(String placeId) async {
+    try {
+      final response = await _apiService.get(
+        '${ApiConfig.placesPath}/cached/$placeId',
+      );
+
+      return PlaceDetailsResponse.fromJson(response);
+    } catch (e) {
+      throw Exception('Failed to get cached place details: ${e.toString()}');
+    }
+  }
+
   // Get place details with intelligent fallback
   // Supports lat/lng/country context to find the correct location
   // This prevents "Ithra" from returning "Ithra Tower" in wrong country
@@ -59,6 +72,13 @@ class PlacesService {
     String? fallbackName,
     String? country,
   }) async {
+    try {
+      return await getCachedPlaceDetails(placeId);
+    } catch (_) {
+      // Keep the legacy live details path as a fallback for search results that
+      // have not been processed by the scheduled cache job yet.
+    }
+
     try {
       final queryParams = {
         'language': 'en',

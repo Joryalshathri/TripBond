@@ -12,6 +12,15 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def _is_public_trip(trip: dict) -> bool:
+    value = trip.get("is_public")
+    if value is None:
+        return True
+    if isinstance(value, str):
+        return value.strip().lower() not in {"false", "0", "no", "private"}
+    return bool(value)
+
+
 async def check_trip_access(
     trip_id: str, 
     user_id: str, 
@@ -90,7 +99,7 @@ async def check_trip_access(
             )
     elif required_role == "view":
         if not (is_creator or is_member):
-            if not trip.get("is_public", True):
+            if not _is_public_trip(trip):
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="You do not have access to this private trip"

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/places_service.dart';
 import '../models/place_model.dart';
+import '../widgets/place_image_carousel.dart';
 
 class NearbyPlacesScreen extends StatefulWidget {
   final double latitude;
@@ -169,42 +170,29 @@ class _NearbyPlacesScreenState extends State<NearbyPlacesScreen> {
 
   Widget _buildPlaceCard(PlaceResult place) {
     final distance = _calculateDistance(place);
+    final images = [
+      ...place.images.map(
+        (image) => PlaceImageData(
+          url: image.url,
+          attributions: image.attributions,
+        ),
+      ),
+      if (place.imageUrl != null &&
+          place.imageUrl!.isNotEmpty &&
+          !place.images.any((image) => image.url == place.imageUrl))
+        PlaceImageData(url: place.imageUrl!),
+    ];
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Image section
-          if (place.imageUrl != null && place.imageUrl!.isNotEmpty)
-            Container(
-              width: double.infinity,
-              height: 150,
-              decoration: BoxDecoration(
-                color: Colors.grey[200],
-              ),
-              child: Image.network(
-                place.imageUrl!,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    color: Colors.grey[300],
-                    child: const Center(
-                      child: Icon(Icons.location_on, size: 48, color: Colors.grey),
-                    ),
-                  );
-                },
-              ),
-            )
-          else
-            Container(
-              width: double.infinity,
-              height: 150,
-              color: Colors.grey[300],
-              child: const Center(
-                child: Icon(Icons.location_on, size: 48, color: Colors.grey),
-              ),
-            ),
+          PlaceImageCarousel(
+            images: images,
+            height: 150,
+            showAttribution: images.isNotEmpty,
+          ),
           ListTile(
             title: Text(place.name),
             subtitle: Column(

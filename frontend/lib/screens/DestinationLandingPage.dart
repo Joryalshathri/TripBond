@@ -11,11 +11,12 @@ import 'plans_list.dart';
 import 'chat_screen.dart';
 import 'poi_explorer_screen.dart';
 import 'TripHomeScreen.dart';
-import 'trip_flow_screen.dart';
+import 'trip_preview_screen.dart';
 import '../services/favorites_service.dart';
 import '../services/feed_service.dart';
 import '../providers/trip_provider.dart';
 import '../state/trip_creation_state.dart';
+import '../widgets/app_bottom_nav.dart';
 
 class Destination {
   final int id;
@@ -115,7 +116,6 @@ class _DestinationLandingPageState extends State<DestinationLandingPage> {
   List<Map<String, dynamic>> _feed = [];
   bool _isLoadingFeed = true;
   String? _feedError;
-  final Set<String> _pendingJoinRequests = {};
 
   String _getTimeAgo(DateTime dateTime) {
     final duration = DateTime.now().difference(dateTime);
@@ -156,68 +156,21 @@ class _DestinationLandingPageState extends State<DestinationLandingPage> {
     }
   }
 
-  Future<void> _toggleFeedLike(Map<String, dynamic> trip) async {
+  void _openTripPreview(Map<String, dynamic> trip) {
     final tripId = trip['id']?.toString() ?? '';
     if (tripId.isEmpty) return;
-    final wasLiked = trip['has_liked'] == true;
-    setState(() {
-      trip['has_liked'] = !wasLiked;
-      trip['likes_count'] =
-          (trip['likes_count'] as int? ?? 0) + (wasLiked ? -1 : 1);
-    });
-    try {
-      if (wasLiked) {
-        await _feedService.unlikeTrip(tripId);
-      } else {
-        await _feedService.likeTrip(tripId);
-      }
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        trip['has_liked'] = wasLiked;
-        trip['likes_count'] =
-            (trip['likes_count'] as int? ?? 0) + (wasLiked ? 1 : -1);
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed: $e')),
-      );
-    }
-  }
-
-  Future<void> _requestToJoin(Map<String, dynamic> trip) async {
-    final tripId = trip['id']?.toString() ?? '';
-    if (tripId.isEmpty) return;
-    setState(() => _pendingJoinRequests.add(tripId));
-    try {
-      await _feedService.requestToJoin(tripId);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Request sent.')),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _pendingJoinRequests.remove(tripId));
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed: $e')),
-      );
-    }
-  }
-
-  void _openTripFlow(Map<String, dynamic> trip) {
-    final tripId = trip['id']?.toString() ?? '';
-    if (tripId.isEmpty) return;
-    final canOpen = trip['is_creator'] == true || trip['is_member'] == true;
-    if (!canOpen) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Request to join before opening this trip.')),
-      );
-      return;
-    }
     Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => TripFlowScreen(
+      builder: (_) => TripPreviewScreen(
         tripId: tripId,
-        tripTitle: (trip['title'] ?? 'Trip').toString(),
-        destination: (trip['destination'] ?? '').toString(),
+        initialTrip: trip,
+        onTripChanged: (updatedTrip) {
+          if (!mounted) return;
+          setState(() {
+            trip
+              ..clear()
+              ..addAll(updatedTrip);
+          });
+        },
       ),
     ));
   }
@@ -297,17 +250,19 @@ class _DestinationLandingPageState extends State<DestinationLandingPage> {
           builder: (BuildContext context, StateSetter setModalState) {
             final tripProvider = Provider.of<TripProvider>(context);
             final allTrips = tripProvider.myTrips;
-            
-            print('DEBUG: TripProvider loading state: ${tripProvider.isLoading}');
+
+            print(
+                'DEBUG: TripProvider loading state: ${tripProvider.isLoading}');
             print('DEBUG: All trips count: ${allTrips.length}');
             print('DEBUG: All trips: $allTrips');
-            
-            List<Map<String, dynamic>> currentDisplayList = 
-              _filterTripsByCategory(allTrips, selectedCategory);
-            
-            print('DEBUG: Filtered trips for category "$selectedCategory": ${currentDisplayList.length}');
+
+            List<Map<String, dynamic>> currentDisplayList =
+                _filterTripsByCategory(allTrips, selectedCategory);
+
+            print(
+                'DEBUG: Filtered trips for category "$selectedCategory": ${currentDisplayList.length}');
             print('DEBUG: Filtered trips: $currentDisplayList');
-            
+
             return DraggableScrollableSheet(
               initialChildSize: 0.85,
               minChildSize: 0.6,
@@ -347,13 +302,18 @@ class _DestinationLandingPageState extends State<DestinationLandingPage> {
                           DropdownButtonHideUnderline(
                             child: DropdownButton<String>(
                               value: selectedCategory,
-                              icon: const Icon(Icons.keyboard_arrow_down, size: 20),
+                              icon: const Icon(Icons.keyboard_arrow_down,
+                                  size: 20),
                               style: const TextStyle(
                                   fontFamily: 'Poppins',
                                   fontWeight: FontWeight.w700,
                                   fontSize: 18,
                                   color: Colors.black),
-                              items: ['Past Plans', 'Current Plans', 'Future Plans']
+                              items: [
+                                'Past Plans',
+                                'Current Plans',
+                                'Future Plans'
+                              ]
                                   .map((val) => DropdownMenuItem(
                                       value: val, child: Text(val)))
                                   .toList(),
@@ -383,39 +343,38 @@ class _DestinationLandingPageState extends State<DestinationLandingPage> {
                             ),
                           )
                         else
-                          ...currentDisplayList
-                              .map((trip) {
-                                final tripName = trip['title'] ?? trip['name'] ?? 'Trip';
-                                final startDate = trip['start_date'] ?? '';
-                                final endDate = trip['end_date'] ?? '';
-                                final dateRange = '$startDate to $endDate';
-                                
-                                return Container(
-                                  margin: const EdgeInsets.only(bottom: 10),
-                                  decoration: BoxDecoration(
-                                    border: Border.all(
-                                        color: Colors.grey.shade300, width: 2),
-                                    borderRadius: BorderRadius.circular(15),
-                                  ),
-                                  child: ListTile(
-                                    leading: const Icon(Icons.location_on,
-                                        color: Color(0xFF4675B8)),
-                                    title: Text(tripName,
-                                        style: const TextStyle(
-                                            fontFamily: 'Poppins',
-                                            fontWeight: FontWeight.w600)),
-                                    subtitle: Text(dateRange,
-                                        style: TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.grey.shade600)),
-                                    trailing: const Icon(Icons.chevron_right,
-                                        size: 20),
-                                    onTap: () => setModalState(
-                                        () => selectedTrip = trip),
-                                  ),
-                                );
-                              })
-                              .toList(),
+                          ...currentDisplayList.map((trip) {
+                            final tripName =
+                                trip['title'] ?? trip['name'] ?? 'Trip';
+                            final startDate = trip['start_date'] ?? '';
+                            final endDate = trip['end_date'] ?? '';
+                            final dateRange = '$startDate to $endDate';
+
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 10),
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                    color: Colors.grey.shade300, width: 2),
+                                borderRadius: BorderRadius.circular(15),
+                              ),
+                              child: ListTile(
+                                leading: const Icon(Icons.location_on,
+                                    color: Color(0xFF4675B8)),
+                                title: Text(tripName,
+                                    style: const TextStyle(
+                                        fontFamily: 'Poppins',
+                                        fontWeight: FontWeight.w600)),
+                                subtitle: Text(dateRange,
+                                    style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey.shade600)),
+                                trailing:
+                                    const Icon(Icons.chevron_right, size: 20),
+                                onTap: () =>
+                                    setModalState(() => selectedTrip = trip),
+                              ),
+                            );
+                          }).toList(),
                       ] else ...[
                         Stack(
                           alignment: Alignment.center,
@@ -432,8 +391,9 @@ class _DestinationLandingPageState extends State<DestinationLandingPage> {
                                         fit: BoxFit.cover,
                                         errorBuilder: (_, __, ___) =>
                                             const Center(
-                                              child: Icon(Icons.image_not_supported),
-                                            ),
+                                          child:
+                                              Icon(Icons.image_not_supported),
+                                        ),
                                       )
                                     : const Center(
                                         child: Icon(Icons.image_not_supported),
@@ -489,11 +449,11 @@ class _DestinationLandingPageState extends State<DestinationLandingPage> {
                                       0,
                                       Post(
                                         userName: 'Sarah Mohamed',
-                                        location: selectedTrip!['title'] ?? 
-                                                  selectedTrip!['name'] ?? 
-                                                  'Trip',
-                                        image: selectedTrip!['image_url'] ?? 
-                                               'assets/images/cities/jeddah.png',
+                                        location: selectedTrip!['title'] ??
+                                            selectedTrip!['name'] ??
+                                            'Trip',
+                                        image: selectedTrip!['image_url'] ??
+                                            'assets/images/cities/jeddah.png',
                                         title: titleController.text,
                                         likes: 0,
                                         privacy: selectedPrivacy,
@@ -525,14 +485,13 @@ class _DestinationLandingPageState extends State<DestinationLandingPage> {
   List<Map<String, dynamic>> _filterTripsByCategory(
       List<Map<String, dynamic>> trips, String category) {
     final now = DateTime.now();
-    
+
     return trips.where((trip) {
       final startDate = trip['start_date'] != null
           ? DateTime.tryParse(trip['start_date'])
           : null;
-      final endDate = trip['end_date'] != null
-          ? DateTime.tryParse(trip['end_date'])
-          : null;
+      final endDate =
+          trip['end_date'] != null ? DateTime.tryParse(trip['end_date']) : null;
 
       if (startDate == null || endDate == null) {
         return category == 'Future Plans';
@@ -779,7 +738,7 @@ class _DestinationLandingPageState extends State<DestinationLandingPage> {
     final destination = (trip['destination'] ?? '').toString();
     final title = (trip['title'] ?? 'Trip').toString();
     final imageUrl = (trip['image_url'] ?? '').toString();
-    final pendingJoin = _pendingJoinRequests.contains(tripId);
+    final pendingJoin = trip['has_pending_join_request'] == true;
     final canOpen = trip['is_creator'] == true || trip['is_member'] == true;
 
     DateTime? created;
@@ -792,7 +751,7 @@ class _DestinationLandingPageState extends State<DestinationLandingPage> {
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: () => _openTripFlow(trip),
+      onTap: () => _openTripPreview(trip),
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 16),
         decoration: BoxDecoration(
@@ -805,68 +764,66 @@ class _DestinationLandingPageState extends State<DestinationLandingPage> {
                   offset: const Offset(0, 2))
             ]),
         padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 18,
-                backgroundColor: const Color(0xFF4675B8),
-                backgroundImage: (creator['avatar_url'] != null &&
-                        creator['avatar_url'].toString().isNotEmpty)
-                    ? NetworkImage(creator['avatar_url'].toString())
-                    : null,
-                child: (creator['avatar_url'] == null ||
-                        creator['avatar_url'].toString().isEmpty)
-                    ? Text(
-                        creatorName.isNotEmpty
-                            ? creatorName[0].toUpperCase()
-                            : '?',
-                        style: const TextStyle(color: Colors.white),
-                      )
-                    : null,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Flexible(
-                          child: Text(creatorName,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                  fontFamily: 'Poppins',
-                                  fontWeight: FontWeight.w600)),
-                        ),
-                        if (created != null) ...[
-                          const SizedBox(width: 8),
-                          Text('• ${_getTimeAgo(created)}',
-                              style: const TextStyle(
-                                  fontSize: 11, color: Colors.grey)),
-                        ],
-                      ],
-                    ),
-                    if (destination.isNotEmpty)
-                      Row(children: [
-                        const Icon(Icons.location_on,
-                            size: 14, color: Color(0xFF6F7789)),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(destination,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                  fontSize: 13, color: Color(0xFF6F7789))),
-                        ),
-                      ]),
-                  ],
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 18,
+                  backgroundColor: const Color(0xFF4675B8),
+                  backgroundImage: (creator['avatar_url'] != null &&
+                          creator['avatar_url'].toString().isNotEmpty)
+                      ? NetworkImage(creator['avatar_url'].toString())
+                      : null,
+                  child: (creator['avatar_url'] == null ||
+                          creator['avatar_url'].toString().isEmpty)
+                      ? Text(
+                          creatorName.isNotEmpty
+                              ? creatorName[0].toUpperCase()
+                              : '?',
+                          style: const TextStyle(color: Colors.white),
+                        )
+                      : null,
                 ),
-              ),
-              GestureDetector(
-                onTap: () => _toggleFeedLike(trip),
-                child: Row(
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(creatorName,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    fontFamily: 'Poppins',
+                                    fontWeight: FontWeight.w600)),
+                          ),
+                          if (created != null) ...[
+                            const SizedBox(width: 8),
+                            Text('• ${_getTimeAgo(created)}',
+                                style: const TextStyle(
+                                    fontSize: 11, color: Colors.grey)),
+                          ],
+                        ],
+                      ),
+                      if (destination.isNotEmpty)
+                        Row(children: [
+                          const Icon(Icons.location_on,
+                              size: 14, color: Color(0xFF6F7789)),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(destination,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    fontSize: 13, color: Color(0xFF6F7789))),
+                          ),
+                        ]),
+                    ],
+                  ),
+                ),
+                Row(
                   children: [
                     Text('$likes',
                         style: TextStyle(
@@ -880,118 +837,72 @@ class _DestinationLandingPageState extends State<DestinationLandingPage> {
                         color: hasLiked ? Colors.red : Colors.grey[600]),
                   ],
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: imageUrl.isNotEmpty
-                ? Image.network(
-                    imageUrl,
-                    width: double.infinity,
-                    height: 180,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
+              ],
+            ),
+            const SizedBox(height: 12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: imageUrl.isNotEmpty
+                  ? Image.network(
+                      imageUrl,
+                      width: double.infinity,
+                      height: 180,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        width: double.infinity,
+                        height: 180,
+                        color: Colors.grey[200],
+                        child: const Icon(Icons.image_not_supported,
+                            color: Colors.grey),
+                      ),
+                    )
+                  : Container(
                       width: double.infinity,
                       height: 180,
                       color: Colors.grey[200],
-                      child: const Icon(Icons.image_not_supported,
+                      child: const Icon(Icons.airplanemode_active,
                           color: Colors.grey),
                     ),
-                  )
-                : Container(
-                    width: double.infinity,
-                    height: 180,
-                    color: Colors.grey[200],
-                    child:
-                        const Icon(Icons.airplanemode_active, color: Colors.grey),
-                  ),
-          ),
-          const SizedBox(height: 12),
-          Text(title,
-              style: const TextStyle(
-                  fontFamily: 'Poppins',
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  fontStyle: FontStyle.italic)),
-          const SizedBox(height: 4),
-          Text('$memberCount members',
-              style: TextStyle(fontSize: 12, color: Colors.grey[600])),
-          const SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
-            child: canOpen
-                ? ElevatedButton.icon(
-                    onPressed: () => _openTripFlow(trip),
-                    icon: const Icon(Icons.open_in_new, size: 18),
-                    label: const Text('Open trip'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF4675B8),
-                      foregroundColor: Colors.white,
-                    ),
-                  )
-                : OutlinedButton.icon(
-                    onPressed: pendingJoin ? null : () => _requestToJoin(trip),
-                    icon: const Icon(Icons.group_add_outlined, size: 18),
-                    label: Text(pendingJoin ? 'Request sent' : 'Request to join'),
             ),
-          ),
-        ],
-      ),
+            const SizedBox(height: 12),
+            Text(title,
+                style: const TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    fontStyle: FontStyle.italic)),
+            const SizedBox(height: 4),
+            Text('$memberCount members',
+                style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+            if (pendingJoin && !canOpen) ...[
+              const SizedBox(height: 4),
+              const Text('Join request sent',
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF4675B8),
+                      fontWeight: FontWeight.w600)),
+            ],
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => _openTripPreview(trip),
+                icon: const Icon(Icons.visibility_outlined, size: 18),
+                label: const Text('View trip'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF4675B8),
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildBottomNav(BuildContext context) {
-    return Positioned(
-        bottom: 0,
-        left: 0,
-        right: 0,
-        child: Container(
-            height: 70,
-            decoration: const BoxDecoration(
-                color: Color(0xFF4675B8),
-                borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(25),
-                    topRight: Radius.circular(25))),
-            padding: const EdgeInsets.symmetric(horizontal: 0),
-            child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  SizedBox(width: 50, child: _navIcon(Icons.home, active: true,
-                      onTap: () => Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) => const DestinationLandingPage())))),
-                  SizedBox(width: 50, child: _navIcon(Icons.search,
-                      onTap: () => Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) => const PlansList(source: 'home'))))),
-                  SizedBox(width: 50, child: _navIcon(Icons.airplanemode_active,
-                      onTap: () => Navigator.pushReplacement(context,
-                          MaterialPageRoute(builder: (_) => const AI_Plan())))),
-                  SizedBox(width: 50, child: _navIcon(Icons.group_outlined,
-                      onTap: () => Navigator.pushReplacement(context,
-                          MaterialPageRoute(builder: (_) => const Bonders())))),
-                  SizedBox(width: 50, child: _navIcon(Icons.person_outline,
-                      onTap: () => Navigator.pushReplacement(context,
-                          MaterialPageRoute(builder: (_) => const Profile())))),
-                ])));
-  }
-
-  Widget _navIcon(IconData icon, {VoidCallback? onTap, bool active = false}) {
-    return GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Icon(icon, size: 24, color: Colors.white),
-          if (active) ...[
-            const SizedBox(height: 4),
-            Container(width: 20, height: 2, color: Colors.white)
-          ]
-        ]));
+    return const AppBottomNav(currentTab: AppNavTab.home);
   }
 }
 

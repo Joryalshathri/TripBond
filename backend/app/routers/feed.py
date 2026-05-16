@@ -20,6 +20,15 @@ from ..services.trip_access import check_trip_access
 router = APIRouter()
 
 
+def _is_public_trip(trip: Dict[str, Any]) -> bool:
+    value = trip.get("is_public")
+    if value is None:
+        return True
+    if isinstance(value, str):
+        return value.strip().lower() not in {"false", "0", "no", "private"}
+    return bool(value)
+
+
 def _profile_lookup(profile_ids: List[str]) -> Dict[str, Dict[str, Any]]:
     if not profile_ids:
         return {}
@@ -86,6 +95,18 @@ async def get_feed(
         members_by_trip[row["trip_id"]] = members_by_trip.get(row["trip_id"], 0) + 1
         member_ids_by_trip.setdefault(row["trip_id"], set()).add(row["user_id"])
 
+    pending_res = await run_in_threadpool(
+        lambda: db.client.table("trip_join_requests")
+        .select("trip_id")
+        .in_("trip_id", trip_ids)
+        .eq("user_id", user_id)
+        .eq("status", "pending")
+        .execute()
+    )
+    pending_join_trip_ids = {
+        row["trip_id"] for row in (pending_res.data or []) if row.get("trip_id")
+    }
+
     out: List[Dict[str, Any]] = []
     for trip in trips:
         liker_ids = likes_by_trip.get(trip["id"], [])
@@ -112,6 +133,7 @@ async def get_feed(
                 "member_count": members_by_trip.get(trip["id"], 0) + 1,  # +1 for creator
                 "is_creator": trip.get("created_by") == user_id,
                 "is_member": user_id in member_ids_by_trip.get(trip["id"], set()),
+                "has_pending_join_request": trip["id"] in pending_join_trip_ids,
             }
         )
     return out
@@ -134,7 +156,7 @@ async def like_trip(
     if not trip.data:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trip not found")
     trip_row = trip.data[0]
-    if not trip_row.get("is_public") and trip_row["created_by"] != user_id:
+    if not _is_public_trip(trip_row) and trip_row["created_by"] != user_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Trip is private")
 
     record = {"trip_id": trip_id, "user_id": user_id}
@@ -191,7 +213,7 @@ async def request_to_join(
     if not trip.data:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trip not found")
     trip_row = trip.data[0]
-    if not trip_row.get("is_public"):
+    if not _is_public_trip(trip_row):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Trip is private")
     if trip_row["created_by"] == user_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You are the creator")

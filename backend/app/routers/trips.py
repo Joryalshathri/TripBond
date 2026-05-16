@@ -2,7 +2,8 @@ from fastapi import APIRouter, HTTPException, status, Query, Depends
 from fastapi.concurrency import run_in_threadpool
 from typing import Any, Dict, List
 from datetime import datetime, timedelta
-from ..database import SupabaseDB
+from collections import Counter
+from ..database import SupabaseDB, get_supabase_admin_client
 from ..services.trip_access import check_trip_access
 from ..services import trip_flow_service, trip_service
 from ..services.itinerary_service import (
@@ -46,6 +47,15 @@ def _trip_phase(trip: Dict[str, Any]) -> str:
     return str(trip.get("phase") or "planning")
 
 
+def _is_public_trip(trip: Dict[str, Any]) -> bool:
+    value = trip.get("is_public")
+    if value is None:
+        return True
+    if isinstance(value, str):
+        return value.strip().lower() not in {"false", "0", "no", "private"}
+    return bool(value)
+
+
 def _to_trip_response(trip: Dict[str, Any]) -> TripResponse:
     return TripResponse(
         id=trip["id"],
@@ -59,7 +69,7 @@ def _to_trip_response(trip: Dict[str, Any]) -> TripResponse:
         trip_type=trip.get("trip_type"),
         description=trip.get("description"),
         image_url=trip.get("image_url"),
-        is_public=trip.get("is_public", True),
+        is_public=_is_public_trip(trip),
         created_at=trip.get("created_at"),
     )
 
@@ -97,7 +107,7 @@ async def get_trips_by_user(user_id: str):
         return [
             _to_trip_response(trip)
             for trip in (response.data or [])
-            if trip.get("is_public", True)
+            if _is_public_trip(trip)
         ]
     except HTTPException:
         raise
@@ -113,10 +123,10 @@ async def get_trips_by_user(user_id: str):
 async def get_public_trip_detail(trip_id: str):
     """Get public trip details (no auth required)"""
     try:
-        db = SupabaseDB(admin=True)
+        client = get_supabase_admin_client()
         
         trip_response = await run_in_threadpool(
-            lambda: db.client.table("trips").select("*").eq("id", trip_id).execute()
+            lambda: client.table("trips").select("*").eq("id", trip_id).execute()
         )
         if not trip_response.data:
             raise HTTPException(
@@ -126,7 +136,7 @@ async def get_public_trip_detail(trip_id: str):
         
         trip = trip_response.data[0]
         
-        if not trip.get("is_public", True):
+        if not _is_public_trip(trip):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="This trip is private"
@@ -148,10 +158,10 @@ async def get_public_trip_detail(trip_id: str):
 async def get_public_trip_itinerary(trip_id: str):
     """Get public trip itinerary (no auth required)"""
     try:
-        db = SupabaseDB(admin=True)
+        client = get_supabase_admin_client()
         
         trip_response = await run_in_threadpool(
-            lambda: db.client.table("trips").select("*").eq("id", trip_id).execute()
+            lambda: client.table("trips").select("*").eq("id", trip_id).execute()
         )
         if not trip_response.data:
             raise HTTPException(
@@ -161,7 +171,7 @@ async def get_public_trip_itinerary(trip_id: str):
         
         trip = trip_response.data[0]
         
-        if not trip.get("is_public", True):
+        if not _is_public_trip(trip):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="This trip is private"
@@ -169,23 +179,28 @@ async def get_public_trip_itinerary(trip_id: str):
         
         # Fetch latest itinerary
         itinerary = await run_in_threadpool(
-            lambda: get_latest_itinerary(trip_id)
+            lambda: get_latest_itinerary(trip_id, client=client)
         )
         
         if not itinerary:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="No itinerary found for this trip"
+            return ItineraryResponse(
+                trip_id=trip_id,
+                days=[],
+                total_cost=0.0,
+                total_days=0,
+                optimization_score=None,
+                generated_at=None,
+                strategy=None,
             )
         
         # Fetch all items for this itinerary
         items = await run_in_threadpool(
-            lambda: list_items(itinerary["id"])
+            lambda: list_items(itinerary["id"], client=client)
         )
         
         # Build a map of place names/ids to trip_places for enrichment
         places_response = await run_in_threadpool(
-            lambda: db.client.table("trip_places").select("*").eq("trip_id", trip_id).execute()
+            lambda: client.table("trip_places").select("*").eq("trip_id", trip_id).execute()
         )
         places_map = {}
         if places_response.data:
@@ -199,23 +214,42 @@ async def get_public_trip_itinerary(trip_id: str):
         # Group by day_index → days[]
         days_dict = {}
         total_cost = 0.0
+        trip_start_date = None
+        if trip.get("start_date"):
+            try:
+                trip_start_date = datetime.fromisoformat(str(trip["start_date"])).date()
+            except ValueError:
+                trip_start_date = None
         
         for item in items:
-            day_idx = int(item.get("day_index") or 1)
+            try:
+                day_idx = int(item.get("day_index") or 1)
+            except (TypeError, ValueError):
+                day_idx = 1
             if day_idx not in days_dict:
-                days_dict[day_idx] = {"day": day_idx, "activities": []}
+                if trip_start_date:
+                    day_date = (trip_start_date + timedelta(days=day_idx - 1)).isoformat()
+                else:
+                    day_date = f"Day {day_idx}"
+                days_dict[day_idx] = {
+                    "day": day_idx,
+                    "date": day_date,
+                    "activities": [],
+                    "total_cost": 0.0,
+                    "total_duration_minutes": 0,
+                }
             
             # Try to enrich with place data
-            item_title = item.get("title", "Activity")
+            item_title = item.get("title") or "Activity"
             place_data = places_map.get(item_title.lower()) or places_map.get(item_title)
             
             activity = {
                 "id": item["id"],
                 "name": item_title,
-                "type": item.get("type", "activity"),
+                "type": item.get("type") or "activity",
                 "location": item.get("location") or trip.get("destination", "Unknown"),
-                "start_time": item["start_time"],
-                "end_time": item["end_time"],
+                "start_time": item.get("start_time"),
+                "end_time": item.get("end_time"),
                 "description": item.get("notes", ""),
                 "cost": place_data.get("cost") if place_data else item.get("cost"),
                 "rating": place_data.get("rating") if place_data else item.get("rating"),
@@ -229,6 +263,15 @@ async def get_public_trip_itinerary(trip_id: str):
                 "longitude": place_data.get("longitude") if place_data else None,
                 "score": item.get("score")
             }
+            activity_cost = activity.get("cost") or 0.0
+            try:
+                activity_cost = float(activity_cost)
+            except (TypeError, ValueError):
+                activity_cost = 0.0
+            total_cost += activity_cost
+            days_dict[day_idx]["total_cost"] += activity_cost
+            duration = _duration_minutes(activity.get("start_time"), activity.get("end_time")) or 0
+            days_dict[day_idx]["total_duration_minutes"] += duration
             days_dict[day_idx]["activities"].append(activity)
         
         days = [days_dict[k] for k in sorted(days_dict.keys())]
@@ -885,6 +928,44 @@ async def generate_trip_itinerary(
             preferences=request.preferences,
             voted_places=voted,
         )
+
+        activity_count = sum(
+            len(day.get("activities", []))
+            for day in itinerary_data.get("days", [])
+            if isinstance(day, dict)
+        )
+        if activity_count == 0:
+            destination = (trip.get("destination") or trip.get("location") or "").strip()
+            fallback_pois = await run_in_threadpool(
+                lambda: ai_poi_service.get_pois_for_destination(
+                    destination,
+                    limit=24,
+                    require_coordinates=True,
+                )
+            )
+            if fallback_pois:
+                fallback = build_smart_itinerary(
+                    trip,
+                    fallback_pois,
+                    pace=request.pace or "moderate",
+                )
+                itinerary_data = {
+                    "days": fallback.days,
+                    "total_cost": fallback.total_cost,
+                    "fitness_score": fallback.fitness_score,
+                }
+                strategy = f"{fallback.strategy}_destination_fallback"
+                activity_count = sum(
+                    len(day.get("activities", []))
+                    for day in itinerary_data.get("days", [])
+                    if isinstance(day, dict)
+                )
+
+        if activity_count == 0:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="No usable places found for this trip destination.",
+            )
         
         # Insert itinerary record using helper function
         itinerary_row = await run_in_threadpool(
@@ -1125,6 +1206,8 @@ async def update_itinerary_item(
             "notes": activity.description,
             "score": activity.priority if activity.priority else 1
         }
+        if activity.day is not None:
+            patch["day_index"] = max(activity.day, 1)
         
         try:
             updated_item = await run_in_threadpool(
@@ -1392,6 +1475,63 @@ def _duration_minutes(start: str | None, end: str | None) -> int | None:
         return None
 
 
+def _liked_trip_signals_for_user(db: SupabaseDB, user_id: str) -> Dict[str, Any]:
+    likes = (
+        db.client.table("trip_post_likes")
+        .select("trip_id")
+        .eq("user_id", user_id)
+        .limit(50)
+        .execute()
+    )
+    liked_trip_ids = [row["trip_id"] for row in (likes.data or []) if row.get("trip_id")]
+    if not liked_trip_ids:
+        return {}
+
+    trips = (
+        db.client.table("trips")
+        .select("id, destination, trip_type")
+        .in_("id", liked_trip_ids)
+        .eq("is_public", True)
+        .execute()
+    )
+    rows = trips.data or []
+    if not rows:
+        return {}
+
+    destinations = [
+        str(row.get("destination") or "").strip()
+        for row in rows
+        if str(row.get("destination") or "").strip()
+    ]
+    trip_types = [
+        str(row.get("trip_type") or "").strip().lower()
+        for row in rows
+        if str(row.get("trip_type") or "").strip()
+    ]
+
+    trip_type_tags = {
+        "adventure": ["activity", "attraction", "park", "nature", "outdoor"],
+        "outdoor": ["activity", "attraction", "park", "nature", "outdoor"],
+        "culture": ["museum", "historical", "landmark"],
+        "cultural": ["museum", "historical", "landmark"],
+        "food": ["restaurant", "cafe"],
+        "family": ["park", "zoo", "aquarium", "amusement_park", "museum"],
+        "relax": ["restaurant", "cafe", "beach", "park", "garden"],
+        "relaxing": ["restaurant", "cafe", "beach", "park", "garden"],
+        "nightlife": ["restaurant", "cafe", "entertainment"],
+    }
+    activity_tags: list[str] = []
+    for trip_type in trip_types:
+        activity_tags.extend(trip_type_tags.get(trip_type, [trip_type]))
+
+    return {
+        "liked_trip_count": len(rows),
+        "liked_destinations": [item for item, _ in Counter(destinations).most_common(5)],
+        "liked_trip_types": [item for item, _ in Counter(trip_types).most_common(5)],
+        "activity_tags": [item for item, _ in Counter(activity_tags).most_common(10)],
+    }
+
+
 def _build_group_preferences_from_members(db: SupabaseDB, trip: Dict[str, Any]) -> dict:
     trip_id = trip["id"]
     members = (
@@ -1428,12 +1568,22 @@ def _build_group_preferences_from_members(db: SupabaseDB, trip: Dict[str, Any]) 
             .execute()
         )
         profile_data = profile.data[0] if profile.data else {}
+        trip_pref_data = trip_prefs.data[0] if trip_prefs.data else {}
+        liked_signals = _liked_trip_signals_for_user(db, member_id)
+        if liked_signals.get("activity_tags"):
+            merged_activity_tags = list(dict.fromkeys([
+                *(trip_pref_data.get("activity_tags") or []),
+                *liked_signals["activity_tags"],
+            ]))
+            trip_pref_data = {**trip_pref_data, "activity_tags": merged_activity_tags}
+
         individual_preferences.append({
             "user_id": member_id,
             "weight": 1.0,
-            "trip_preferences": trip_prefs.data[0] if trip_prefs.data else {},
+            "trip_preferences": trip_pref_data,
             "general_preferences": profile_data,
             "personality": profile_data,
+            "liked_trips": liked_signals,
         })
 
     if not individual_preferences:
@@ -1452,6 +1602,26 @@ def _build_group_preferences_from_members(db: SupabaseDB, trip: Dict[str, Any]) 
     ]
     if travel_styles and not aggregated.get("travel_style"):
         aggregated["travel_style"] = max(set(travel_styles), key=travel_styles.count)
+
+    liked_destinations = [
+        destination
+        for prefs in individual_preferences
+        for destination in prefs.get("liked_trips", {}).get("liked_destinations", [])
+    ]
+    if liked_destinations:
+        aggregated["liked_destinations"] = [
+            item for item, _ in Counter(liked_destinations).most_common(5)
+        ]
+
+    liked_trip_types = [
+        trip_type
+        for prefs in individual_preferences
+        for trip_type in prefs.get("liked_trips", {}).get("liked_trip_types", [])
+    ]
+    if liked_trip_types:
+        aggregated["liked_trip_types"] = [
+            item for item, _ in Counter(liked_trip_types).most_common(5)
+        ]
 
     return aggregated
 
@@ -1892,7 +2062,12 @@ async def add_place_to_trip(
         rating = place_data.get("rating")
         user_ratings_total = place_data.get("user_ratings_total")
         types = place_data.get("types", [])
-        image_url = place_data.get("image_url")
+        image_url = place_data.get("image_url") or place_data.get("photo_url")
+        if not image_url and isinstance(place_data.get("images"), list):
+            for image in place_data["images"]:
+                if isinstance(image, dict) and image.get("url"):
+                    image_url = image["url"]
+                    break
         
         if not name or latitude is None or longitude is None:
             raise HTTPException(

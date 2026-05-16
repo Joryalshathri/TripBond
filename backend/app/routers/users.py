@@ -361,6 +361,9 @@ async def get_my_profile(user_context: tuple[str, str] = Depends(get_current_use
         favorites_response = await run_in_threadpool(
             lambda: db.client.table("user_favorites").select("id", count="exact").eq("user_id", user_id).execute()
         )
+        liked_trips_response = await run_in_threadpool(
+            lambda: db.client.table("trip_post_likes").select("trip_id", count="exact").eq("user_id", user_id).execute()
+        )
         return ProfileResponse(
             id=profile["id"],
             email=profile.get("email_address", ""),  # Updated to use email_address
@@ -374,7 +377,7 @@ async def get_my_profile(user_context: tuple[str, str] = Depends(get_current_use
             gender=profile.get("gender"),
             is_public=profile.get("is_public", True),
             past_trips_count=trips_response.count if trips_response else 0,
-            liked_pages_count=0,
+            liked_pages_count=liked_trips_response.count if liked_trips_response else 0,
             favorites_count=favorites_response.count if favorites_response else 0,
             followers_count=len(_parse_connection_ids(profile.get("followers"))),
             following_count=len(_parse_connection_ids(profile.get("following"))),
@@ -425,6 +428,14 @@ async def get_user_profile(user_id: str):
         except Exception as e:
             logger.warning(f"Failed to get favorites count for user {user_id}: {e}")
             favorites_response = None
+
+        try:
+            liked_trips_response = await run_in_threadpool(
+                lambda: db.client.table("trip_post_likes").select("trip_id", count="exact").eq("user_id", user_id).execute()
+            )
+        except Exception as e:
+            logger.warning(f"Failed to get liked trips count for user {user_id}: {e}")
+            liked_trips_response = None
             
         return ProfileResponse(
             id=profile["id"],
@@ -436,7 +447,7 @@ async def get_user_profile(user_id: str):
             current_location=profile.get("current_location"),
             is_public=profile.get("is_public", True),
             past_trips_count=trips_response.count if trips_response else 0,
-            liked_pages_count=0,
+            liked_pages_count=liked_trips_response.count if liked_trips_response else 0,
             favorites_count=favorites_response.count if favorites_response else 0,
             followers_count=len(_parse_connection_ids(profile.get("followers"))),
             following_count=len(_parse_connection_ids(profile.get("following"))),
@@ -574,6 +585,9 @@ async def update_profile(
         favorites_response = await run_in_threadpool(
             lambda: db.client.table("user_favorites").select("id", count="exact").eq("user_id", user_id).execute()
         )
+        liked_trips_response = await run_in_threadpool(
+            lambda: db.client.table("trip_post_likes").select("trip_id", count="exact").eq("user_id", user_id).execute()
+        )
         p = response.data[0]
         return ProfileResponse(
             id=p["id"],
@@ -588,7 +602,7 @@ async def update_profile(
             gender=p.get("gender"),
             is_public=p.get("is_public", True),
             past_trips_count=trips_response.count if trips_response else 0,
-            liked_pages_count=0,
+            liked_pages_count=liked_trips_response.count if liked_trips_response else 0,
             favorites_count=favorites_response.count if favorites_response else 0,
             followers_count=len(_parse_connection_ids(p.get("followers"))),
             following_count=len(_parse_connection_ids(p.get("following"))),

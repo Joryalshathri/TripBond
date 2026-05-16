@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'onboarding_screen.dart';
 import 'login_screen.dart';
 import 'widgets/custom_loading_spinner.dart';
+import '../services/app_cache_warmup_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -19,6 +20,7 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
+    AppCacheWarmupService().warmDestinationData();
     _splashTimer = Timer(const Duration(seconds: 2), _checkFirstTime);
   }
 

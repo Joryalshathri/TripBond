@@ -535,7 +535,7 @@ class TripService {
 
   // Add itinerary item
   Future<Map<String, dynamic>> addItineraryItem(
-      String tripId, Map<String, dynamic> itemData) async {
+      String tripId, int day, Map<String, dynamic> itemData) async {
     try {
       final token = await _authService.getAuthToken();
       if (token == null) {
@@ -543,7 +543,7 @@ class TripService {
       }
 
       final response = await _apiService.post(
-        '${ApiConfig.tripsPath}/$tripId/itinerary/items',
+        '${ApiConfig.tripsPath}/$tripId/itinerary/items?day=$day',
         itemData,
         token: token,
       );
