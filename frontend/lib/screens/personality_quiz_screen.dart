@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/api_service.dart';
 import '../services/personality_service.dart';
 import '../services/auth_service.dart';
 
@@ -14,7 +15,7 @@ class _PersonalityQuizScreenState extends State<PersonalityQuizScreen> {
   final _authService = AuthService();
 
   List<Map<String, dynamic>> questions = [];
-  Map<int, int> answers = {}; // question_id -> rating (1-5)
+  Map<int, int> answers = {}; // question id -> rating (1-5)
   bool isLoading = true;
   String errorMessage = '';
   int currentQuestion = 0;
@@ -43,24 +44,31 @@ class _PersonalityQuizScreenState extends State<PersonalityQuizScreen> {
 
   Future<void> _submitQuiz() async {
     try {
-      final user = await _authService.getAuthToken();
-      if (user == null) {
-        throw Exception('Not authenticated');
+      final token = await _authService.getAuthToken();
+      if (token == null || token.isEmpty) {
+        throw Exception('Not authenticated. Please sign in again.');
       }
 
-      // Convert answers to submission format
+      final userId = await _authService.getUserId();
+      if (userId == null || userId.isEmpty) {
+        throw Exception('User session expired. Please sign in again.');
+      }
+
+      if (answers.length < questions.length) {
+        throw Exception('Please answer all questions before submitting.');
+      }
+
       final submissionAnswers = answers.entries
           .map((e) => {
                 'question_id': e.key,
-                'rating': e.value,
+                'answer': _ratingToAnswer(e.value),
               })
           .toList();
 
-      // Get user ID from auth
-      final userId = (await _authService.getUserId()) ?? '';
-
-      final result =
-          await _personalityService.submitQuiz(userId, submissionAnswers);
+      await _personalityService.submitQuizSubmission(
+        userId: userId,
+        answers: submissionAnswers,
+      );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -69,8 +77,12 @@ class _PersonalityQuizScreenState extends State<PersonalityQuizScreen> {
         Navigator.pop(context);
       }
     } catch (e) {
+      if (!mounted) return;
+      final message = e is ApiException
+          ? e.message
+          : e.toString().replaceFirst('Exception: ', '');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: ${e.toString()}')),
+        SnackBar(content: Text(message)),
       );
     }
   }
@@ -143,7 +155,7 @@ class _PersonalityQuizScreenState extends State<PersonalityQuizScreen> {
                           const SizedBox(height: 32),
                           // Question
                           Text(
-                            questions[currentQuestion]['question'] ?? '',
+                            _questionText(questions[currentQuestion]),
                             style: const TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
@@ -154,14 +166,15 @@ class _PersonalityQuizScreenState extends State<PersonalityQuizScreen> {
                           Column(
                             children: List.generate(5, (index) {
                               final rating = index + 1;
-                              final isSelected =
-                                  answers[currentQuestion] == rating;
+                              final questionId =
+                                  _questionId(questions[currentQuestion]);
+                              final isSelected = answers[questionId] == rating;
                               return Padding(
                                 padding: const EdgeInsets.only(bottom: 12),
                                 child: GestureDetector(
                                   onTap: () {
                                     setState(() {
-                                      answers[currentQuestion] = rating;
+                                      answers[questionId] = rating;
                                     });
                                   },
                                   child: Container(
@@ -233,7 +246,9 @@ class _PersonalityQuizScreenState extends State<PersonalityQuizScreen> {
                               if (currentQuestion > 0)
                                 const SizedBox(width: 12),
                               Expanded(
-                                child: answers.containsKey(currentQuestion)
+                                child: answers.containsKey(
+                                        _questionId(
+                                            questions[currentQuestion]))
                                     ? ElevatedButton(
                                         onPressed: currentQuestion <
                                                 questions.length - 1
@@ -245,6 +260,11 @@ class _PersonalityQuizScreenState extends State<PersonalityQuizScreen> {
                                         style: ElevatedButton.styleFrom(
                                           backgroundColor:
                                               const Color(0xFF4675B8),
+                                          foregroundColor: Colors.white,
+                                          disabledBackgroundColor:
+                                              Colors.grey[300],
+                                          disabledForegroundColor:
+                                              Colors.grey[600],
                                           padding: const EdgeInsets.symmetric(
                                             vertical: 16,
                                           ),
@@ -253,16 +273,32 @@ class _PersonalityQuizScreenState extends State<PersonalityQuizScreen> {
                                           currentQuestion < questions.length - 1
                                               ? 'Next'
                                               : 'Submit',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w600,
+                                          ),
                                         ),
                                       )
                                     : ElevatedButton(
                                         onPressed: null,
                                         style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.grey[300],
+                                          foregroundColor: Colors.grey[600],
+                                          disabledBackgroundColor:
+                                              Colors.grey[300],
+                                          disabledForegroundColor:
+                                              Colors.grey[600],
                                           padding: const EdgeInsets.symmetric(
                                             vertical: 16,
                                           ),
                                         ),
-                                        child: const Text('Select an option'),
+                                        child: const Text(
+                                          'Select an option',
+                                          style: TextStyle(
+                                            color: Colors.grey,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
                                       ),
                               ),
                             ],
@@ -288,5 +324,22 @@ class _PersonalityQuizScreenState extends State<PersonalityQuizScreen> {
       default:
         return '';
     }
+  }
+
+  String _questionText(Map<String, dynamic> question) {
+    return (question['text'] ?? question['question'] ?? '').toString();
+  }
+
+  int _questionId(Map<String, dynamic> question) {
+    final id = question['id'];
+    if (id is int) return id;
+    if (id is num) return id.toInt();
+    return currentQuestion + 1;
+  }
+
+  String _ratingToAnswer(int rating) {
+    if (rating <= 2) return 'disagree';
+    if (rating == 3) return 'neutral';
+    return 'agree';
   }
 }

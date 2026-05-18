@@ -1,4 +1,5 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Depends
+from ..auth import get_current_user_context
 from ..schemas.personality import (
     QuizSubmission,
     PersonalityScores,
@@ -16,13 +17,22 @@ async def get_quiz_questions():
 
 
 @router.post("/submit", response_model=PersonalityScores)
-async def submit_quiz(submission: QuizSubmission):
+async def submit_quiz(
+    submission: QuizSubmission,
+    user_context: tuple[str, str] = Depends(get_current_user_context),
+):
     """
     Submit quiz answers and calculate + persist Big Five personality scores.
     Also saves individual answers to the personality_answers table.
     """
+    user_id, _token = user_context
+    if submission.user_id and submission.user_id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot submit quiz for another user",
+        )
     try:
-        return personality_service.submit_quiz_answers(submission.user_id, submission.answers)
+        return personality_service.submit_quiz_answers(user_id, submission.answers)
     except HTTPException:
         raise
     except Exception as e:

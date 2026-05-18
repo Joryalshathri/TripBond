@@ -26,6 +26,11 @@ _CSV_PATH = _AI_BACKEND_ROOT / "data" / "final_integrated_poi_dataset.csv"
 _DENYLIST = {
     "Al", "Ad", "Ras", "King", "Saudi", "SH", "1c", "Closed", "Temporarily",
     "Tuwarin", "Sa'ad", "Khubayb", "Qesm", "Hafar",
+    # Non-KSA / outside scope
+    "Abu Dhabi", "Hurghada", "Manama", "Muharraq", "Zallaq",
+    # Scrape noise / sub-locality fragments
+    "Buqayq", "Dhurma", "Huraymila", "Rughabah", "Uthmaniyah", "Ushaiqer",
+    "Al-Muzahmiya", "Kaec", "Rijal Almaa",
 }
 
 # Manual coordinate / metadata overrides for cities that have valid POIs but
@@ -56,6 +61,15 @@ _OVERRIDES: Dict[str, Dict[str, Any]] = {
     "Khobar":      {"alias_of": "Al Khobar"},
     "Buraidah":    {"alias_of": "Buraydah"},
     "Buraydah":    {"province": "Qassim",            "lat": 26.3260, "lng": 43.9750, "country": "Saudi Arabia"},
+    "King Abdullah Economic City": {
+        "province": "Makkah", "lat": 22.4000, "lng": 39.0800, "country": "Saudi Arabia",
+    },
+    "Unayzah":     {"province": "Qassim",            "lat": 26.0900, "lng": 43.9700, "country": "Saudi Arabia"},
+    "Umluj":       {"province": "Tabuk",             "lat": 25.0201, "lng": 37.2669, "country": "Saudi Arabia"},
+    "Shaqra":      {"province": "Riyadh",            "lat": 25.2400, "lng": 45.2500, "country": "Saudi Arabia"},
+    "Safwa":       {"province": "Eastern Province",  "lat": 26.6500, "lng": 49.9500, "country": "Saudi Arabia"},
+    "Al-Kharj":    {"province": "Riyadh",            "lat": 24.1550, "lng": 47.3050, "country": "Saudi Arabia"},
+    "Arar":        {"province": "Northern Borders",  "lat": 30.9750, "lng": 41.0380, "country": "Saudi Arabia"},
 }
 
 # Image asset hints. Keys are normalised city names; values are asset paths
@@ -71,6 +85,12 @@ _ASSET_MAP: Dict[str, str] = {
 }
 
 _cache: Optional[List[Dict[str, Any]]] = None
+
+
+def invalidate_cache() -> None:
+    """Clear in-memory city list (call after updating the POI CSV)."""
+    global _cache
+    _cache = None
 
 
 def _load() -> Optional[pd.DataFrame]:
@@ -93,7 +113,15 @@ def _safe(value: Any) -> Optional[str]:
     return text or None
 
 
-def list_cities(min_count: int = 2) -> List[Dict[str, Any]]:
+# Only Saudi provinces / regions — blocks stray international rows in the CSV.
+_KSA_PROVINCES = {
+    "Riyadh", "Makkah", "Medina", "Madinah", "Eastern Province", "Asir", "Aseer",
+    "Tabuk", "Hail", "Qassim", "Najran", "Jazan", "Jizan", "Al Baha", "Northern Borders",
+    "",  # filled via overrides
+}
+
+
+def list_cities(min_count: int = 10) -> List[Dict[str, Any]]:
     """Return curated cities sorted by POI count (descending).
 
     Each entry contains: name, count, province, lat, lng, country,
@@ -130,6 +158,8 @@ def list_cities(min_count: int = 2) -> List[Dict[str, Any]]:
             continue
         if not any(c.isalpha() for c in raw_name):
             continue
+        if int(row["count"]) < min_count:
+            continue
 
         # Resolve aliases (Khobar -> Al Khobar, Buraidah -> Buraydah)
         override = _OVERRIDES.get(raw_name, {})
@@ -151,8 +181,14 @@ def list_cities(min_count: int = 2) -> List[Dict[str, Any]]:
         if (lat is None or lng is None) and raw_name not in _OVERRIDES:
             continue
 
-        province = override.get("province") or row.get("province") or ""
+        province = _safe(override.get("province") or row.get("province")) or ""
+        if province and province not in _KSA_PROVINCES and province != "International":
+            # Allow unknown province only when we have an explicit KSA override.
+            if raw_name not in _OVERRIDES:
+                continue
         country = override.get("country", "Saudi Arabia")
+        if str(country).strip().lower() not in {"", "saudi arabia", "ksa", "kingdom of saudi arabia"}:
+            continue
         image_asset = _ASSET_MAP.get(raw_name)
 
         result.append({

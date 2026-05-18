@@ -17,37 +17,35 @@ class PersonalityService {
         '${ApiConfig.personalityPath}/questions',
       );
 
-      if (response is List) {
-        return response.cast<Map<String, dynamic>>();
-      } else if (response is Map && response.containsKey('questions')) {
-        final questions = response['questions'];
-        if (questions is List) {
-          return questions.cast<Map<String, dynamic>>();
-        }
-      }
-
-      return [];
+      return _normalizeQuizQuestions(response);
     } catch (e) {
       throw Exception('Failed to get quiz questions: ${e.toString()}');
     }
   }
 
-  // Submit quiz answers
+  List<Map<String, dynamic>> _normalizeQuizQuestions(dynamic response) {
+    final List<dynamic> raw;
+    if (response is List) {
+      raw = response;
+    } else if (response is Map && response['questions'] is List) {
+      raw = response['questions'] as List;
+    } else {
+      return [];
+    }
+
+    return raw.map((item) {
+      final map = Map<String, dynamic>.from(item as Map);
+      final text = (map['text'] ?? map['question'] ?? '').toString();
+      map['text'] = text;
+      map['question'] = text;
+      return map;
+    }).toList();
+  }
+
+  // Submit quiz answers (requires authentication).
   Future<Map<String, dynamic>> submitQuiz(
       String userId, List<Map<String, dynamic>> answers) async {
-    try {
-      final response = await _apiService.post(
-        '${ApiConfig.personalityPath}/submit',
-        {
-          'user_id': userId,
-          'answers': answers,
-        },
-      );
-
-      return response;
-    } catch (e) {
-      throw Exception('Failed to submit quiz: ${e.toString()}');
-    }
+    return submitQuizSubmission(userId: userId, answers: answers);
   }
 
   // Submit quiz answers in the backend schema format.
@@ -55,6 +53,11 @@ class PersonalityService {
     required String userId,
     required List<Map<String, dynamic>> answers,
   }) async {
+    final token = await _authService.getAuthToken();
+    if (token == null || token.isEmpty) {
+      throw Exception('Not authenticated. Please sign in again.');
+    }
+
     try {
       final response = await _apiService.post(
         '${ApiConfig.personalityPath}/submit',
@@ -62,6 +65,7 @@ class PersonalityService {
           'user_id': userId,
           'answers': answers,
         },
+        token: token,
       );
 
       if (response is Map<String, dynamic>) {

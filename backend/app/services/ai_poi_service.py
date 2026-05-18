@@ -34,6 +34,8 @@ _GENERIC_DESTINATION_TOKENS = {
 _CITY_ALIASES = {
     "khobar": ["Al Khobar"],
     "al khobar": ["Al Khobar", "Khobar"],
+    "kaec": ["King Abdullah Economic City"],
+    "king abdullah economic city": ["King Abdullah Economic City"],
     "alula": ["AlUla", "Al Ula"],
     "al ula": ["AlUla"],
     "buraidah": ["Buraydah"],
@@ -45,6 +47,13 @@ _CITY_ALIASES = {
     "as seer": ["Aseer"],
     "asir": ["Aseer", "Abha"],
 }
+
+
+def invalidate_poi_dataset_cache() -> None:
+    """Clear in-memory POI CSV cache (call after updating the dataset file)."""
+    global _pois_cache, _group_recs_cache
+    _pois_cache = None
+    _group_recs_cache = None
 
 
 def _load_poi_dataset() -> Optional[pd.DataFrame]:
