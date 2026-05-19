@@ -142,6 +142,99 @@ async def get_feed(
 # ==================== Likes ====================
 
 
+@router.get("/me/liked-trips", response_model=List[Dict[str, Any]])
+async def get_my_liked_trips(
+    limit: int = Query(100, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    user_context: tuple[str, str] = Depends(get_current_user_context),
+):
+    """Trips liked by the current user, shaped like feed cards for profile rendering."""
+    user_id, _ = user_context
+    db = SupabaseDB(admin=True)
+
+    liked_res = await run_in_threadpool(
+        lambda: db.client.table("trip_post_likes")
+        .select("trip_id")
+        .eq("user_id", user_id)
+        .range(offset, offset + limit - 1)
+        .execute()
+    )
+    liked_trip_ids = [
+        row["trip_id"] for row in (liked_res.data or []) if row.get("trip_id")
+    ]
+    if not liked_trip_ids:
+        return []
+
+    trips_res = await run_in_threadpool(
+        lambda: db.client.table("trips")
+        .select("*")
+        .in_("id", liked_trip_ids)
+        .execute()
+    )
+    trip_by_id = {trip["id"]: trip for trip in (trips_res.data or [])}
+    trips = [
+        trip_by_id[trip_id]
+        for trip_id in liked_trip_ids
+        if trip_id in trip_by_id and _is_public_trip(trip_by_id[trip_id])
+    ]
+    if not trips:
+        return []
+
+    creator_ids = list({t["created_by"] for t in trips if t.get("created_by")})
+    profiles = _profile_lookup(creator_ids)
+    trip_ids = [t["id"] for t in trips]
+
+    likes_res = await run_in_threadpool(
+        lambda: db.client.table("trip_post_likes")
+        .select("trip_id, user_id")
+        .in_("trip_id", trip_ids)
+        .execute()
+    )
+    likes_by_trip: Dict[str, List[str]] = {tid: [] for tid in trip_ids}
+    for row in (likes_res.data or []):
+        likes_by_trip.setdefault(row["trip_id"], []).append(row["user_id"])
+
+    members_res = await run_in_threadpool(
+        lambda: db.client.table("trip_participants")
+        .select("trip_id, user_id, status")
+        .in_("trip_id", trip_ids)
+        .eq("status", "accepted")
+        .execute()
+    )
+    members_by_trip: Dict[str, int] = {tid: 0 for tid in trip_ids}
+    member_ids_by_trip: Dict[str, set[str]] = {tid: set() for tid in trip_ids}
+    for row in (members_res.data or []):
+        members_by_trip[row["trip_id"]] = members_by_trip.get(row["trip_id"], 0) + 1
+        member_ids_by_trip.setdefault(row["trip_id"], set()).add(row["user_id"])
+
+    out: List[Dict[str, Any]] = []
+    for trip in trips:
+        creator = profiles.get(trip.get("created_by") or "", {})
+        out.append({
+            "id": trip["id"],
+            "title": trip.get("title"),
+            "destination": trip.get("destination"),
+            "image_url": trip.get("image_url"),
+            "description": trip.get("description"),
+            "start_date": trip.get("start_date"),
+            "end_date": trip.get("end_date"),
+            "phase": trip.get("phase") or "planning",
+            "created_at": trip.get("created_at"),
+            "creator": {
+                "id": creator.get("id"),
+                "full_name": creator.get("full_name"),
+                "username": creator.get("username"),
+                "avatar_url": creator.get("avatar_url"),
+            },
+            "likes_count": len(likes_by_trip.get(trip["id"], [])),
+            "has_liked": True,
+            "member_count": members_by_trip.get(trip["id"], 0) + 1,
+            "is_creator": trip.get("created_by") == user_id,
+            "is_member": user_id in member_ids_by_trip.get(trip["id"], set()),
+        })
+    return out
+
+
 @router.post("/trips/{trip_id}/like")
 async def like_trip(
     trip_id: str,

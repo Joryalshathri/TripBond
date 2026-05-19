@@ -5,20 +5,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'settings.dart';
 import 'editProfile.dart';
-import 'DestinationLandingPage.dart';
-import 'Bonder.dart';
-import 'AI_Plan.dart';
 import 'chat_screen.dart';
 import 'personality_quiz_screen.dart';
 import 'feedback_screen.dart';
-import 'plans_list.dart';
 import 'package:top_snackbar_flutter/top_snack_bar.dart';
 import 'package:top_snackbar_flutter/custom_snack_bar.dart';
 import '../services/profileService.dart';
-import '../services/favorites_service.dart';
+import '../services/feed_service.dart';
+import '../services/trip_service.dart';
 import '../services/user_service.dart';
 import '../models/profile_model.dart';
-import '../models.dart';
 import '../widgets/app_bottom_nav.dart';
 
 const List<String> _tabs = ['Posted Trips', 'Liked Trips'];
@@ -37,8 +33,12 @@ class _ProfileState extends State<Profile> {
   UserProfile? _userProfile;
   bool _isLoading = true;
   String? _error;
-  final FavoritesService _favoritesService = FavoritesService();
+  final FeedService _feedService = FeedService();
+  final TripService _tripService = TripService();
   final UserService _userService = UserService();
+  List<Map<String, dynamic>> _postedTrips = [];
+  bool _isLoadingPostedTrips = true;
+  String? _postedTripsError;
   List<Map<String, dynamic>> _likedTrips = [];
   bool _isLoadingLikedTrips = true;
   String? _likedTripsError;
@@ -51,6 +51,7 @@ class _ProfileState extends State<Profile> {
   void initState() {
     super.initState();
     _loadProfile();
+    _loadPostedTrips();
     _loadLikedTrips();
   }
 
@@ -71,10 +72,10 @@ class _ProfileState extends State<Profile> {
 
   Future<void> _loadLikedTrips() async {
     try {
-      final favorites = await _favoritesService.getMyFavorites();
+      final likedTrips = await _feedService.getMyLikedTrips();
       if (!mounted) return;
       setState(() {
-        _likedTrips = favorites;
+        _likedTrips = likedTrips;
         _isLoadingLikedTrips = false;
         _likedTripsError = null;
       });
@@ -83,6 +84,24 @@ class _ProfileState extends State<Profile> {
       setState(() {
         _likedTripsError = e.toString().replaceFirst('Exception: ', '');
         _isLoadingLikedTrips = false;
+      });
+    }
+  }
+
+  Future<void> _loadPostedTrips() async {
+    try {
+      final trips = await _tripService.getMyTrips();
+      if (!mounted) return;
+      setState(() {
+        _postedTrips = trips;
+        _isLoadingPostedTrips = false;
+        _postedTripsError = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _postedTripsError = e.toString().replaceFirst('Exception: ', '');
+        _isLoadingPostedTrips = false;
       });
     }
   }
@@ -122,7 +141,10 @@ class _ProfileState extends State<Profile> {
   }
 
   // ---  DELETE DIALOG ---
-  Future<void> _confirmDelete(Post post) async {
+  Future<void> _confirmDeleteTrip(Map<String, dynamic> trip) async {
+    final tripId = (trip['id'] ?? '').toString();
+    if (tripId.isEmpty) return;
+
     return showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -157,21 +179,33 @@ class _ProfileState extends State<Profile> {
                     fontWeight: FontWeight.w600)),
           ),
           ElevatedButton(
-            onPressed: () {
-              setState(() {
-                posts.remove(post);
-              });
-              Navigator.pop(context);
-              // Success Notification
-              showTopSnackBar(
-                Overlay.of(context),
-                const CustomSnackBar.success(
-                  message: "Post deleted successfully",
-                  backgroundColor: Color(0xFF4675B8),
-                  icon: Icon(Icons.delete_outline,
-                      color: Colors.white24, size: 80),
-                ),
-              );
+            onPressed: () async {
+              try {
+                await _tripService.deleteTrip(tripId);
+                if (!mounted) return;
+                setState(() {
+                  _postedTrips
+                      .removeWhere((item) => item['id']?.toString() == tripId);
+                });
+                Navigator.pop(context);
+                showTopSnackBar(
+                  Overlay.of(context),
+                  const CustomSnackBar.success(
+                    message: "Post deleted successfully",
+                    backgroundColor: Color(0xFF4675B8),
+                    icon: Icon(Icons.delete_outline,
+                        color: Colors.white24, size: 80),
+                  ),
+                );
+              } catch (e) {
+                if (!mounted) return;
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(e.toString().replaceFirst('Exception: ', '')),
+                  ),
+                );
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.redAccent,
@@ -406,8 +440,7 @@ class _ProfileState extends State<Profile> {
 
   Widget _buildProfileInfo() {
     final displayName = _displayName();
-    final int userTripCount =
-        posts.where((p) => p.userName == displayName).length;
+    final int userTripCount = _postedTrips.length;
     final avatarUrl = _userProfile?.avatarUrl?.trim() ?? '';
     final avatarBytes = _decodeDataUrlImage(avatarUrl);
     return Column(
@@ -528,101 +561,183 @@ class _ProfileState extends State<Profile> {
 
   Widget _buildContent() {
     if (_activeTab == 'Liked Trips') return _buildLikedGrid();
-    final userPosts = posts.where((p) => p.userName == _displayName()).toList();
+
+    if (_isLoadingPostedTrips) {
+      return const Padding(
+        padding: EdgeInsets.all(24),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_postedTripsError != null) {
+      return Padding(
+        padding: const EdgeInsets.all(24),
+        child: Center(child: Text('Error: $_postedTripsError')),
+      );
+    }
+
+    if (_postedTrips.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(24),
+        child: Center(
+          child: Text(
+            'No posted trips yet',
+            style: TextStyle(color: Colors.grey.shade600),
+          ),
+        ),
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Wrap(
         spacing: 12,
         runSpacing: 12,
-        children: userPosts
-            .map((post) => SizedBox(
-                      width: (MediaQuery.of(context).size.width - 44) / 2,
-                      child: Container(
-                        decoration: BoxDecoration(
-                            color: Colors.white,
-                            border: Border.all(color: Colors.grey.shade200),
-                            borderRadius: BorderRadius.circular(16)),
-                        clipBehavior: Clip.antiAlias,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Stack(
-                              children: [
-                                Image.asset(post.image,
-                                    height: 110,
-                                    width: double.infinity,
-                                    fit: BoxFit.cover),
-                                // Glass-morphic Delete Icon
-                                Positioned(
-                                  top: 8,
-                                  right: 8,
-                                  child: GestureDetector(
-                                    onTap: () => _confirmDelete(post),
-                                    child: Container(
-                                      padding: const EdgeInsets.all(6),
-                                      decoration: BoxDecoration(
-                                        color:
-                                            Colors.white.withValues(alpha: 0.9),
-                                        shape: BoxShape.circle,
-                                        boxShadow: [
-                                          BoxShadow(
-                                              color: Colors.black12,
-                                              blurRadius: 4)
-                                        ],
-                                      ),
-                                      child: const Icon(
-                                        Icons.delete_outline_rounded,
-                                        color: Colors.redAccent,
-                                        size: 18,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.all(10),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(post.title,
-                                      style: const TextStyle(
-                                          fontFamily: 'Poppins',
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: 13),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis),
-                                  Row(children: [
-                                    const Icon(Icons.location_on,
-                                        size: 10, color: Color(0xFF4675B8)),
-                                    const SizedBox(width: 4),
-                                    Expanded(
-                                        child: Text(post.location,
-                                            style: const TextStyle(
-                                                fontSize: 10,
-                                                color: Color(0xFF9E9E9E)),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis))
-                                  ]),
-                                  Text(_getTimeAgo(post.timestamp),
-                                      style: TextStyle(
-                                          fontSize: 10,
-                                          color: Colors.grey.shade400,
-                                          fontStyle: FontStyle.italic)),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    )
-                        .animate()
-                        .fadeIn(duration: 400.ms)
-                        .scale(delay: 100.ms) // Entrance animation
-                )
+        children: _postedTrips
+            .map((trip) => _buildTripTile(trip, allowDelete: true)
+                .animate()
+                .fadeIn(duration: 400.ms)
+                .scale(delay: 100.ms))
             .toList(),
       ),
     );
+  }
+
+  Widget _buildTripTile(Map<String, dynamic> trip, {bool allowDelete = false}) {
+    final title = (trip['title'] ?? 'Untitled Trip').toString();
+    final destination =
+        (trip['destination'] ?? trip['location'] ?? 'Trip').toString();
+    final imageUrl = (trip['image_url'] ?? '').toString();
+    final createdAt = _createdAtLabel(trip['created_at']);
+
+    return SizedBox(
+      width: (MediaQuery.of(context).size.width - 44) / 2,
+      child: Container(
+        decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border.all(color: Colors.grey.shade200),
+            borderRadius: BorderRadius.circular(16)),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Stack(
+              children: [
+                _buildTripImage(imageUrl),
+                if (allowDelete &&
+                    (trip['created_by'] ?? '').toString() == _userProfile?.id)
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: GestureDetector(
+                      onTap: () => _confirmDeleteTrip(trip),
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.9),
+                          shape: BoxShape.circle,
+                          boxShadow: const [
+                            BoxShadow(color: Colors.black12, blurRadius: 4)
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.delete_outline_rounded,
+                          color: Colors.redAccent,
+                          size: 18,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            Padding(
+              padding: const EdgeInsets.all(10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                      style: const TextStyle(
+                          fontFamily: 'Poppins',
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis),
+                  Row(children: [
+                    const Icon(Icons.location_on,
+                        size: 10, color: Color(0xFF4675B8)),
+                    const SizedBox(width: 4),
+                    Expanded(
+                        child: Text(destination,
+                            style: const TextStyle(
+                                fontSize: 10, color: Color(0xFF9E9E9E)),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis))
+                  ]),
+                  Text(createdAt,
+                      style: TextStyle(
+                          fontSize: 10,
+                          color: Colors.grey.shade400,
+                          fontStyle: FontStyle.italic)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTripImage(String imageUrl) {
+    final imageBytes = _decodeDataUrlImage(imageUrl);
+    if (imageBytes != null) {
+      return Image.memory(
+        imageBytes,
+        height: 110,
+        width: double.infinity,
+        fit: BoxFit.cover,
+      );
+    }
+
+    if (imageUrl.isNotEmpty) {
+      final isNetwork =
+          imageUrl.startsWith('http://') || imageUrl.startsWith('https://');
+      return isNetwork
+          ? Image.network(
+              imageUrl,
+              height: 110,
+              width: double.infinity,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => _buildTripImageFallback(),
+            )
+          : Image.asset(
+              imageUrl,
+              height: 110,
+              width: double.infinity,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => _buildTripImageFallback(),
+            );
+    }
+
+    return _buildTripImageFallback();
+  }
+
+  Widget _buildTripImageFallback() {
+    return Container(
+      height: 110,
+      width: double.infinity,
+      color: const Color(0xFFE9EEF7),
+      child: Icon(
+        Icons.travel_explore,
+        color: const Color(0xFF4675B8).withValues(alpha: 0.7),
+        size: 28,
+      ),
+    );
+  }
+
+  String _createdAtLabel(dynamic rawCreatedAt) {
+    final createdAt = DateTime.tryParse(rawCreatedAt?.toString() ?? '');
+    if (createdAt == null) return 'Recently';
+    return _getTimeAgo(createdAt.toLocal());
   }
 
   Widget _buildLikedGrid() {
@@ -659,97 +774,56 @@ class _ProfileState extends State<Profile> {
         runSpacing: 12,
         children: _likedTrips.asMap().entries.map((entry) {
           final trip = entry.value;
-          final favoriteId = (trip['id'] ?? '').toString();
-          return SizedBox(
-            width: (MediaQuery.of(context).size.width - 44) / 2,
-            child: Container(
-              decoration: BoxDecoration(
-                  color: Colors.white,
-                  border: Border.all(color: Colors.grey.shade200),
-                  borderRadius: BorderRadius.circular(16)),
-              clipBehavior: Clip.antiAlias,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Stack(children: [
-                    Container(
-                      height: 100,
-                      width: double.infinity,
-                      color: const Color(0xFFE9EEF7),
-                      child: Center(
-                        child: Icon(
-                          Icons.favorite,
-                          color: const Color(0xFF4675B8).withValues(alpha: 0.7),
-                          size: 28,
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                        top: 8,
-                        right: 8,
-                        child: GestureDetector(
-                            onTap: favoriteId.isEmpty
-                                ? null
-                                : () async {
-                                    try {
-                                      await _favoritesService
-                                          .removeFavorite(favoriteId);
-                                      if (!mounted) return;
-                                      setState(() {
-                                        _likedTrips.removeAt(entry.key);
-                                      });
-                                    } catch (e) {
-                                      if (!mounted) return;
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
-                                        SnackBar(
-                                          content: Text(e
-                                              .toString()
-                                              .replaceFirst('Exception: ', '')),
-                                        ),
-                                      );
-                                    }
-                                  },
-                            child: const Icon(Icons.favorite,
-                                size: 18, color: Color(0xFFEF4444))))
-                  ]),
-                  Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                            (trip['destination_name'] ?? 'Liked trip')
-                                .toString(),
-                            style: const TextStyle(
-                                fontFamily: 'Poppins',
-                                fontWeight: FontWeight.w700,
-                                fontSize: 13)),
-                        Row(children: [
-                          const Icon(Icons.location_on,
-                              size: 10, color: Color(0xFF4675B8)),
-                          const SizedBox(width: 4),
-                          Expanded(
-                              child: Text(
-                                  (trip['destination_type'] ?? 'Trip')
-                                      .toString(),
-                                  style: const TextStyle(
-                                      fontSize: 10, color: Color(0xFF9E9E9E)),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis))
-                        ]),
-                        Text((trip['created_at'] ?? 'Recently').toString(),
-                            style: TextStyle(
-                                fontSize: 8, color: Colors.grey.shade400)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ).animate().fadeIn(duration: 400.ms).scale(delay: 50.ms);
+          return _buildLikedTripTile(trip, entry.key)
+              .animate()
+              .fadeIn(duration: 400.ms)
+              .scale(delay: 50.ms);
         }).toList(),
       ),
+    );
+  }
+
+  Widget _buildLikedTripTile(Map<String, dynamic> trip, int index) {
+    final tripId = (trip['id'] ?? '').toString();
+
+    return Stack(
+      children: [
+        _buildTripTile(trip),
+        Positioned(
+          top: 8,
+          right: 8,
+          child: GestureDetector(
+            onTap: tripId.isEmpty
+                ? null
+                : () async {
+                    try {
+                      await _feedService.unlikeTrip(tripId);
+                      if (!mounted) return;
+                      setState(() {
+                        _likedTrips.removeAt(index);
+                      });
+                    } catch (e) {
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                              e.toString().replaceFirst('Exception: ', '')),
+                        ),
+                      );
+                    }
+                  },
+            child: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.9),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.favorite,
+                  size: 18, color: Color(0xFFEF4444)),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -758,11 +832,13 @@ class _ProfileState extends State<Profile> {
   }
 
   Widget _buildFollowersModal() {
-    return _buildUserListModal("Followers", _followersData, _isLoadingFollowers);
+    return _buildUserListModal(
+        "Followers", _followersData, _isLoadingFollowers);
   }
 
   Widget _buildFollowingModal() {
-    return _buildUserListModal("Following", _followingData, _isLoadingFollowing);
+    return _buildUserListModal(
+        "Following", _followingData, _isLoadingFollowing);
   }
 
   Widget _buildUserListModal(
@@ -809,8 +885,9 @@ class _ProfileState extends State<Profile> {
                           final user = users[index];
                           final name =
                               (user['name'] ?? 'TripBond User').toString();
-                          final avatarUrl = (user['avatar_url'] ?? '').toString();
-                            final avatarBytes = _decodeDataUrlImage(avatarUrl);
+                          final avatarUrl =
+                              (user['avatar_url'] ?? '').toString();
+                          final avatarBytes = _decodeDataUrlImage(avatarUrl);
                           final userId = (user['id'] ?? '').toString();
                           final hasAvatar = avatarUrl.isNotEmpty;
 
@@ -821,9 +898,11 @@ class _ProfileState extends State<Profile> {
                               backgroundColor: hasAvatar
                                   ? Colors.transparent
                                   : const Color(0xFF4675B8),
-                                backgroundImage: avatarBytes != null
+                              backgroundImage: avatarBytes != null
                                   ? MemoryImage(avatarBytes)
-                                  : (hasAvatar ? NetworkImage(avatarUrl) : null),
+                                  : (hasAvatar
+                                      ? NetworkImage(avatarUrl)
+                                      : null),
                               child: !hasAvatar
                                   ? Text(
                                       name.isNotEmpty
@@ -849,7 +928,8 @@ class _ProfileState extends State<Profile> {
                                       Navigator.push(
                                           context,
                                           MaterialPageRoute(
-                                              builder: (_) => const ChatScreen()));
+                                              builder: (_) =>
+                                                  const ChatScreen()));
                                     },
                             ),
                           );

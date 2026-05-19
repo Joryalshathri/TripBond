@@ -13,7 +13,7 @@ class QuizAnswer(BaseModel):
 
 
 class QuizSubmission(BaseModel):
-    user_id: str
+    user_id: Optional[str] = None  # Ignored when JWT is present; kept for clients
     answers: List[QuizAnswer]
 
 

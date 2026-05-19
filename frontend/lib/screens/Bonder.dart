@@ -59,10 +59,14 @@ class _BondersState extends State<Bonders> {
     });
 
     try {
-      final results = await Future.wait([
+      final results = await Future.wait<Object>([
         _bonderService.getFriends(),
         _bonderService.getAllBonders(limit: 200),
+        _userService.getBondRequests(direction: 'outgoing'),
       ]);
+      final friendsData = results[0] as List<BonderItem>;
+      final allBondersData = results[1] as List<BonderItem>;
+      final outgoingRequests = results[2] as List<Map<String, dynamic>>;
       final previews = await _chatService.getConversationPreviews();
       final previewByPartnerId = {
         for (final p in previews) p.partnerId: p,
@@ -72,7 +76,12 @@ class _BondersState extends State<Bonders> {
           p.partnerId: _BonderMeta(unreadCount: p.unreadCount),
       };
 
-      final friends = results[0].map((b) {
+      final pendingBondIds = outgoingRequests
+          .map((request) => (request['user_id'] ?? '').toString())
+          .where((id) => id.isNotEmpty)
+          .toSet();
+
+      final friends = friendsData.map((b) {
         final p = previewByPartnerId[b.id];
         if (p == null) {
           return b;
@@ -93,7 +102,7 @@ class _BondersState extends State<Bonders> {
           return aHasPreview ? -1 : 1;
         });
 
-      final allBonders = results[1]
+      final allBonders = allBondersData
           .map((b) =>
               b.copyWith(lastMsg: 'Tap to view profile or send a bond request'))
           .toList()
@@ -104,6 +113,9 @@ class _BondersState extends State<Bonders> {
       setState(() {
         _friends = friends;
         _allBonders = allBonders;
+        _pendingBondIds
+          ..clear()
+          ..addAll(pendingBondIds);
         _bonderMeta = metaByPartnerId;
         _refreshFilteredBonders();
         _isLoading = false;

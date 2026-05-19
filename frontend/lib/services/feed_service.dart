@@ -18,7 +18,8 @@ class FeedService {
     return token;
   }
 
-  Future<List<Map<String, dynamic>>> fetchFeed({int limit = 20, int offset = 0}) async {
+  Future<List<Map<String, dynamic>>> fetchFeed(
+      {int limit = 20, int offset = 0}) async {
     final token = await _token();
     final response = await _api.get(
       '${ApiConfig.feedPath}/',
@@ -31,9 +32,26 @@ class FeedService {
     return [];
   }
 
+  Future<List<Map<String, dynamic>>> getMyLikedTrips({
+    int limit = 100,
+    int offset = 0,
+  }) async {
+    final token = await _token();
+    final response = await _api.get(
+      '${ApiConfig.feedPath}/me/liked-trips',
+      queryParams: {'limit': '$limit', 'offset': '$offset'},
+      token: token,
+    );
+    if (response is List) {
+      return response.cast<Map<String, dynamic>>();
+    }
+    return [];
+  }
+
   Future<void> likeTrip(String tripId) async {
     final token = await _token();
-    await _api.post('${ApiConfig.feedPath}/trips/$tripId/like', {}, token: token);
+    await _api.post('${ApiConfig.feedPath}/trips/$tripId/like', {},
+        token: token);
   }
 
   Future<void> unlikeTrip(String tripId) async {
@@ -41,7 +59,8 @@ class FeedService {
     await _api.delete('${ApiConfig.feedPath}/trips/$tripId/like', token: token);
   }
 
-  Future<Map<String, dynamic>> requestToJoin(String tripId, {String? message}) async {
+  Future<Map<String, dynamic>> requestToJoin(String tripId,
+      {String? message}) async {
     final token = await _token();
     return await _api.post(
       '${ApiConfig.feedPath}/trips/$tripId/join-requests',

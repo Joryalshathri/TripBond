@@ -12,6 +12,12 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
+def _admin_db():
+    """Service-role client so profile updates are not blocked by RLS."""
+    return SupabaseDB(admin=True).client
+
+
 # Big 5 Questions mapping - each question maps to a trait and direction
 # Positive questions: higher score means higher trait value
 # Negative questions: higher score means lower trait value (reverse scored)
@@ -99,7 +105,7 @@ def submit_quiz_answers(user_id: str, answers: List[QuizAnswer]) -> PersonalityS
 
     scores = calculate_personality_scores(answers)
 
-    db = SupabaseDB()
+    client = _admin_db()
     update_data = {
         "openness": scores.openness,
         "conscientiousness": scores.conscientiousness,
@@ -108,7 +114,7 @@ def submit_quiz_answers(user_id: str, answers: List[QuizAnswer]) -> PersonalityS
         "neuroticism": scores.neuroticism
     }
 
-    response = db.client.table("profiles").update(update_data).eq("id", user_id).execute()
+    response = client.table("profiles").update(update_data).eq("id", user_id).execute()
 
     if not response.data:
         raise HTTPException(
@@ -118,7 +124,7 @@ def submit_quiz_answers(user_id: str, answers: List[QuizAnswer]) -> PersonalityS
 
     # Persist individual answers
     try:
-        db.client.table("personality_answers").delete().eq("user_id", user_id).execute()
+        client.table("personality_answers").delete().eq("user_id", user_id).execute()
 
         answers_to_insert = []
         for answer in answers:
@@ -132,12 +138,11 @@ def submit_quiz_answers(user_id: str, answers: List[QuizAnswer]) -> PersonalityS
                 answers_to_insert.append({
                     "user_id": user_id,
                     "question_id": answer.question_id,
-                    "question_text": question["text"],
-                    "answer_value": answer_value
+                    "answer_value": answer_value,
                 })
 
         if answers_to_insert:
-            db.client.table("personality_answers").insert(answers_to_insert).execute()
+            client.table("personality_answers").insert(answers_to_insert).execute()
 
     except Exception as e:
         logger.warning(f"Failed to save personality answers: {e}")
@@ -153,8 +158,8 @@ def update_personality_scores(user_id: str, updates: dict) -> PersonalityScores:
             detail="No personality scores provided for update"
         )
 
-    db = SupabaseDB()
-    response = db.client.table("profiles").update(updates).eq("id", user_id).execute()
+    client = _admin_db()
+    response = client.table("profiles").update(updates).eq("id", user_id).execute()
 
     if not response.data:
         raise HTTPException(
@@ -174,8 +179,8 @@ def update_personality_scores(user_id: str, updates: dict) -> PersonalityScores:
 
 def get_personality_scores(user_id: str) -> PersonalityScores:
     """Retrieve personality scores for a user."""
-    db = SupabaseDB()
-    response = db.client.table("profiles").select(
+    client = _admin_db()
+    response = client.table("profiles").select(
         "openness, conscientiousness, extraversion, agreeableness, neuroticism"
     ).eq("id", user_id).execute()
 
