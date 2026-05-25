@@ -2,6 +2,12 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+const String kPlaceImageLogoAsset = 'assets/images/icons/logo.png';
+
+bool isBundledPlaceImageUrl(String url) {
+  return url.startsWith('assets/');
+}
+
 class PlaceImageData {
   final String url;
   final List<String> attributions;
@@ -25,6 +31,10 @@ class PlaceImageData {
 
 List<PlaceImageData> placeImagesFromMap(Map<String, dynamic> place) {
   final images = <PlaceImageData>[];
+  final imageAsset = (place['image_asset'] ?? '').toString();
+  if (imageAsset.isNotEmpty) {
+    images.add(PlaceImageData(url: imageAsset));
+  }
   final rawImages = place['images'];
   if (rawImages is List) {
     for (final raw in rawImages) {
@@ -47,6 +57,45 @@ List<PlaceImageData> placeImagesFromMap(Map<String, dynamic> place) {
     images.add(PlaceImageData(url: fallback));
   }
   return images;
+}
+
+Widget buildPlaceImage({
+  required String url,
+  required BoxFit fit,
+  Widget Function(BuildContext, Object, StackTrace?)? errorBuilder,
+}) {
+  if (isBundledPlaceImageUrl(url)) {
+    return Image.asset(
+      url,
+      fit: fit,
+      errorBuilder: errorBuilder ??
+          (_, __, ___) => Image.asset(
+                kPlaceImageLogoAsset,
+                fit: fit,
+              ),
+    );
+  }
+  return Image.network(
+    url,
+    fit: fit,
+    errorBuilder: errorBuilder,
+  );
+}
+
+Widget buildPlaceImagePlaceholder({
+  double iconSize = 48,
+  Color backgroundColor = const Color(0xFFF3F4F6),
+}) {
+  return Container(
+    color: backgroundColor,
+    alignment: Alignment.center,
+    child: Image.asset(
+      kPlaceImageLogoAsset,
+      width: iconSize,
+      height: iconSize,
+      fit: BoxFit.contain,
+    ),
+  );
 }
 
 String cleanPlaceAttribution(String value) {
@@ -154,11 +203,10 @@ class _PlaceImageCarouselState extends State<PlaceImageCarousel> {
     if (widget.images.isEmpty) {
       return ClipRRect(
         borderRadius: widget.borderRadius,
-        child: Container(
+        child: SizedBox(
           height: widget.height,
           width: double.infinity,
-          color: Colors.grey[300],
-          child: Icon(widget.placeholderIcon, size: 48, color: Colors.grey),
+          child: buildPlaceImagePlaceholder(iconSize: 56),
         ),
       );
     }
@@ -182,13 +230,10 @@ class _PlaceImageCarouselState extends State<PlaceImageCarousel> {
               itemCount: widget.images.length,
               onPageChanged: (value) => setState(() => _index = value),
               itemBuilder: (context, index) {
-                return Image.network(
-                  widget.images[index].url,
+                return buildPlaceImage(
+                  url: widget.images[index].url,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
-                    color: Colors.grey[300],
-                    child: const Icon(Icons.broken_image, color: Colors.grey),
-                  ),
+                  errorBuilder: (_, __, ___) => buildPlaceImagePlaceholder(),
                 );
               },
             ),
@@ -262,9 +307,11 @@ class _PlaceImageCarouselState extends State<PlaceImageCarousel> {
                 right: 8,
                 bottom: widget.images.length > 1 ? 22 : 8,
                 child: Text(
-                  attribution.isEmpty
-                      ? 'Google Maps'
-                      : 'Google Maps: $attribution',
+                  isBundledPlaceImageUrl(current.url)
+                      ? 'TripBond'
+                      : attribution.isEmpty
+                          ? 'Google Maps'
+                          : 'Google Maps: $attribution',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(

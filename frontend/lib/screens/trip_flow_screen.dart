@@ -269,10 +269,10 @@ class _TripFlowScreenState extends State<TripFlowScreen> {
       title: myComplete ? 'Waiting for places' : 'Choose your places',
       body: myComplete
           ? 'You marked your picks complete. Voting starts after everyone is done and the creator opens voting.'
-          : 'Start with an AI-generated plan for the destination, adjust the places, then add them to the shared voting pool.',
+          : 'Start with a suggested itinerary for the destination, adjust the places, then add them to the shared voting pool.',
       children: [
         if (!myComplete)
-          _primaryButton('Review AI starter plan', _openPlacePicker),
+          _primaryButton('Review suggested itinerary', _openPlacePicker),
         if (!myComplete && _int('my_places_count') > 0)
           _secondaryButton('I am done adding places', _markPlacesComplete),
         if (_bool('is_creator')) ...[

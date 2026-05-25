@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/places_service.dart';
 import '../models/place_model.dart';
 import '../widgets/place_image_carousel.dart';
+import '../utils/place_navigation.dart';
 
 class PlacesSearchScreen extends StatefulWidget {
   const PlacesSearchScreen({Key? key}) : super(key: key);
@@ -129,9 +130,11 @@ class _PlacesSearchScreenState extends State<PlacesSearchScreen> {
         PlaceImageData(url: place.imageUrl!),
     ];
 
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Column(
+    return InkWell(
+      onTap: () => openPlacePreviewFromResult(context, place),
+      child: Card(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           PlaceImageCarousel(
@@ -149,6 +152,8 @@ class _PlacesSearchScreenState extends State<PlacesSearchScreen> {
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
+                    color: Color(0xFF4675B8),
+                    decoration: TextDecoration.underline,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -195,6 +200,7 @@ class _PlacesSearchScreenState extends State<PlacesSearchScreen> {
             ),
           ),
         ],
+      ),
       ),
     );
   }

@@ -82,6 +82,8 @@ _ASSET_MAP: Dict[str, str] = {
     "Al Khobar":  "assets/images/cities/Khobar.png",
     "Jeddah":     "assets/images/cities/jeddah.png",
     "Riyadh":     "assets/images/cities/Riyadh.png",
+    "Dammam":     "assets/images/cities/Dammam.png",
+    "AlUla":      "assets/images/cities/AlUla.png",
 }
 
 _cache: Optional[List[Dict[str, Any]]] = None

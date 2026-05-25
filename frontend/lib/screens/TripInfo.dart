@@ -6,15 +6,12 @@ import '../state/trip_creation_state.dart';
 
 const List<String> _tripTypes = [
   'Solo Trip',
-  'Friends Trip',
-  'Family Trip (with kids)',
-  'Family Trip (without kids)',
+  'Group Trip',
 ];
 
 bool _isGroupType(String? type) {
   if (type == null) return false;
-  return type.toLowerCase().contains('friends') ||
-      type.toLowerCase().contains('family');
+  return type.toLowerCase().contains('group');
 }
 
 class TripInfo extends StatefulWidget {
@@ -90,6 +87,14 @@ class _TripinfoState extends State<TripInfo> {
     }
   }
 
+  bool get _canProceed {
+    if (_selectedTripType == null) return false;
+    if (_isGroupType(_selectedTripType)) {
+      return _selectedInviteeIds.isNotEmpty;
+    }
+    return true;
+  }
+
   Future<int> _sendSelectedInvites(String tripId) async {
     var failures = 0;
     for (final userId in _selectedInviteeIds) {
@@ -116,6 +121,14 @@ class _TripinfoState extends State<TripInfo> {
     if (_selectedTripType == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select a trip type')),
+      );
+      return;
+    }
+    if (_isGroupType(_selectedTripType) && _selectedInviteeIds.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select at least one bonder for a group trip'),
+        ),
       );
       return;
     }
@@ -243,7 +256,7 @@ class _TripinfoState extends State<TripInfo> {
                     _buildPublicToggle(),
                     const SizedBox(height: 16),
                     if (_isGroupType(_selectedTripType))
-                      _buildInviteFriendsSection(),
+                      _buildSelectBondersSection(),
                   ],
                 ),
               ),
@@ -255,7 +268,8 @@ class _TripinfoState extends State<TripInfo> {
               width: double.infinity,
               height: 56,
               child: ElevatedButton(
-                onPressed: _isSubmitting ? null : _createTripAndPickPlaces,
+                onPressed:
+                    _isSubmitting || !_canProceed ? null : _createTripAndPickPlaces,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF4675B8),
                   foregroundColor: Colors.white,
@@ -536,7 +550,7 @@ class _TripinfoState extends State<TripInfo> {
     );
   }
 
-  Widget _buildInviteFriendsSection() {
+  Widget _buildSelectBondersSection() {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -554,7 +568,7 @@ class _TripinfoState extends State<TripInfo> {
               SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Invite friends now so they can accept, add their places, and vote together.',
+                  'Select bonders to join this trip. They can add places and vote together.',
                   style: TextStyle(
                     fontFamily: 'Poppins',
                     fontSize: 12,
@@ -578,7 +592,7 @@ class _TripinfoState extends State<TripInfo> {
             )
           else if (_inviteCandidates.isEmpty)
             const Text(
-              'No friends found yet. Bond with people first, then invite them to a trip.',
+              'No bonders found yet. Bond with people first, then add them to your group trip.',
               style: TextStyle(
                 fontFamily: 'Poppins',
                 fontSize: 12,

@@ -10,8 +10,8 @@ import '../core/animations/animation_constants.dart';
 import '../services/bonder_service.dart';
 import '../services/chat_service.dart';
 import '../services/auth_service.dart';
-import '../services/user_service.dart';
 import '../widgets/app_bottom_nav.dart';
+import '../widgets/start_conversation_sheet.dart';
 
 class _BonderMeta {
   final int unreadCount;
@@ -28,14 +28,10 @@ class Bonders extends StatefulWidget {
 class _BondersState extends State<Bonders> {
   final BonderService _bonderService = BonderService();
   final ChatService _chatService = ChatService();
-  final UserService _userService = UserService();
   bool _isSearching = false;
   final TextEditingController _searchController = TextEditingController();
-  String _selectedList = 'friends';
   List<BonderItem> _friends = [];
-  List<BonderItem> _allBonders = [];
   List<BonderItem> _filteredBonders = [];
-  final Set<String> _pendingBondIds = {};
   Map<String, _BonderMeta> _bonderMeta = {};
   bool _isLoading = false;
   String? _error;
@@ -59,14 +55,7 @@ class _BondersState extends State<Bonders> {
     });
 
     try {
-      final results = await Future.wait<Object>([
-        _bonderService.getFriends(),
-        _bonderService.getAllBonders(limit: 200),
-        _userService.getBondRequests(direction: 'outgoing'),
-      ]);
-      final friendsData = results[0] as List<BonderItem>;
-      final allBondersData = results[1] as List<BonderItem>;
-      final outgoingRequests = results[2] as List<Map<String, dynamic>>;
+      final friendsData = await _bonderService.getFriends();
       final previews = await _chatService.getConversationPreviews();
       final previewByPartnerId = {
         for (final p in previews) p.partnerId: p,
@@ -75,11 +64,6 @@ class _BondersState extends State<Bonders> {
         for (final p in previews)
           p.partnerId: _BonderMeta(unreadCount: p.unreadCount),
       };
-
-      final pendingBondIds = outgoingRequests
-          .map((request) => (request['user_id'] ?? '').toString())
-          .where((id) => id.isNotEmpty)
-          .toSet();
 
       final friends = friendsData.map((b) {
         final p = previewByPartnerId[b.id];
@@ -102,20 +86,10 @@ class _BondersState extends State<Bonders> {
           return aHasPreview ? -1 : 1;
         });
 
-      final allBonders = allBondersData
-          .map((b) =>
-              b.copyWith(lastMsg: 'Tap to view profile or send a bond request'))
-          .toList()
-        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-
       if (!mounted) return;
 
       setState(() {
         _friends = friends;
-        _allBonders = allBonders;
-        _pendingBondIds
-          ..clear()
-          ..addAll(pendingBondIds);
         _bonderMeta = metaByPartnerId;
         _refreshFilteredBonders();
         _isLoading = false;
@@ -137,23 +111,17 @@ class _BondersState extends State<Bonders> {
   }
 
   void _refreshFilteredBonders({String? query}) {
-    final source = _selectedList == 'friends' ? _friends : _allBonders;
     final normalizedQuery =
         (query ?? _searchController.text).trim().toLowerCase();
-    _filteredBonders = source
+    _filteredBonders = _friends
         .where((bonder) => bonder.name.toLowerCase().contains(normalizedQuery))
         .toList();
   }
 
-  Set<String> get _friendIds => _friends.map((b) => b.id).toSet();
-
   String get _emptyMessage {
-    if (_selectedList == 'friends') {
-      return 'No friends yet. Open All Bonders to find people to bond with.';
-    }
     return _searchController.text.trim().isEmpty
-        ? 'No bonders found'
-        : 'No matching bonders found';
+        ? 'No friends yet.'
+        : 'No matching friends found';
   }
 
   void _updateLastMessage(String bonderId, String message) {
@@ -187,44 +155,29 @@ class _BondersState extends State<Bonders> {
     });
   }
 
-  Future<void> _sendBondRequest(BonderItem bonder) async {
-    if (_pendingBondIds.contains(bonder.id) || _friendIds.contains(bonder.id)) {
-      return;
-    }
-
-    setState(() => _pendingBondIds.add(bonder.id));
-    try {
-      final response = await _userService.sendBondRequest(bonder.id);
-      if (!mounted) return;
-      if (response['status']?.toString() == 'accepted') {
-        await _loadBonders();
-        if (!mounted) return;
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(response['status']?.toString() == 'accepted'
-              ? 'You are now bonded with ${bonder.name}'
-              : 'Bond request sent to ${bonder.name}'),
+  Future<void> _openChat(BonderItem bonder) async {
+    _clearUnreadForBonder(bonder.id);
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ChatPage(
+          bonderId: bonder.id,
+          name: bonder.name,
+          onMessageSent: (msg) => _updateLastMessage(bonder.id, msg),
         ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _pendingBondIds.remove(bonder.id));
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-              'Could not send request: ${e.toString().replaceAll('Exception: ', '')}'),
-        ),
-      );
+      ),
+    );
+    if (mounted) {
+      await _loadBonders();
     }
   }
 
-  void _selectList(String list) {
-    if (_selectedList == list) return;
-    setState(() {
-      _selectedList = list;
-      _refreshFilteredBonders();
-    });
+  void _showStartConversationSheet() {
+    showStartConversationSheet(
+      context,
+      friends: _friends,
+      onFriendSelected: _openChat,
+    );
   }
 
   // --- DELETE CONFIRMATION DIALOG ---
@@ -270,7 +223,7 @@ class _BondersState extends State<Bonders> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text("Sort Bonders",
+              const Text("Sort Friends",
                   style: TextStyle(
                       fontFamily: 'Poppins',
                       fontWeight: FontWeight.bold,
@@ -291,10 +244,10 @@ class _BondersState extends State<Bonders> {
               ),
               ListTile(
                 leading: const Icon(Icons.history),
-                title: const Text("Recent First"),
+                title: const Text("Recent chats first"),
                 onTap: () {
                   setState(() {
-                    _filteredBonders = List.from(_allBonders);
+                    _filteredBonders = List.from(_friends);
                     _refreshFilteredBonders();
                   });
                   Navigator.pop(context);
@@ -331,7 +284,7 @@ class _BondersState extends State<Bonders> {
                                       autofocus: true,
                                       onChanged: _filterList,
                                       decoration: const InputDecoration(
-                                        hintText: 'Search bonders...',
+                                        hintText: 'Search friends...',
                                         border: InputBorder.none,
                                         hintStyle: TextStyle(
                                             fontFamily: 'Poppins',
@@ -341,13 +294,19 @@ class _BondersState extends State<Bonders> {
                                           fontFamily: 'Poppins', fontSize: 18),
                                     )
                                   : const Text(
-                                      'Bonders',
+                                      'Friends',
                                       style: TextStyle(
                                           fontFamily: 'Poppins',
                                           fontWeight: FontWeight.w700,
                                           fontSize: 24),
                                     ),
                             ),
+                            GestureDetector(
+                              onTap: _showStartConversationSheet,
+                              child: const Icon(Icons.edit_outlined,
+                                  size: 24, color: Color(0xFF1E1E1E)),
+                            ),
+                            const SizedBox(width: 15),
                             GestureDetector(
                               onTap: _showFilterSheet,
                               child: const Icon(Icons.tune,
@@ -386,8 +345,26 @@ class _BondersState extends State<Bonders> {
                             ),
                           ],
                         ).animate().fadeIn().slideY(begin: -0.1, end: 0),
-                        const SizedBox(height: 18),
-                        _buildListTabs(),
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: _showStartConversationSheet,
+                            icon: const Icon(Icons.edit_outlined),
+                            label: const Text('Start a conversation'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF4675B8),
+                              side: BorderSide(
+                                color: const Color(0xFF4675B8)
+                                    .withValues(alpha: 0.35),
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                          ),
+                        ),
                         const SizedBox(height: 24),
                         if (_isLoading)
                           const Padding(
@@ -420,11 +397,32 @@ class _BondersState extends State<Bonders> {
                             _filteredBonders.isEmpty)
                           Padding(
                             padding: const EdgeInsets.symmetric(vertical: 40),
-                            child: Text(
-                              _emptyMessage,
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                  fontFamily: 'Poppins', color: Colors.grey),
+                            child: Column(
+                              children: [
+                                Text(
+                                  _emptyMessage,
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                      fontFamily: 'Poppins', color: Colors.grey),
+                                ),
+                                const SizedBox(height: 16),
+                                ElevatedButton.icon(
+                                  onPressed: _showStartConversationSheet,
+                                  icon: const Icon(Icons.edit_outlined),
+                                  label: const Text('Start a conversation'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF4675B8),
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 20,
+                                      vertical: 12,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ..._filteredBonders.asMap().entries.map((entry) {
@@ -434,9 +432,7 @@ class _BondersState extends State<Bonders> {
                           // --- WRAPPED IN DISMISSIBLE FOR SWIPE-TO-DELETE ---
                           return Dismissible(
                             key: Key(b.id),
-                            direction: _selectedList == 'friends'
-                                ? DismissDirection.endToStart
-                                : DismissDirection.none,
+                            direction: DismissDirection.endToStart,
                             confirmDismiss: (direction) =>
                                 _confirmDelete(b.name),
                             onDismissed: (direction) {
@@ -508,10 +504,7 @@ class _BondersState extends State<Bonders> {
                                         ],
                                       ),
                                     ),
-                                    if (_selectedList == 'all')
-                                      _buildDiscoveryAction(b)
-                                    else if ((_bonderMeta[b.id]?.unreadCount ??
-                                            0) >
+                                    if ((_bonderMeta[b.id]?.unreadCount ?? 0) >
                                         0)
                                       Container(
                                         padding: const EdgeInsets.symmetric(
@@ -565,102 +558,6 @@ class _BondersState extends State<Bonders> {
           ),
           _buildBottomNav(context),
         ],
-      ),
-    );
-  }
-
-  Widget _buildListTabs() {
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Row(
-        children: [
-          _buildListTab(
-            label: 'Friends',
-            count: _friends.length,
-            active: _selectedList == 'friends',
-            onTap: () => _selectList('friends'),
-          ),
-          _buildListTab(
-            label: 'All Bonders',
-            count: _allBonders.length,
-            active: _selectedList == 'all',
-            onTap: () => _selectList('all'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildListTab({
-    required String label,
-    required int count,
-    required bool active,
-    required VoidCallback onTap,
-  }) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          decoration: BoxDecoration(
-            color: active ? const Color(0xFF4675B8) : Colors.transparent,
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Text(
-            '$label ($count)',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontFamily: 'Poppins',
-              fontWeight: FontWeight.w600,
-              color: active ? Colors.white : const Color(0xFF334155),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDiscoveryAction(BonderItem bonder) {
-    final isFriend = _friendIds.contains(bonder.id);
-    final isPending = _pendingBondIds.contains(bonder.id);
-
-    if (isFriend) {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: const Color(0xFFE8F3EE),
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: const Text(
-          'Friend',
-          style: TextStyle(
-            fontFamily: 'Poppins',
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF2E7D32),
-            fontSize: 12,
-          ),
-        ),
-      );
-    }
-
-    return TextButton(
-      onPressed: isPending ? null : () => _sendBondRequest(bonder),
-      style: TextButton.styleFrom(
-        foregroundColor: const Color(0xFF4675B8),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      ),
-      child: Text(
-        isPending ? 'Pending' : 'Add',
-        style: const TextStyle(
-          fontFamily: 'Poppins',
-          fontWeight: FontWeight.w600,
-        ),
       ),
     );
   }

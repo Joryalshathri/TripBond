@@ -10,7 +10,7 @@ Social feed endpoints (minimal):
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from fastapi.concurrency import run_in_threadpool
 from typing import List, Dict, Any, Optional
-from datetime import datetime
+from datetime import date, datetime
 
 from ..auth import get_current_user_context
 from ..database import SupabaseDB
@@ -27,6 +27,27 @@ def _is_public_trip(trip: Dict[str, Any]) -> bool:
     if isinstance(value, str):
         return value.strip().lower() not in {"false", "0", "no", "private"}
     return bool(value)
+
+
+def _parse_trip_date(value: Any) -> Optional[date]:
+    if not value:
+        return None
+    try:
+        if isinstance(value, datetime):
+            return value.date()
+        if isinstance(value, date):
+            return value
+        return datetime.fromisoformat(str(value).split("T")[0]).date()
+    except ValueError:
+        return None
+
+
+def _can_request_join(trip: Dict[str, Any]) -> bool:
+    """Join requests are only allowed before the trip start date."""
+    start = _parse_trip_date(trip.get("start_date"))
+    if start is None:
+        return False
+    return start > date.today()
 
 
 def _profile_lookup(profile_ids: List[str]) -> Dict[str, Dict[str, Any]]:
@@ -134,6 +155,7 @@ async def get_feed(
                 "is_creator": trip.get("created_by") == user_id,
                 "is_member": user_id in member_ids_by_trip.get(trip["id"], set()),
                 "has_pending_join_request": trip["id"] in pending_join_trip_ids,
+                "can_request_join": _can_request_join(trip),
             }
         )
     return out
@@ -301,13 +323,21 @@ async def request_to_join(
     db = SupabaseDB(admin=True)
 
     trip = await run_in_threadpool(
-        lambda: db.client.table("trips").select("id, created_by, title, is_public").eq("id", trip_id).execute()
+        lambda: db.client.table("trips")
+        .select("id, created_by, title, is_public, start_date")
+        .eq("id", trip_id)
+        .execute()
     )
     if not trip.data:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trip not found")
     trip_row = trip.data[0]
     if not _is_public_trip(trip_row):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Trip is private")
+    if not _can_request_join(trip_row):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Join requests are only allowed for future trips before the start date",
+        )
     if trip_row["created_by"] == user_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You are the creator")
 

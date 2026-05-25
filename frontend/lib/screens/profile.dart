@@ -926,10 +926,15 @@ class _ProfileState extends State<Profile> {
                                   ? null
                                   : () {
                                       Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                              builder: (_) =>
-                                                  const ChatScreen()));
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) =>
+                                              ChatConversationScreen(
+                                            otherUserId: userId,
+                                            otherUserName: name,
+                                          ),
+                                        ),
+                                      );
                                     },
                             ),
                           );

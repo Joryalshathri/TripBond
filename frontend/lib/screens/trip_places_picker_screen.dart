@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/poi_service.dart';
 import '../services/trip_service.dart';
 import '../widgets/place_image_carousel.dart';
+import '../utils/place_navigation.dart';
 import 'group_suggested_itinerary.dart';
 
 /// Place-picker shown to every trip member during the planning phase.
@@ -63,21 +64,56 @@ class _TripPlacesPickerScreenState extends State<TripPlacesPickerScreen> {
   String _placeKey(Map<String, dynamic> p) =>
       (p['id'] ?? p['poi_id'] ?? p['place_id'] ?? p['name'] ?? '').toString();
 
+  Map<String, dynamic> _mergePlaceImages(
+    Map<String, dynamic> primary,
+    Map<String, dynamic> secondary,
+  ) {
+    final merged = Map<String, dynamic>.from(primary);
+    for (final key in ['image_url', 'image_asset', 'photo_url']) {
+      final current = (merged[key] ?? '').toString();
+      final fallback = (secondary[key] ?? '').toString();
+      if (current.isEmpty && fallback.isNotEmpty) {
+        merged[key] = fallback;
+      }
+    }
+
+    final primaryImages = merged['images'];
+    final secondaryImages = secondary['images'];
+    final primaryHasImages =
+        primaryImages is List && primaryImages.isNotEmpty;
+    final secondaryHasImages =
+        secondaryImages is List && secondaryImages.isNotEmpty;
+    if (!primaryHasImages && secondaryHasImages) {
+      merged['images'] = secondaryImages;
+    }
+
+    return merged;
+  }
+
   List<Map<String, dynamic>> _mergeUniquePlaces(
     List<Map<String, dynamic>> primary,
     List<Map<String, dynamic>> secondary,
   ) {
-    final seen = <String>{};
-    final merged = <Map<String, dynamic>>[];
+    final byKey = <String, Map<String, dynamic>>{};
 
-    for (final place in [...primary, ...secondary]) {
+    for (final place in primary) {
       final key = _placeKey(place).trim().toLowerCase();
-      if (key.isEmpty || seen.contains(key)) continue;
-      seen.add(key);
-      merged.add(place);
+      if (key.isEmpty) continue;
+      byKey[key] = place;
     }
 
-    return merged;
+    for (final place in secondary) {
+      final key = _placeKey(place).trim().toLowerCase();
+      if (key.isEmpty) continue;
+      final existing = byKey[key];
+      if (existing == null) {
+        byKey[key] = place;
+      } else {
+        byKey[key] = _mergePlaceImages(existing, place);
+      }
+    }
+
+    return byKey.values.toList();
   }
 
   double? _toDouble(dynamic value) {
@@ -230,6 +266,12 @@ class _TripPlacesPickerScreenState extends State<TripPlacesPickerScreen> {
               mapped['id'] ??
               mapped['poi_id'];
           mapped['type'] = mapped['type'] ?? mapped['poi_type'];
+          mapped['image_url'] =
+              mapped['image_url'] ?? poi['image_url'] ?? poi['photo_url'];
+          mapped['photo_url'] =
+              mapped['photo_url'] ?? mapped['image_url'] ?? poi['photo_url'];
+          mapped['image_asset'] = mapped['image_asset'] ?? poi['image_asset'];
+          mapped['images'] = mapped['images'] ?? poi['images'] ?? const [];
 
           final lat = _placeLatitude(mapped);
           final lng = _placeLongitude(mapped);
@@ -425,7 +467,7 @@ class _TripPlacesPickerScreenState extends State<TripPlacesPickerScreen> {
               _destination.isEmpty
                   ? 'Pick your places'
                   : widget.useStarterPlan
-                      ? 'Review AI starter plan · $_destination'
+                      ? 'Review suggested itinerary · $_destination'
                       : 'Pick your places · $_destination',
               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w400),
             ),
@@ -546,7 +588,7 @@ class _TripPlacesPickerScreenState extends State<TripPlacesPickerScreen> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'AI starter plan',
+                    'Suggested itinerary',
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w800,
@@ -630,11 +672,17 @@ class _TripPlacesPickerScreenState extends State<TripPlacesPickerScreen> {
             ),
             const SizedBox(width: 8),
             Expanded(
-              child: Text(
-                name,
+              child: PlaceNameLink(
+                name: name,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(fontWeight: FontWeight.w600),
+                onTap: () => openPlacePreviewFromMap(
+                  context,
+                  activity,
+                  tripId: widget.tripId,
+                  fallbackLocation: _destination,
+                ),
               ),
             ),
             if (start.isNotEmpty && end.isNotEmpty)
@@ -723,13 +771,19 @@ class _TripPlacesPickerScreenState extends State<TripPlacesPickerScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      name,
+                    PlaceNameLink(
+                      name: name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontWeight: FontWeight.w600,
                         fontSize: 13,
+                      ),
+                      onTap: () => openPlacePreviewFromMap(
+                        context,
+                        place,
+                        tripId: widget.tripId,
+                        fallbackLocation: _destination,
                       ),
                     ),
                     if (address.isNotEmpty) ...[

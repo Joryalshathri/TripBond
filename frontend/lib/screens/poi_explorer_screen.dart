@@ -4,6 +4,7 @@ import '../services/poi_service.dart';
 import '../services/ai_service.dart';
 import '../services/auth_service.dart';
 import '../widgets/place_image_carousel.dart';
+import '../utils/place_navigation.dart';
 
 class POIExplorerScreen extends StatefulWidget {
   const POIExplorerScreen({super.key});
@@ -247,9 +248,11 @@ class _POICard extends StatelessWidget {
     final images = placeImagesFromMap(poi);
     final googleMapsUrl = (poi['google_maps_url'] ?? poi['url'] ?? '').toString();
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Column(
+    return InkWell(
+      onTap: () => openPlacePreviewFromMap(context, poi),
+      child: Card(
+        margin: const EdgeInsets.only(bottom: 12),
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           PlaceImageCarousel(
@@ -371,6 +374,7 @@ class _POICard extends StatelessWidget {
             ),
           ),
         ],
+      ),
       ),
     );
   }

@@ -15,6 +15,7 @@ import 'voting_screen.dart';
 import 'trip_places_picker_screen.dart';
 import '../widgets/place_image_carousel.dart';
 import '../widgets/app_bottom_nav.dart';
+import '../utils/place_navigation.dart';
 
 class TripHomeScreen extends StatefulWidget {
   final String? tripId;
@@ -347,7 +348,27 @@ class _TripHomeScreenState extends State<TripHomeScreen>
     final googleMapsUrl = (place['google_maps_url'] ?? place['url'] ?? '').toString();
 
     return GestureDetector(
-      onTap: () => _showAddToTripSheet(place),
+      onTap: () => openPlacePreviewFromMap(
+        context,
+        place,
+        tripId: widget.tripId,
+        fallbackLocation: widget.destination,
+        extraActions: widget.tripId != null && widget.tripId!.isNotEmpty
+            ? [
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _showAddToTripSheet(place);
+                    },
+                    icon: const Icon(Icons.add_location_alt_outlined),
+                    label: const Text('Add to trip'),
+                  ),
+                ),
+              ]
+            : null,
+      ),
       child: Card(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         elevation: 2,

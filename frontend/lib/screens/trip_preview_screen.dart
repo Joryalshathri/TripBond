@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/feed_service.dart';
 import '../services/trip_service.dart';
+import '../utils/place_navigation.dart';
 import 'trip_flow_screen.dart';
 
 class TripPreviewScreen extends StatefulWidget {
@@ -124,6 +125,16 @@ class _TripPreviewScreenState extends State<TripPreviewScreen> {
 
   Future<void> _requestToJoin() async {
     if (_requestingJoin || _trip['has_pending_join_request'] == true) return;
+    if (!_canRequestJoin) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Join requests are only available for upcoming trips before they start.',
+          ),
+        ),
+      );
+      return;
+    }
     setState(() => _requestingJoin = true);
     try {
       await _feedService.requestToJoin(widget.tripId);
@@ -157,6 +168,19 @@ class _TripPreviewScreenState extends State<TripPreviewScreen> {
   bool get _canOpenTrip =>
       _trip['is_creator'] == true || _trip['is_member'] == true;
   bool get _hasPendingJoin => _trip['has_pending_join_request'] == true;
+  bool get _canRequestJoin {
+    if (_trip['can_request_join'] is bool) {
+      return _trip['can_request_join'] as bool;
+    }
+    final raw = _trip['start_date']?.toString();
+    if (raw == null || raw.isEmpty) return false;
+    final start = DateTime.tryParse(raw);
+    if (start == null) return false;
+    final today = DateTime.now();
+    final startDay = DateTime(start.year, start.month, start.day);
+    final todayDay = DateTime(today.year, today.month, today.day);
+    return startDay.isAfter(todayDay);
+  }
 
   int _asInt(dynamic value) {
     if (value is int) return value;
@@ -317,7 +341,9 @@ class _TripPreviewScreenState extends State<TripPreviewScreen> {
             Expanded(
               child: Text(
                 _itineraryError != null
-                    ? 'No public itinerary has been shared yet. You can still like it or request to join.'
+                    ? (_canRequestJoin
+                        ? 'No public itinerary has been shared yet. You can still like it or request to join.'
+                        : 'No public itinerary has been shared yet. You can still like this trip.')
                     : 'No itinerary has been added yet.',
               ),
             ),
@@ -364,25 +390,38 @@ class _TripPreviewScreenState extends State<TripPreviewScreen> {
           ),
           const SizedBox(height: 6),
           ...activityList.take(4).map((activity) {
-            final item = activity is Map ? activity : const {};
+            final item = activity is Map
+                ? Map<String, dynamic>.from(activity)
+                : <String, dynamic>{};
             final name =
                 (item['name'] ?? item['title'] ?? 'Activity').toString();
             final time = (item['start_time'] ?? '').toString();
             return Padding(
               padding: const EdgeInsets.only(bottom: 4),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(Icons.place_outlined,
-                      size: 16, color: Color(0xFF4675B8)),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      time.isNotEmpty ? '$time · $name' : name,
-                      style: TextStyle(color: Colors.grey[800]),
+              child: InkWell(
+                onTap: () => openPlacePreviewFromMap(
+                  context,
+                  item,
+                  tripId: widget.tripId,
+                ),
+                borderRadius: BorderRadius.circular(4),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.place_outlined,
+                        size: 16, color: Color(0xFF4675B8)),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        time.isNotEmpty ? '$time · $name' : name,
+                        style: const TextStyle(
+                          color: Color(0xFF4675B8),
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             );
           }),
@@ -416,12 +455,19 @@ class _TripPreviewScreenState extends State<TripPreviewScreen> {
                   style: _primaryButtonStyle(),
                 )
               : ElevatedButton.icon(
-                  onPressed: _hasPendingJoin || _requestingJoin
+                  onPressed: !_canRequestJoin ||
+                          _hasPendingJoin ||
+                          _requestingJoin
                       ? null
                       : _requestToJoin,
                   icon: const Icon(Icons.group_add_outlined),
-                  label:
-                      Text(_hasPendingJoin ? 'Request sent' : 'Request join'),
+                  label: Text(
+                    _hasPendingJoin
+                        ? 'Request sent'
+                        : !_canRequestJoin
+                            ? 'Trip started'
+                            : 'Request join',
+                  ),
                   style: _primaryButtonStyle(),
                 ),
         ),

@@ -18,7 +18,7 @@ from ..services.itinerary_service import (
 )
 from ..services.smart_scheduler import build_smart_itinerary
 from ..services.recommendation_service import rank_recommendations
-from ..services import ai_poi_service, vote_service, notification_service, group_service
+from ..services import ai_poi_service, vote_service, notification_service, group_service, place_enrichment_service, place_image_assets
 from ..schemas.trips import (
     TripResponse,
     CreateTripRequest,
@@ -272,7 +272,9 @@ async def get_public_trip_itinerary(trip_id: str):
             days_dict[day_idx]["total_cost"] += activity_cost
             duration = _duration_minutes(activity.get("start_time"), activity.get("end_time")) or 0
             days_dict[day_idx]["total_duration_minutes"] += duration
-            days_dict[day_idx]["activities"].append(activity)
+            days_dict[day_idx]["activities"].append(
+                _activity_with_media(activity, trip.get("destination") or trip.get("location") or "", place_data)
+            )
         
         days = [days_dict[k] for k in sorted(days_dict.keys())]
         
@@ -1140,7 +1142,13 @@ async def get_itinerary(
                 "latitude": place_data.get("latitude") if place_data else item.get("latitude"),
                 "longitude": place_data.get("longitude") if place_data else item.get("longitude"),
             }
-            days_dict[day_idx]["activities"].append(activity)
+            days_dict[day_idx]["activities"].append(
+                _activity_with_media(
+                    activity,
+                    (trip.get("destination") or trip.get("location") or ""),
+                    place_data,
+                )
+            )
         
         days = [days_dict[k] for k in sorted(days_dict.keys())]
         
@@ -1375,7 +1383,55 @@ def _opening_hours_dict(value: Any) -> dict | None:
     return None
 
 
+def _poi_with_media(poi: dict, destination: str) -> dict:
+    """Attach cached Google or bundled fallback images to a POI dict."""
+    city = (poi.get("city") or destination or "").strip()
+    merged = dict(poi)
+    if city:
+        enriched_rows = place_enrichment_service.merge_pois_with_cached_enrichments([merged], city)
+        if enriched_rows:
+            merged = enriched_rows[0]
+    return place_image_assets.apply_bundled_images(merged)
+
+
+def _activity_with_media(
+    activity: dict,
+    destination: str,
+    place_data: dict | None = None,
+) -> dict:
+    """Ensure itinerary activities expose a usable photo/image for the client."""
+    enriched_activity = dict(activity)
+    source = dict(place_data or {})
+    source.setdefault("name", enriched_activity.get("name"))
+    source.setdefault("city", destination)
+
+    photo_url = (
+        enriched_activity.get("photo_url")
+        or enriched_activity.get("image_url")
+        or source.get("image_url")
+        or source.get("photo_url")
+    )
+    images = enriched_activity.get("images") or source.get("images")
+    image_asset = enriched_activity.get("image_asset") or source.get("image_asset")
+
+    if not photo_url:
+        bundled = place_image_assets.apply_bundled_images(source)
+        photo_url = bundled.get("image_url")
+        images = images or bundled.get("images")
+        image_asset = image_asset or bundled.get("image_asset")
+
+    if photo_url:
+        enriched_activity["photo_url"] = photo_url
+        enriched_activity["image_url"] = photo_url
+    if images:
+        enriched_activity["images"] = images
+    if image_asset:
+        enriched_activity["image_asset"] = image_asset
+    return enriched_activity
+
+
 def _recommendation_poi_response(poi: dict, destination: str) -> POIResponse:
+    poi = _poi_with_media(poi, destination)
     latitude = _as_float(poi.get("latitude") or poi.get("lat"))
     longitude = _as_float(poi.get("longitude") or poi.get("lng") or poi.get("lon"))
     coordinates = poi.get("coordinates")
@@ -1705,6 +1761,8 @@ async def get_trip_starter_plan(
                 preferences_source=preferences_source,
             )
 
+        pois = place_enrichment_service.merge_pois_with_cached_enrichments(pois, destination)
+
         ranked = rank_recommendations(pois, preferences or {}, trip, limit=limit)
         scheduler_places = [
             _starter_scheduler_place(poi, score)
@@ -1750,6 +1808,7 @@ async def get_trip_starter_plan(
                     "rating": poi_response.rating,
                     "user_ratings_total": poi_response.user_ratings_total,
                     "photo_url": poi_response.image_url,
+                    "image_url": poi_response.image_url,
                     "fsq_id": poi.get("fsq_id"),
                     "external_place_id": poi_response.external_place_id,
                     "address": poi_response.address,
@@ -1844,6 +1903,8 @@ async def get_trip_recommendations(
 
         if not pois:
             return []
+
+        pois = place_enrichment_service.merge_pois_with_cached_enrichments(pois, destination)
 
         ranked = rank_recommendations(
             pois,

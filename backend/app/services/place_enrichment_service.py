@@ -21,7 +21,7 @@ from fastapi import HTTPException, status
 from ..config import get_settings
 from ..database import get_supabase_admin_client
 from ..schemas.places import PlaceDetailsResponse, PlaceDetailsResult, PlacePhoto
-from . import ai_poi_service, google_places_service
+from . import ai_poi_service, google_places_service, place_image_assets
 
 logger = logging.getLogger(__name__)
 
@@ -260,7 +260,7 @@ def merge_place_with_enrichment(place: Dict[str, Any], enrichment: Optional[Dict
     if not enrichment:
         place.setdefault("images", [])
         place.setdefault("cache_status", "missing")
-        return place
+        return place_image_assets.apply_bundled_images(place)
 
     images = enrichment.get("images") or []
     image_url = _safe_text(enrichment.get("image_url")) or _first_image_url(images) or _safe_text(place.get("image_url"))
@@ -293,7 +293,7 @@ def merge_place_with_enrichment(place: Dict[str, Any], enrichment: Optional[Dict
     }
     if "geometry" not in merged and merged.get("latitude") is not None and merged.get("longitude") is not None:
         merged["geometry"] = {"lat": merged["latitude"], "lng": merged["longitude"]}
-    return merged
+    return place_image_assets.apply_bundled_images(merged)
 
 
 def merge_pois_with_cached_enrichments(pois: List[Dict[str, Any]], city: str) -> List[Dict[str, Any]]:
