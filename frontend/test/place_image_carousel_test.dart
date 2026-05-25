@@ -32,4 +32,14 @@ void main() {
     expect(images, hasLength(1));
     expect(images.single.url, 'https://example.com/legacy.jpg');
   });
+
+  test('placeImagesFromMap includes bundled image_asset', () {
+    final images = placeImagesFromMap({
+      'image_asset': 'assets/images/places/dammam_corniche.jpg',
+    });
+
+    expect(images, hasLength(1));
+    expect(images.single.url, 'assets/images/places/dammam_corniche.jpg');
+    expect(isBundledPlaceImageUrl(images.single.url), isTrue);
+  });
 }

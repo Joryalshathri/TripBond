@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '../services/user_service.dart';
 import '../services/trip_service.dart';
+import 'chat_screen.dart';
 
 class UserProfileView extends StatefulWidget {
   final String userId;
@@ -184,6 +185,18 @@ class _UserProfileViewState extends State<UserProfileView> {
     }
   }
 
+  void _openChat() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ChatConversationScreen(
+          otherUserId: widget.userId,
+          otherUserName: widget.userName,
+        ),
+      ),
+    );
+  }
+
   Uint8List? _decodeDataUrlImage(String? value) {
     if (value == null) return null;
     final raw = value.trim();
@@ -357,16 +370,18 @@ class _UserProfileViewState extends State<UserProfileView> {
                         ),
                       ),
                       const SizedBox(width: 12),
-                      // Bond Button
+                      // Bond / Message Button
                       Expanded(
                         child: ElevatedButton(
-                          onPressed: (_isBondLoading || _isBonded)
+                          onPressed: _isBondLoading
                               ? null
-                              : _toggleBond,
+                              : (_isBonded ? _openChat : _toggleBond),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: (_bondRequestPending || _isBonded)
-                                ? Colors.grey[300]
-                                : const Color(0xFFC8A858),
+                            backgroundColor: _isBonded
+                                ? const Color(0xFF4675B8)
+                                : ((_bondRequestPending || _isBonded)
+                                    ? Colors.grey[300]
+                                    : const Color(0xFFC8A858)),
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(20),
@@ -379,7 +394,8 @@ class _UserProfileViewState extends State<UserProfileView> {
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
                                     valueColor: AlwaysStoppedAnimation<Color>(
-                                      (_bondRequestPending || _isBonded)
+                                      (_bondRequestPending || _isBonded) &&
+                                              !_isBonded
                                           ? Colors.black
                                           : Colors.white,
                                     ),
@@ -387,7 +403,7 @@ class _UserProfileViewState extends State<UserProfileView> {
                                 )
                               : Text(
                                   _isBonded
-                                      ? 'Bonded'
+                                      ? 'Message'
                                       : (_bondRequestStatus ==
                                               'pending_received'
                                           ? 'Accept Bond'
@@ -397,9 +413,11 @@ class _UserProfileViewState extends State<UserProfileView> {
                                   style: TextStyle(
                                     fontFamily: 'Poppins',
                                     fontWeight: FontWeight.w600,
-                                    color: (_bondRequestPending || _isBonded)
-                                        ? Colors.black
-                                        : Colors.white,
+                                    color: _isBonded
+                                        ? Colors.white
+                                        : ((_bondRequestPending || _isBonded)
+                                            ? Colors.black
+                                            : Colors.white),
                                   ),
                                 ),
                         ),

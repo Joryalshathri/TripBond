@@ -12,6 +12,7 @@ import '../services/vote_service.dart';
 import '../providers/user_provider.dart';
 import '../widgets/place_image_carousel.dart';
 import '../widgets/app_bottom_nav.dart';
+import '../utils/place_navigation.dart';
 import 'voting_screen.dart';
 import 'trip_join_requests_screen.dart';
 
@@ -773,109 +774,50 @@ class _GroupSuggestedItineraryState extends State<GroupSuggestedItinerary> {
 
   void _showActivityDetail(
       BuildContext context, Map<String, dynamic> activity) {
-    final name =
-        (activity['name'] ?? activity['title'] ?? 'Activity').toString();
-    final location = (activity['address'] ??
-            activity['location'] ??
-            widget.destination ??
-            '')
-        .toString();
-    final start = (activity['start_time'] ?? '').toString();
-    final end = (activity['end_time'] ?? '').toString();
-    final score = activity['score'];
-    final notes = activity['notes']?.toString();
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    name,
-                    style: const TextStyle(
-                        fontSize: 22, fontWeight: FontWeight.w700),
-                  ),
+    final extraActions = isEditMode && activity['id'] != null
+        ? <Widget>[
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _showRescheduleSheet(activity);
+                },
+                icon: const Icon(Icons.settings_outlined),
+                label: const Text('Move to another day or time'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF4675B8),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ],
+              ),
             ),
-            const SizedBox(height: 12),
-            if (location.isNotEmpty)
-              Row(
-                children: [
-                  Icon(Icons.location_on, size: 16, color: Colors.grey[600]),
-                  const SizedBox(width: 6),
-                  Expanded(
-                      child:
-                          Text(location, style: const TextStyle(fontSize: 14))),
-                ],
-              ),
-            const SizedBox(height: 8),
-            if (score is num)
-              Row(
-                children: [
-                  const Icon(Icons.star, size: 16, color: Color(0xFFC8A858)),
-                  const SizedBox(width: 6),
-                  Text('${score.toStringAsFixed(1)} score',
-                      style: const TextStyle(fontSize: 14)),
-                ],
-              ),
-            const SizedBox(height: 8),
-            if (start.isNotEmpty)
-              Text('$start - $end',
-                  style: const TextStyle(fontSize: 14, color: Colors.grey)),
-            if (notes != null && notes.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(notes, style: const TextStyle(fontSize: 13)),
-            ],
-            const SizedBox(height: 24),
-            if (isEditMode && activity['id'] != null) ...[
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    _showRescheduleSheet(activity);
-                  },
-                  icon: const Icon(Icons.drive_file_move_outline),
-                  label: const Text('Move to another day or time'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF4675B8),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _deleteActivity(activity);
+                },
+                icon: const Icon(Icons.delete_outline),
+                label: const Text('Remove from plan'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
               ),
-              const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    _deleteActivity(activity);
-                  },
-                  icon: const Icon(Icons.delete_outline),
-                  label: const Text('Remove from plan'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
+            ),
+          ]
+        : null;
+
+    openPlacePreviewFromMap(
+      context,
+      activity,
+      tripId: _resolvedTripId ?? widget.tripId,
+      fallbackLocation: widget.destination,
+      extraActions: extraActions,
     );
   }
 
@@ -1560,41 +1502,49 @@ class _PlaceBrowserTile extends StatelessWidget {
       ),
       child: Row(
         children: [
-          ClipRRect(
+          InkWell(
+            onTap: () => openPlacePreviewFromMap(context, place),
             borderRadius: BorderRadius.circular(12),
-            child: SizedBox(
-              width: 76,
-              height: 76,
-              child: images.isNotEmpty
-                  ? PlaceImageCarousel(
-                      images: images,
-                      height: 76,
-                      showAttribution: false,
-                    )
-                  : imageUrl != null
-                      ? Image.network(
-                          imageUrl!,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) =>
-                              const _PlaceImageFallback(),
-                        )
-                      : const _PlaceImageFallback(),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: SizedBox(
+                width: 76,
+                height: 76,
+                child: images.isNotEmpty
+                    ? PlaceImageCarousel(
+                        images: images,
+                        height: 76,
+                        showAttribution: false,
+                      )
+                    : imageUrl != null
+                        ? Image.network(
+                            imageUrl!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) =>
+                                const _PlaceImageFallback(),
+                          )
+                        : const _PlaceImageFallback(),
+              ),
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name.isEmpty ? 'Place' : name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
+            child: InkWell(
+              onTap: () => openPlacePreviewFromMap(context, place),
+              borderRadius: BorderRadius.circular(8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  PlaceNameLink(
+                    name: name.isEmpty ? 'Place' : name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    onTap: () => openPlacePreviewFromMap(context, place),
                   ),
-                ),
                 if (location.isNotEmpty) ...[
                   const SizedBox(height: 4),
                   Text(
@@ -1633,6 +1583,7 @@ class _PlaceBrowserTile extends StatelessWidget {
                 ),
               ],
             ),
+          ),
           ),
           IconButton(
             icon: const Icon(Icons.add_circle, color: Color(0xFF4675B8)),
@@ -1833,7 +1784,7 @@ class _CalendarItineraryCard extends StatelessWidget {
             child: GestureDetector(
               onTap: onMove,
               child: const Icon(
-                Icons.drive_file_move_outline,
+                Icons.settings_outlined,
                 color: Color.fromARGB(255, 0, 0, 0),
                 size: 20,
               ),

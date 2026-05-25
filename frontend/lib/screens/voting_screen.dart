@@ -3,6 +3,7 @@ import '../services/trip_service.dart';
 import '../services/vote_service.dart';
 import '../services/auth_service.dart';
 import '../widgets/place_image_carousel.dart';
+import '../utils/place_navigation.dart';
 
 class VotingScreen extends StatefulWidget {
   final String tripId;
@@ -240,31 +241,46 @@ class _VotingScreenState extends State<VotingScreen> {
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                SizedBox(
-                  width: 60,
-                  child: PlaceImageCarousel(
-                    images: images,
-                    height: 60,
-                    borderRadius: BorderRadius.circular(8),
-                    showAttribution: false,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => openPlacePreviewFromMap(
+          context,
+          place,
+          tripId: widget.tripId,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  SizedBox(
+                    width: 60,
+                    child: PlaceImageCarousel(
+                      images: images,
+                      height: 60,
+                      borderRadius: BorderRadius.circular(8),
+                      showAttribution: false,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        (place['name'] ?? 'Place').toString(),
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                      ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        PlaceNameLink(
+                          name: (place['name'] ?? 'Place').toString(),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                          onTap: () => openPlacePreviewFromMap(
+                            context,
+                            place,
+                            tripId: widget.tripId,
+                          ),
+                        ),
                       if ((place['address'] ?? '').toString().isNotEmpty)
                         Text(
                           place['address'].toString(),
@@ -314,6 +330,7 @@ class _VotingScreenState extends State<VotingScreen> {
             ),
           ],
         ),
+      ),
       ),
     );
   }

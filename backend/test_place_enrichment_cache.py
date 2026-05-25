@@ -45,7 +45,10 @@ def test_merge_place_with_enrichment_prefers_cached_gallery():
 
 
 def test_merge_place_without_enrichment_marks_missing_cache():
-    merged = place_enrichment_service.merge_place_with_enrichment({"name": "A"}, None)
+    merged = place_enrichment_service.merge_place_with_enrichment(
+        {"name": "Dammam Corniche", "city": "Dammam"},
+        None,
+    )
 
-    assert merged["images"] == []
+    assert merged["image_asset"] == "assets/images/places/dammam_corniche.jpg"
     assert merged["cache_status"] == "missing"

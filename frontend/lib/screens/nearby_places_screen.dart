@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/places_service.dart';
 import '../models/place_model.dart';
 import '../widgets/place_image_carousel.dart';
+import '../utils/place_navigation.dart';
 
 class NearbyPlacesScreen extends StatefulWidget {
   final double latitude;
@@ -229,7 +230,7 @@ class _NearbyPlacesScreenState extends State<NearbyPlacesScreen> {
               ],
             ),
             trailing: const Icon(Icons.location_on),
-            onTap: () => _showPlaceDetails(place),
+            onTap: () => openPlacePreviewFromResult(context, place),
           ),
         ],
       ),
@@ -257,59 +258,6 @@ class _NearbyPlacesScreenState extends State<NearbyPlacesScreen> {
 
   double _degreesToRadians(double degrees) =>
       degrees * (3.141592653589793 / 180);
-
-  void _showPlaceDetails(PlaceResult place) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(place.name),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (place.formattedAddress != null) ...[
-                const Text('Address:',
-                    style: TextStyle(fontWeight: FontWeight.bold)),
-                Text(place.formattedAddress!),
-                const SizedBox(height: 16),
-              ],
-              if (place.geometry != null) ...[
-                const Text('Coordinates:',
-                    style: TextStyle(fontWeight: FontWeight.bold)),
-                Text(
-                    '${place.geometry!.lat.toStringAsFixed(4)}, ${place.geometry!.lng.toStringAsFixed(4)}'),
-                const SizedBox(height: 16),
-              ],
-              if (place.rating != null) ...[
-                const Text('Rating:',
-                    style: TextStyle(fontWeight: FontWeight.bold)),
-                Text(
-                    '${place.rating} ${place.userRatingsTotal != null ? '(${place.userRatingsTotal} reviews)' : ''}'),
-                const SizedBox(height: 16),
-              ],
-              if (place.types.isNotEmpty) ...[
-                const Text('Types:',
-                    style: TextStyle(fontWeight: FontWeight.bold)),
-                Wrap(
-                  spacing: 8,
-                  children: place.types
-                      .map((type) => Chip(label: Text(type)))
-                      .toList(),
-                ),
-              ],
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 // Simple Math class to avoid dependency

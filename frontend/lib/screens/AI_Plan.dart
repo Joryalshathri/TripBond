@@ -10,6 +10,7 @@ import '../services/trip_service.dart';
 import '../providers/user_provider.dart';
 import '../widgets/place_image_carousel.dart';
 import '../widgets/app_bottom_nav.dart';
+import '../utils/place_navigation.dart';
 
 class Place {
   final String name;
@@ -63,7 +64,7 @@ final List<Map<String, dynamic>> _fallbackItinerary = [
     'places': [
       const Place(
           name: 'Ajdan Walk',
-          image: 'assets/images/cities/Khobar2.png',
+          image: 'assets/images/cities/khobar2.png',
           rating: 4.3,
           location: 'Alkurnaish'),
       const Place(
@@ -290,13 +291,16 @@ class _AI_PlanState extends State<AI_Plan> {
           if (item is! Map<String, dynamic>) continue;
 
           final images = placeImagesFromMap(item);
-          final photoUrl = item['photo_url'] ?? item['image_url'];
-          final imageToUse =
-              (photoUrl != null && photoUrl.toString().isNotEmpty)
-                  ? photoUrl.toString()
-                  : images.isNotEmpty
-                      ? images.first.url
-                  : 'assets/images/places/Ithra.png';
+          final photoUrl = (item['photo_url'] ?? item['image_url'])?.toString();
+          final imageAsset = (item['image_asset'] ?? '').toString();
+          final imageToUse = [
+            if (photoUrl != null && photoUrl.isNotEmpty) photoUrl,
+            if (images.isNotEmpty) images.first.url,
+            if (imageAsset.isNotEmpty) imageAsset,
+          ].firstWhere(
+            (url) => url.isNotEmpty,
+            orElse: () => 'assets/images/icons/logo.png',
+          );
 
           places.add(
             Place(
@@ -310,9 +314,11 @@ class _AI_PlanState extends State<AI_Plan> {
               location:
                   (item['location'] ?? item['notes'] ?? _activeDestination)
                       .toString(),
-              photoUrl: photoUrl != null ? photoUrl.toString() : null,
+              photoUrl: (photoUrl != null && photoUrl.isNotEmpty) ? photoUrl : null,
               fsqId: item['fsq_id']?.toString(),
-              images: images,
+              images: images.isNotEmpty
+                  ? images
+                  : [PlaceImageData(url: imageToUse)],
             ),
           );
         }
@@ -592,74 +598,32 @@ class _AI_PlanState extends State<AI_Plan> {
     );
   }
 
-  void _showPlaceModal(BuildContext context, Place place) {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  place.name,
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Icon(Icons.location_on, size: 16, color: Colors.grey[600]),
-                const SizedBox(width: 6),
-                Text(place.location, style: const TextStyle(fontSize: 14)),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Icon(Icons.star, size: 16, color: const Color(0xFFC8A858)),
-                const SizedBox(width: 6),
-                Text(
-                  '${place.rating.toStringAsFixed(1)} rating',
-                  style: const TextStyle(fontSize: 14),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Added ${place.name} to favorites'),
-                      duration: const Duration(seconds: 2),
-                    ),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF4675B8),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
-                child: const Text('Save Place'),
-              ),
-            ),
-          ],
-        ),
+  void _showPlacePreview(BuildContext context, Place place) {
+    openPlacePreview(
+      context,
+      data: PlacePreviewData(
+        name: place.name,
+        location: place.location,
+        rating: place.rating,
+        placeId: place.externalPlaceId ?? place.fsqId,
+        latitude: place.latitude,
+        longitude: place.longitude,
+        sourceMap: {
+          'name': place.name,
+          'address': place.location,
+          'rating': place.rating,
+          'external_place_id': place.externalPlaceId,
+          'fsq_id': place.fsqId,
+          'latitude': place.latitude,
+          'longitude': place.longitude,
+          'photo_url': place.photoUrl,
+          'image_url': place.image,
+          'images': place.images
+              .map((image) => {'url': image.url, 'attributions': image.attributions})
+              .toList(),
+        },
       ),
+      tripId: widget.tripId,
     );
   }
 
@@ -703,7 +667,7 @@ class _AI_PlanState extends State<AI_Plan> {
                   child: AbsorbPointer(
                     absorbing: isDeleted,
                     child: GestureDetector(
-                      onTap: () => _showPlaceModal(context, place),
+                      onTap: () => _showPlacePreview(context, place),
                       child: _PlaceCard(
                         place: place,
                         showDelete: isEditMode && !isDeleted,
@@ -868,48 +832,27 @@ class _PlaceCard extends StatelessWidget {
   }
 
   Widget _buildPlaceImage(Place place, double width, double height) {
-    final images = place.images.isNotEmpty
-        ? place.images
-        : (place.photoUrl != null && place.photoUrl!.startsWith('http')
-            ? [PlaceImageData(url: place.photoUrl!)]
-            : <PlaceImageData>[]);
-
-    if (images.isNotEmpty) {
-      return SizedBox(
-        width: width,
-        child: PlaceImageCarousel(
-          images: images,
-          height: height,
-          showAttribution: images.isNotEmpty,
-        ),
-      );
-    } else if (place.image.startsWith('http')) {
-      return Image.network(
-        place.image,
-        width: width,
-        height: height,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) =>
-            _buildPlaceholderImage(width, height),
-      );
-    } else {
-      return Image.asset(
-        place.image,
-        width: width,
-        height: height,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) =>
-            _buildPlaceholderImage(width, height),
-      );
+    final resolved = <PlaceImageData>[
+      ...place.images.where((image) => image.url.isNotEmpty),
+    ];
+    if (resolved.isEmpty &&
+        place.photoUrl != null &&
+        place.photoUrl!.isNotEmpty) {
+      resolved.add(PlaceImageData(url: place.photoUrl!));
     }
-  }
+    if (resolved.isEmpty && place.image.isNotEmpty) {
+      resolved.add(PlaceImageData(url: place.image));
+    }
 
-  Widget _buildPlaceholderImage(double width, double height) {
-    return Container(
+    return SizedBox(
       width: width,
       height: height,
-      color: const Color(0xFF4675B8),
-      child: const Icon(Icons.place, size: 40, color: Colors.white),
+      child: PlaceImageCarousel(
+        images: resolved,
+        height: height,
+        showAttribution: resolved.isNotEmpty &&
+            resolved.any((image) => image.url.startsWith('http')),
+      ),
     );
   }
 }

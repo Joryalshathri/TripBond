@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/user_provider.dart';
+import '../utils/place_navigation.dart';
 
 class BondersSuggestions extends StatefulWidget {
   final List<Map<String, dynamic>> suggestions;
@@ -144,14 +145,21 @@ class _BondersSuggestionsState extends State<BondersSuggestions> {
                                       mainAxisAlignment:
                                           MainAxisAlignment.spaceBetween,
                                       children: [
-                                        Text(s['name'] as String,
-                                            style: TextStyle(
-                                                fontFamily: 'Poppins',
-                                                fontWeight: FontWeight.w700,
-                                                fontSize: 16,
-                                                color: isHighlight
-                                                    ? Colors.white
-                                                    : Colors.black)),
+                                        PlaceNameLink(
+                                          name: s['name'] as String,
+                                          style: TextStyle(
+                                            fontFamily: 'Poppins',
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 16,
+                                          ),
+                                          linkColor: isHighlight
+                                              ? Colors.white
+                                              : const Color(0xFF4675B8),
+                                          onTap: () => openPlacePreviewFromMap(
+                                            context,
+                                            Map<String, dynamic>.from(s),
+                                          ),
+                                        ),
                                         Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/chat_service.dart';
+import '../services/auth_service.dart';
+import '../services/bonder_service.dart';
+import '../widgets/start_conversation_sheet.dart';
 import 'user_profile_view.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -37,6 +40,25 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  void _openConversation(BonderItem friend) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ChatConversationScreen(
+          otherUserId: friend.id,
+          otherUserName: friend.name,
+        ),
+      ),
+    ).then((_) => _loadConversations());
+  }
+
+  void _showStartConversationSheet() {
+    showStartConversationSheet(
+      context,
+      onFriendSelected: _openConversation,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -45,6 +67,22 @@ class _ChatScreenState extends State<ChatScreen> {
         title: const Text('Messages'),
         backgroundColor: const Color(0xFF4675B8),
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.edit_outlined),
+            tooltip: 'Start a conversation',
+            onPressed: _showStartConversationSheet,
+          ),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _showStartConversationSheet,
+        backgroundColor: const Color(0xFF4675B8),
+        icon: const Icon(Icons.edit_outlined, color: Colors.white),
+        label: const Text(
+          'New message',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+        ),
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -79,10 +117,25 @@ class _ChatScreenState extends State<ChatScreen> {
                               color: Colors.grey[600],
                             ),
                           ),
+                          const SizedBox(height: 20),
+                          ElevatedButton.icon(
+                            onPressed: _showStartConversationSheet,
+                            icon: const Icon(Icons.edit_outlined),
+                            label: const Text('Start a conversation'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF4675B8),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                                vertical: 12,
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     )
                   : ListView.builder(
+                      padding: const EdgeInsets.only(bottom: 88),
                       itemCount: conversations.length,
                       itemBuilder: (context, index) {
                         final conversation = conversations[index];
@@ -219,8 +272,10 @@ class ChatConversationScreen extends StatefulWidget {
 
 class _ChatConversationScreenState extends State<ChatConversationScreen> {
   final _chatService = ChatService();
+  final _authService = AuthService();
   final _messageController = TextEditingController();
   List<ChatMessage> messages = [];
+  String? _currentUserId;
   bool isLoading = true;
   bool isSending = false;
 
@@ -233,10 +288,13 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   Future<void> _loadMessages() async {
     try {
       setState(() => isLoading = true);
+      final userId = await _authService.getUserId();
       final msgs = await _chatService.getMessagesWithUser(
         widget.otherUserId,
       );
+      await _chatService.markMessagesAsRead(widget.otherUserId);
       setState(() {
+        _currentUserId = userId;
         messages = msgs;
         isLoading = false;
       });
@@ -336,33 +394,12 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                         itemCount: messages.length,
                         itemBuilder: (context, index) {
                           final message = messages[messages.length - 1 - index];
-                          return _MessageBubble(message: message);
+                          return _MessageBubble(
+                            message: message,
+                            currentUserId: _currentUserId,
+                          );
                         },
                       ),
-          ),
-          // View Profile Button
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => UserProfileView(
-                      userId: widget.otherUserId,
-                      userName: widget.otherUserName,
-                    ),
-                  ),
-                ),
-                icon: const Icon(Icons.person),
-                label: Text('View ${widget.otherUserName}\'s Profile'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF4675B8),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
-              ),
-            ),
           ),
           Container(
             padding: const EdgeInsets.all(16),
@@ -419,12 +456,17 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
 
 class _MessageBubble extends StatelessWidget {
   final ChatMessage message;
+  final String? currentUserId;
 
-  const _MessageBubble({required this.message});
+  const _MessageBubble({
+    required this.message,
+    required this.currentUserId,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final isSent = message.senderId == message.senderId; // Placeholder logic
+    final isSent =
+        currentUserId != null && message.senderId == currentUserId;
     return Align(
       alignment: isSent ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(

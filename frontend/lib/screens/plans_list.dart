@@ -7,6 +7,7 @@ import '../providers/user_provider.dart';
 import '../services/city_service.dart';
 import '../state/trip_creation_state.dart';
 import '../widgets/app_bottom_nav.dart';
+import '../widgets/place_image_carousel.dart';
 import 'AI_Plan.dart';
 import 'bonder.dart';
 import 'DatesPage.dart';
@@ -464,15 +465,10 @@ class _PlansListState extends State<PlansList> {
   }
 
   Widget _defaultTripImage() {
-    return Container(
+    return SizedBox(
       width: 90,
       height: 90,
-      color: const Color(0xFF4675B8).withValues(alpha: 0.1),
-      child: const Icon(
-        Icons.travel_explore,
-        size: 40,
-        color: Color(0xFF4675B8),
-      ),
+      child: buildPlaceImagePlaceholder(iconSize: 40),
     );
   }
 
@@ -751,14 +747,7 @@ class _CityCardState extends State<_CityCard>
   }
 
   Widget _placeholder() {
-    final hue = (widget.city.name.hashCode % 360).abs().toDouble();
-    final color = HSLColor.fromAHSL(1.0, hue, 0.45, 0.55).toColor();
-    return Container(
-      color: color,
-      child: const Center(
-        child: Icon(Icons.location_city, color: Colors.white, size: 48),
-      ),
-    );
+    return buildPlaceImagePlaceholder(iconSize: 48);
   }
 }
 
